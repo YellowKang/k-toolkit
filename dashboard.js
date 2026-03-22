@@ -429,12 +429,19 @@ function init() {
 function initTopbarClock() {
   const el = document.getElementById('topbarClock');
   if (!el) return;
+  const DAYS_ZH = ['日','一','二','三','四','五','六'];
+  const DAYS_EN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   function tick() {
     const now = new Date();
     const h = String(now.getHours()).padStart(2,'0');
     const m = String(now.getMinutes()).padStart(2,'0');
     const s = String(now.getSeconds()).padStart(2,'0');
-    el.textContent = `${h}:${m}:${s}`;
+    const lang = typeof getCurrentLang === 'function' ? getCurrentLang() : 'zh';
+    const day = lang === 'zh' ? `周${DAYS_ZH[now.getDay()]}` : DAYS_EN[now.getDay()];
+    const mo = String(now.getMonth()+1).padStart(2,'0');
+    const d = String(now.getDate()).padStart(2,'0');
+    const dateStr = lang === 'zh' ? `${mo}/${d} ${day}` : `${day} ${mo}/${d}`;
+    el.innerHTML = `<span class="topbar-clock-time">${h}:${m}:${s}</span><span class="topbar-clock-date">${dateStr}</span>`;
   }
   tick();
   setInterval(tick, 1000);
@@ -531,7 +538,9 @@ let _searchTimer = null;
 
 function handleSearch(val) {
   const clearBtn = document.getElementById('searchClear');
+  const kbdHint = document.getElementById('searchKbdHint');
   if (clearBtn) clearBtn.style.display = val.trim() ? '' : 'none';
+  if (kbdHint) kbdHint.style.display = val.trim() ? 'none' : '';
   clearTimeout(_searchTimer);
   _searchTimer = setTimeout(() => {
     searchQuery = val.trim().toLowerCase();
@@ -657,6 +666,8 @@ function clearSearch() {
   searchQuery = '';
   const clearBtn = document.getElementById('searchClear');
   if (clearBtn) clearBtn.style.display = 'none';
+  const kbdHint = document.getElementById('searchKbdHint');
+  if (kbdHint) kbdHint.style.display = '';
   hideSearchDropdown();
 }
 
