@@ -7,6 +7,14 @@
 [![GitHub Pages](https://img.shields.io/badge/demo-GitHub%20Pages-blue)](https://yellowkang.github.io/k-toolkit/)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)](#docker)
 
+K Toolkit 是一个面向开发者的在线工具集合，涵盖文本处理、编码加密、CSS、图片、网络、时间、效率等 10 大分类共 92 个工具。
+所有工具均运行在浏览器本地，无需服务器，无需登录，数据不离开你的设备。
+
+K Toolkit is an online toolbox for developers, covering 92 tools across 10 categories including text processing, encoding/encryption, CSS, image, network, time, and productivity.
+All tools run locally in the browser — no server, no login, your data never leaves your device.
+
+**在线体验 / Live Demo：[https://yellowkang.github.io/k-toolkit/](https://yellowkang.github.io/k-toolkit/)**
+
 ## 工具列表 / Tools
 
 | 分类 | 工具 |
