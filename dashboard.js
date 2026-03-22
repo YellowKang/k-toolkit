@@ -717,19 +717,19 @@ function renderSearchResults(q) {
 
 // ── 主题 ──
 const THEMES = [
-  { key: 'dark',      name: t('theme_dark'),      color: '#8b5cf6', border: '#a78bfa' },
-  { key: 'light',     name: t('theme_light'),     color: '#ede9fe', border: '#6d28d9' },
-  { key: 'tech-blue', name: t('theme_tech_blue'), color: '#60a5fa', border: '#bfdbfe' },
-  { key: 'sakura',    name: t('theme_sakura'),    color: '#ec4899', border: '#f9a8d4' },
-  { key: 'orange',    name: t('theme_orange'),    color: '#f97316', border: '#fdba74' },
-  { key: 'green',     name: t('theme_green'),     color: '#10b981', border: '#6ee7b7' },
+  { key: 'dark',      i18n: 'theme_dark',      color: '#8b5cf6', border: '#a78bfa' },
+  { key: 'light',     i18n: 'theme_light',     color: '#ede9fe', border: '#6d28d9' },
+  { key: 'tech-blue', i18n: 'theme_tech_blue', color: '#60a5fa', border: '#bfdbfe' },
+  { key: 'sakura',    i18n: 'theme_sakura',    color: '#ec4899', border: '#f9a8d4' },
+  { key: 'orange',    i18n: 'theme_orange',    color: '#f97316', border: '#fdba74' },
+  { key: 'green',     i18n: 'theme_green',     color: '#10b981', border: '#6ee7b7' },
 ];
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', theme);
-  const t = THEMES.find(t => t.key === theme) || THEMES[0];
+  const th = THEMES.find(th => th.key === theme) || THEMES[0];
   const btn = document.getElementById('themeBtn');
-  if (btn) btn.innerHTML = `<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${t.color};border:2.5px solid ${t.border};box-shadow:0 0 8px ${t.color},0 0 2px ${t.border};vertical-align:middle;flex-shrink:0"></span><span style="font-size:11px;margin-left:6px;color:var(--text);vertical-align:middle;font-weight:500">${t.name}</span>`;
+  if (btn) btn.innerHTML = `<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${th.color};border:2.5px solid ${th.border};box-shadow:0 0 8px ${th.color},0 0 2px ${th.border};vertical-align:middle;flex-shrink:0"></span><span style="font-size:11px;margin-left:6px;color:var(--text);vertical-align:middle;font-weight:500">${t(th.i18n)}</span>`;
 }
 
 function toggleTheme() {
@@ -742,13 +742,13 @@ function openThemePicker() {
   picker = document.createElement('div');
   picker.id = 'themePicker';
   picker.style.cssText = 'position:absolute;top:calc(100% + 8px);right:0;background:var(--sidebar-bg);border:1px solid var(--border);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:4px;min-width:160px;z-index:9999;backdrop-filter:blur(24px);box-shadow:0 16px 48px rgba(0,0,0,0.4)';
-  THEMES.forEach(t => {
+  THEMES.forEach(th => {
     const item = document.createElement('div');
-    item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;font-size:13px;color:var(--text);transition:background 0.15s' + (t.key === theme ? ';background:var(--surface);outline:1px solid var(--accent)' : '');
-    item.innerHTML = `<span style="width:14px;height:14px;border-radius:50%;background:${t.color};flex-shrink:0;display:inline-block"></span>${t.name}`;
-    item.onmouseenter = () => { if (t.key !== theme) item.style.background = 'var(--surface-hover)'; };
-    item.onmouseleave = () => { if (t.key !== theme) item.style.background = ''; };
-    item.onclick = () => { theme = t.key; LS.set('dtb_theme', theme); applyTheme(); picker.remove(); };
+    item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;font-size:13px;color:var(--text);transition:background 0.15s' + (th.key === theme ? ';background:var(--surface);outline:1px solid var(--accent)' : '');
+    item.innerHTML = `<span style="width:14px;height:14px;border-radius:50%;background:${th.color};flex-shrink:0;display:inline-block"></span>${t(th.i18n)}`;
+    item.onmouseenter = () => { if (th.key !== theme) item.style.background = 'var(--surface-hover)'; };
+    item.onmouseleave = () => { if (th.key !== theme) item.style.background = ''; };
+    item.onclick = () => { theme = th.key; LS.set('dtb_theme', theme); applyTheme(); picker.remove(); };
     picker.appendChild(item);
   });
   const wrap = document.getElementById('themeBtn').parentElement;
