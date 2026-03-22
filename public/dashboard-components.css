@@ -944,3 +944,52 @@ select.tool-input { cursor: pointer; }
   /* 相关工具 section */
   .related-tools .tools-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ── Topbar 时钟 ── */
+.topbar-clock {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 5px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.topbar-clock::before {
+  content: '⏱';
+  font-size: 12px;
+}
+[data-theme="light"] .topbar-clock { background: rgba(0,0,0,0.04); }
+
+/* ── 搜索框增强：左对齐，胶囊风格 ── */
+.search-wrap {
+  flex: 1;
+  max-width: 400px;
+  margin-right: auto;
+}
+.search-input {
+  border-radius: 20px;
+  padding: 8px 36px 8px 38px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--glass-border);
+  transition: all 0.25s ease;
+}
+.search-input:focus {
+  border-radius: 20px;
+  background: rgba(102,126,234,0.08);
+  border-color: rgba(102,126,234,0.6);
+  box-shadow: 0 0 0 3px rgba(102,126,234,0.12), 0 0 24px rgba(102,126,234,0.1);
+}
+
+/* ── home-hero 布局：纵向 ── */
+.home-hero-top {
+  margin-bottom: 16px;
+}

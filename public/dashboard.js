@@ -215,16 +215,14 @@ function renderHomePage(mode) {
       ${topTools.map(tool => `<button class="hero-quick-btn" onclick="navigateTo('${tool.id}')" style="--qc:${tool.color}">${tool.icon} ${tool.name}</button>`).join('')}
     </div>` : '';
   html += `<div class="home-hero">
-    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-      <div>
-        <div class="home-hero-title">🔧 K Toolkit</div>
-        <div class="home-hero-sub">${greeting}，${t('hero_sub', tools.length)}</div>
-      </div>
-      <div class="home-hero-stats" style="margin-left:auto">
-        <div class="home-hero-stat"><strong>${tools.length}</strong>${t('stat_tools')}</div>
-        <div class="home-hero-stat"><strong>${favorites.length || 0}</strong>${t('stat_favs')}</div>
-        <div class="home-hero-stat"><strong>${recent.length || 0}</strong>${t('stat_recent')}</div>
-      </div>
+    <div class="home-hero-top">
+      <div class="home-hero-title">🔧 K Toolkit</div>
+      <div class="home-hero-sub">${greeting}，${t('hero_sub', tools.length)}</div>
+    </div>
+    <div class="home-hero-stats">
+      <div class="home-hero-stat"><strong>${tools.length}</strong>${t('stat_tools')}</div>
+      <div class="home-hero-stat"><strong>${favorites.length || 0}</strong>${t('stat_favs')}</div>
+      <div class="home-hero-stat"><strong>${recent.length || 0}</strong>${t('stat_recent')}</div>
     </div>
     ${topHtml}
   </div>`;
@@ -413,6 +411,7 @@ function init() {
   applySidebarCollapse();
   bindKeyboard();
   initScrollTop();
+  initTopbarClock();
   // 给侧边栏 nav-item 设置 tooltip（折叠态悬停显示）
   document.querySelectorAll('.nav-item[data-page]').forEach(a => {
     const label = a.querySelector('.nav-label');
@@ -424,6 +423,21 @@ function init() {
     const h = location.hash.replace('#', '') || 'home';
     navigateTo(h, false);
   });
+}
+
+// ── 顶部时钟 ──
+function initTopbarClock() {
+  const el = document.getElementById('topbarClock');
+  if (!el) return;
+  function tick() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    el.textContent = `${h}:${m}:${s}`;
+  }
+  tick();
+  setInterval(tick, 1000);
 }
 
 // ── 返回顶部 ──
