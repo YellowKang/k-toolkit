@@ -217,7 +217,7 @@ function renderHomePage(mode) {
   html += `<div class="home-hero">
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
       <div>
-        <div class="home-hero-title">🔧 DevToolbox</div>
+        <div class="home-hero-title">🔧 K Toolkit</div>
         <div class="home-hero-sub">${greeting}，${t('hero_sub', tools.length)}</div>
       </div>
       <div class="home-hero-stats" style="margin-left:auto">
