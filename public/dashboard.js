@@ -717,12 +717,12 @@ function renderSearchResults(q) {
 
 // ── 主题 ──
 const THEMES = [
-  { key: 'dark',      name: '暗夜黑', color: '#8b5cf6', border: '#a78bfa' },
-  { key: 'light',     name: '纯白色', color: '#ede9fe', border: '#6d28d9' },
-  { key: 'tech-blue', name: '科技蓝', color: '#60a5fa', border: '#bfdbfe' },
-  { key: 'sakura',    name: '樱花粉', color: '#ec4899', border: '#f9a8d4' },
-  { key: 'orange',    name: '商务橙', color: '#f97316', border: '#fdba74' },
-  { key: 'green',     name: '清新绿', color: '#10b981', border: '#6ee7b7' },
+  { key: 'dark',      name: t('theme_dark'),      color: '#8b5cf6', border: '#a78bfa' },
+  { key: 'light',     name: t('theme_light'),     color: '#ede9fe', border: '#6d28d9' },
+  { key: 'tech-blue', name: t('theme_tech_blue'), color: '#60a5fa', border: '#bfdbfe' },
+  { key: 'sakura',    name: t('theme_sakura'),    color: '#ec4899', border: '#f9a8d4' },
+  { key: 'orange',    name: t('theme_orange'),    color: '#f97316', border: '#fdba74' },
+  { key: 'green',     name: t('theme_green'),     color: '#10b981', border: '#6ee7b7' },
 ];
 
 function applyTheme() {
