@@ -44,6 +44,7 @@
                     <input type="text" class="search-input" id="searchInput"
                         placeholder="搜索工具... (按 / 聚焦)"
                         oninput="handleSearch(this.value)"
+                        onfocus="if(!this.value.trim())_showSearchHistory()"
                         onkeydown="handleSearchKey(event)">
                     <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">✕</button>
                     <div class="search-kbd-hint" id="searchKbdHint"><kbd class="search-kbd">/</kbd></div>

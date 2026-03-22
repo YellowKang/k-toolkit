@@ -43,18 +43,19 @@
   flex: 1; max-width: 480px; position: relative;
   display: flex; align-items: center;
 }
-.search-icon { position: absolute; left: 12px; font-size: 14px; color: var(--text-muted); pointer-events: none; }
+.search-icon { position: absolute; left: 14px; font-size: 15px; color: var(--text-muted); pointer-events: none; z-index: 1; }
 .search-input {
-  width: 100%; padding: 8px 36px 8px 36px;
+  width: 100%; padding: 9px 60px 9px 42px;
   background: rgba(255,255,255,0.05);
-  border: 1px solid var(--glass-border);
-  border-radius: 10px; color: var(--text); font-size: 14px;
-  transition: all 0.2s; outline: none;
+  border: 1px solid rgba(102,126,234,0.2);
+  border-radius: 22px; color: var(--text); font-size: 13.5px;
+  transition: all 0.25s; outline: none; font-family: inherit;
+  backdrop-filter: blur(8px);
 }
 .search-input:focus {
-  border-color: var(--accent);
+  border-color: rgba(102,126,234,0.55);
   background: rgba(102,126,234,0.08);
-  box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
+  box-shadow: 0 0 0 3px rgba(102,126,234,0.12), 0 4px 20px rgba(102,126,234,0.1);
 }
 .search-input::placeholder { color: var(--text-muted); }
 .search-clear {
@@ -386,32 +387,11 @@ select.tool-input { cursor: pointer; }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── 搜索框增强 ── */
-.search-wrap {
-  flex: 1; max-width: 420px;
-  position: relative;
-  display: flex; align-items: center;
-}
-.search-input {
-  width: 100%;
-  padding: 9px 36px 9px 38px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  color: var(--text); font-size: 13.5px;
-  outline: none; transition: all 0.25s ease;
-  font-family: inherit;
-}
-.search-input::placeholder { color: var(--text-muted); }
-.search-input:focus {
-  background: rgba(102,126,234,0.06);
-  border-color: rgba(102,126,234,0.5);
-  box-shadow: 0 0 0 3px rgba(102,126,234,0.1), 0 0 20px rgba(102,126,234,0.08);
-}
+/* ── 搜索框增强（此处仅覆盖 clear 按钮，主样式在首段）── */
 .search-icon {
-  position: absolute; left: 12px; top: 50%;
+  position: absolute; left: 14px; top: 50%;
   transform: translateY(-50%);
-  font-size: 14px; pointer-events: none;
+  font-size: 15px; pointer-events: none;
   color: var(--text-muted); z-index: 1;
 }
 .search-clear {
