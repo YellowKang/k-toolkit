@@ -205,7 +205,6 @@ function renderHomePage(mode) {
   // 主页 Hero
   const hour = new Date().getHours();
   const greeting = hour < 6 ? t('greet_late') : hour < 12 ? t('greet_morning') : hour < 18 ? t('greet_afternoon') : t('greet_evening');
-  const tools = getLocalizedTools(TOOLS);
   // 热门工具 top5（使用次数）
   const topTools = Object.entries(usageCounts)
     .sort((a,b) => b[1]-a[1]).slice(0,5)
