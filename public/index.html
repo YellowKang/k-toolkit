@@ -46,6 +46,7 @@
                         oninput="handleSearch(this.value)"
                         onkeydown="handleSearchKey(event)">
                     <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">✕</button>
+                    <div class="search-kbd-hint" id="searchKbdHint"><kbd class="search-kbd">/</kbd></div>
                 </div>
                 <div class="topbar-actions">
                     <button class="theme-btn" id="langBtn" onclick="setLang(getCurrentLang()==='zh'?'en':'zh')" style="display:inline-flex;align-items:center;font-size:12px;font-weight:600;min-width:36px;justify-content:center">EN</button>
