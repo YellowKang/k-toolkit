@@ -273,6 +273,8 @@ function setLang(lang) {
   if (inp) inp.placeholder = t('search_placeholder');
   // 重渲染当前页
   if (typeof renderHomePage === 'function') renderHomePage(typeof currentPage !== 'undefined' ? currentPage : 'home');
+  // 重建侧边栏导航（分类名/工具名需要更新）
+  if (typeof buildSidebarNav === 'function') buildSidebarNav();
 }
 
 // ── 获取当前语言下的工具数据（覆盖 name/desc/category）──
