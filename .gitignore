@@ -25,3 +25,6 @@ npm-debug.log*
 
 # Runtime data
 data/
+
+# Design docs (internal only)
+design/
