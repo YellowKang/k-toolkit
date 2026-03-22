@@ -676,8 +676,8 @@ function focusSearch(e) {
   const inp = document.getElementById('searchInput');
   if (inp) {
     inp.focus(); inp.select();
-    // 无内容时展示搜索历史
-    if (!inp.value.trim() && searchHistory.length) _showSearchHistory();
+    // 无内容时展示搜索历史+热门
+    if (!inp.value.trim()) _showSearchHistory();
   }
 }
 
@@ -693,11 +693,44 @@ function _showSearchHistory() {
       if (wrap && !wrap.contains(e.target)) hideSearchDropdown();
     });
   }
-  const items = searchHistory.map(h =>
-    `<div class="sdrop-item" onclick="_useHistory('${escHtml(h)}')"><span style="color:var(--text-muted);margin-right:8px">🕐</span>${escHtml(h)}</div>`
-  ).join('');
-  drop.innerHTML = `<div class="sdrop-header">${t('search_history')}</div>${items}`;
+  const localTools = getLocalizedTools(TOOLS);
+  // 热门工具（使用次数最多的5个）
+  const hotTools = Object.entries(usageCounts)
+    .sort((a,b) => b[1]-a[1]).slice(0,5)
+    .map(([id]) => localTools.find(t => t.id===id)).filter(Boolean);
+  // 若没有使用记录则取最近5个
+  const showHot = hotTools.length ? hotTools : localTools.slice(0,5);
+  let html = '';
+  if (searchHistory.length) {
+    html += `<div class="sdrop-header"><span>${t('search_history')}</span><span class="sdrop-clear-all" onclick="_clearSearchHistory()" style="cursor:pointer;font-size:11px;color:var(--text-muted);padding:2px 6px;border-radius:4px;transition:color 0.15s" onmouseenter="this.style.color='var(--accent)'" onmouseleave="this.style.color='var(--text-muted)'">✕ 清除</span></div>`;
+    searchHistory.forEach((h,i) => {
+      html += `<div class="sdrop-item" onclick="_useHistory('${escHtml(h)}')"><span style="color:var(--text-muted);font-size:12px;margin-right:8px">🕐</span><span style="flex:1">${escHtml(h)}</span><span onclick="event.stopPropagation();_removeSearchHistory(${i})" style="color:var(--text-muted);padding:2px 6px;border-radius:4px;font-size:12px;cursor:pointer" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--text-muted)'">✕</span></div>`;
+    });
+    html += `<div style="height:1px;background:rgba(255,255,255,0.06);margin:6px 8px"></div>`;
+  }
+  html += `<div class="sdrop-header"><span>${searchHistory.length ? '🔥 热门' : '🔥 热门工具'}</span></div>`;
+  showHot.forEach(tool => {
+    html += `<div class="sdrop-item" data-id="${tool.id}" onclick="sdropClick('${tool.id}')">`;
+    html += `<span class="sdrop-icon" style="background:${tool.color}22">${tool.icon}</span>`;
+    html += `<span class="sdrop-info"><span class="sdrop-name">${escHtml(tool.name)}</span><span class="sdrop-desc">${escHtml(tool.desc)}</span></span>`;
+    html += `<span class="sdrop-cat-tag">${escHtml(tool.category)}</span>`;
+    html += `</div>`;
+  });
+  drop.innerHTML = html;
   drop.style.display = '';
+}
+
+function _clearSearchHistory() {
+  searchHistory = [];
+  LS.set('dtb_search_history', []);
+  hideSearchDropdown();
+}
+
+function _removeSearchHistory(idx) {
+  searchHistory.splice(idx, 1);
+  LS.set('dtb_search_history', searchHistory);
+  if (searchHistory.length || Object.keys(usageCounts).length) _showSearchHistory();
+  else hideSearchDropdown();
 }
 
 function _useHistory(q) {
