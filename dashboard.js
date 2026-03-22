@@ -371,20 +371,23 @@ function buildSidebarNav() {
     html += `<a class="nav-item" data-page="${i.page}" href="#${i.page}" data-tooltip="${i.label}"><span class="nav-icon">${i.icon}</span><span class="nav-label">${i.label}</span></a>`;
   });
   html += '</div><div class="nav-divider"></div>';
+  const localCatIcons = getLocalizedCatIcons(CAT_ICONS);
+  const localizedTools = getLocalizedTools(TOOLS);
   CATEGORIES.forEach(cat => {
-    const catTools = TOOLS.filter(t => t.category === cat);
-    const icon = CAT_ICONS[cat] || '📁';
+    const catTools = localizedTools.filter(tool => TOOLS.find(x => x.id === tool.id && x.category === cat));
+    const localCatName = catTools.length ? catTools[0].category : cat;
+    const icon = localCatIcons[cat] || CAT_ICONS[cat] || '📁';
     const isCollapsed = collapsedCats[cat];
     html += `<div class="nav-cat ${isCollapsed ? 'collapsed' : ''}" data-cat="${cat}">`;
     html += `<div class="nav-cat-header" onclick="toggleNavCat('${cat}')">`;
     html += `<span class="nav-cat-icon">${icon}</span>`;
-    html += `<span class="nav-cat-label">${cat}</span>`;
+    html += `<span class="nav-cat-label">${localCatName}</span>`;
     html += `<span class="nav-cat-count">${catTools.length}</span>`;
     html += `<span class="nav-cat-arrow">›</span>`;
     html += `</div>`;
     html += `<div class="nav-cat-tools">`;
-    catTools.forEach(t => {
-      html += `<a class="nav-item nav-tool-item" data-page="${t.id}" href="#${t.id}" data-tooltip="${t.name}"><span class="nav-icon">${t.icon}</span><span class="nav-label">${t.name}</span></a>`;
+    catTools.forEach(tool => {
+      html += `<a class="nav-item nav-tool-item" data-page="${tool.id}" href="#${tool.id}" data-tooltip="${tool.name}"><span class="nav-icon">${tool.icon}</span><span class="nav-label">${tool.name}</span></a>`;
     });
     html += `</div></div>`;
   });
