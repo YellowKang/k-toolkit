@@ -47,7 +47,8 @@
                     <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">✕</button>
                 </div>
                 <div class="topbar-actions">
-                    <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="切换主题">☀️</button>
+                    <button class="theme-btn" id="langBtn" onclick="setLang(getCurrentLang()==='zh'?'en':'zh')" style="display:inline-flex;align-items:center;font-size:12px;font-weight:600;min-width:36px;justify-content:center">EN</button>
+                    <button class="theme-btn" id="themeBtn" onclick="openThemePicker()" title="切换主题" style="display:inline-flex;align-items:center;justify-content:center;padding:6px"></button>
                 </div>
             </header>
 
