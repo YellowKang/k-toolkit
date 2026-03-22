@@ -63,12 +63,12 @@ const LANG_ZH = {
   cmd_footer_confirm:'确认',
   cmd_footer_close:'关闭',
   lang_btn:      'EN',
-  theme_dark:    'Dark',
-  theme_light:   'Light',
-  theme_tech_blue:'Tech Blue',
-  theme_sakura:  'Sakura',
-  theme_orange:  'Orange',
-  theme_green:   'Green',
+  theme_dark:    '暗夜黑',
+  theme_light:   '纯白色',
+  theme_tech_blue:'科技蓝',
+  theme_sakura:  '樱花粉',
+  theme_orange:  '商务橙',
+  theme_green:   '清新绿',
 };
 
 const LANG_EN = {
@@ -133,12 +133,12 @@ const LANG_EN = {
   cmd_footer_confirm:'Confirm',
   cmd_footer_close:'Close',
   lang_btn:      '中文',
-  theme_dark:    '暗夜黑',
-  theme_light:   '纯白色',
-  theme_tech_blue:'科技蓝',
-  theme_sakura:  '樱花粉',
-  theme_orange:  '商务橙',
-  theme_green:   '清新绿',
+  theme_dark:    'Dark',
+  theme_light:   'Light',
+  theme_tech_blue:'Tech Blue',
+  theme_sakura:  'Sakura',
+  theme_orange:  'Orange',
+  theme_green:   'Green',
 };
 
 // ── 分类名中->英映射 ──
