@@ -9,12 +9,12 @@ function _cmdOpen() {
   if (document.getElementById('cmdPalette')) return;
   // 每次打开重建，确保 favorites/recent 数量是最新值
   _paletteActions = [
-    { id: 'theme',        label: '切换主题',     icon: '🌙', sub: '深色 / 浅色',          action: () => { toggleTheme(); closeCmdPalette(); } },
-    { id: 'home',         label: '回到首页',     icon: '🏠', sub: '工具列表',             action: () => { navigateTo('home'); closeCmdPalette(); } },
-    { id: 'favorites',    label: '我的收藏',     icon: '⭐', sub: `${favorites.length} 个工具`, action: () => { navigateTo('favorites'); closeCmdPalette(); } },
-    { id: 'recent',       label: '最近使用',     icon: '🕐', sub: `${recent.length} 个工具`,    action: () => { navigateTo('recent'); closeCmdPalette(); } },
-    { id: 'clear-recent', label: '清除使用记录', icon: '🗑️', sub: '清空最近使用',         action: () => { recent=[]; LS.set('dtb_recent',[]); showToast('已清除'); closeCmdPalette(); } },
-    { id: 'clear-usage',  label: '清除统计数据', icon: '📊', sub: '清空使用次数',         action: () => { usageCounts={}; LS.set('dtb_usage',{}); showToast('已清除'); closeCmdPalette(); } },
+    { id: 'theme',        label: t('cmd_toggle_theme'), icon: '🌙', sub: t('cmd_theme_sub'),          action: () => { toggleTheme(); closeCmdPalette(); } },
+    { id: 'home',         label: t('cmd_go_home'),     icon: '🏠', sub: t('cmd_home_sub'),             action: () => { navigateTo('home'); closeCmdPalette(); } },
+    { id: 'favorites',    label: t('cmd_favs'),        icon: '⭐', sub: t('cmd_favs_sub', favorites.length), action: () => { navigateTo('favorites'); closeCmdPalette(); } },
+    { id: 'recent',       label: t('cmd_recent'),      icon: '🕐', sub: t('cmd_recent_sub', recent.length),    action: () => { navigateTo('recent'); closeCmdPalette(); } },
+    { id: 'clear-recent', label: t('cmd_clear_recent'), icon: '🗑️', sub: t('cmd_clear_recent_sub'),         action: () => { recent=[]; LS.set('dtb_recent',[]); showToast(t('toast_cleared')); closeCmdPalette(); } },
+    { id: 'clear-usage',  label: t('cmd_clear_usage'),  icon: '📊', sub: t('cmd_clear_usage_sub'),         action: () => { usageCounts={}; LS.set('dtb_usage',{}); showToast(t('toast_cleared')); closeCmdPalette(); } },
   ];
   const overlay = document.createElement('div');
   overlay.className = 'cmd-palette-overlay';
@@ -23,15 +23,15 @@ function _cmdOpen() {
     <div class="cmd-palette" onclick="event.stopPropagation()">
       <div class="cmd-input-wrap">
         <span class="cmd-input-icon">🔍</span>
-        <input class="cmd-input" id="cmdInput" placeholder="搜索工具或操作..."
+        <input class="cmd-input" id="cmdInput" placeholder="${t('cmd_placeholder')}"
           oninput="_cmdRender(this.value)" onkeydown="_cmdKey(event)" autocomplete="off">
         <span class="cmd-kbd">Esc</span>
       </div>
       <div class="cmd-results" id="cmdResults"></div>
       <div class="cmd-footer">
-        <span><kbd class="cmd-kbd">↑↓</kbd> 导航</span>
-        <span><kbd class="cmd-kbd">Enter</kbd> 执行</span>
-        <span><kbd class="cmd-kbd">Esc</kbd> 关闭</span>
+        <span><kbd class="cmd-kbd">↑↓</kbd> ${t('cmd_footer_nav')}</span>
+        <span><kbd class="cmd-kbd">Enter</kbd> ${t('cmd_footer_confirm')}</span>
+        <span><kbd class="cmd-kbd">Esc</kbd> ${t('cmd_footer_close')}</span>
       </div>
     </div>`;
   overlay.addEventListener('click', closeCmdPalette);
@@ -47,41 +47,41 @@ function _cmdRender(q) {
   if (!res) return;
   _cmdIdx = -1;
   let html = '';
-  const scoreT = t => {
+  const scoreT = tool => {
     if (!ql) return 0;
-    if (t.name.toLowerCase() === ql) return 100;
-    if (t.name.toLowerCase().startsWith(ql)) return 80;
-    if (t.name.toLowerCase().includes(ql)) return 60;
-    if (t.category.toLowerCase().includes(ql)) return 40;
-    if (t.desc.toLowerCase().includes(ql)) return 20;
+    if (tool.name.toLowerCase() === ql) return 100;
+    if (tool.name.toLowerCase().startsWith(ql)) return 80;
+    if (tool.name.toLowerCase().includes(ql)) return 60;
+    if (tool.category.toLowerCase().includes(ql)) return 40;
+    if (tool.desc.toLowerCase().includes(ql)) return 20;
     return 0;
   };
-  const tools = ql ? TOOLS.map(t => ({t, s: scoreT(t)})).filter(x => x.s > 0).sort((a,b) => b.s-a.s).slice(0,8).map(x=>x.t) : [];
+  const tools = ql ? getLocalizedTools(TOOLS).map(tool => ({t: tool, s: scoreT(tool)})).filter(x => x.s > 0).sort((a,b) => b.s-a.s).slice(0,8).map(x=>x.t) : [];
   const actions = ql ? _paletteActions.filter(a => a.label.includes(ql) || a.sub.includes(ql)) : _paletteActions;
-  const recentTools = !ql ? recent.slice(0,5).map(id => TOOLS.find(t => t.id===id)).filter(Boolean) : [];
+  const recentTools = !ql ? recent.slice(0,5).map(id => getLocalizedTools(TOOLS).find(tool => tool.id===id)).filter(Boolean) : [];
 
   if (!tools.length && !actions.length && !recentTools.length) {
-    res.innerHTML = `<div class="cmd-empty">未找到「${escHtml(q)}」相关结果</div>`;
+    res.innerHTML = `<div class="cmd-empty">${t('search_no_result', escHtml(q))}</div>`;
     return;
   }
   if (recentTools.length) {
-    html += `<div class="cmd-section-label">最近使用</div>`;
-    recentTools.forEach((t,i) => {
-      html += `<div class="cmd-item" data-idx="${i}" onclick="navigateTo('${t.id}');closeCmdPalette()"><span class="cmd-item-icon" style="background:${t.color}22">${t.icon}</span><span class="cmd-item-label">${escHtml(t.name)}</span><span class="cmd-item-sub">${escHtml(t.category)}</span><span class="cmd-item-enter">↵</span></div>`;
+    html += `<div class="cmd-section-label">${t('cmd_section_recent')}</div>`;
+    recentTools.forEach((tool,i) => {
+      html += `<div class="cmd-item" data-idx="${i}" onclick="navigateTo('${tool.id}');closeCmdPalette()"><span class="cmd-item-icon" style="background:${tool.color}22">${tool.icon}</span><span class="cmd-item-label">${escHtml(tool.name)}</span><span class="cmd-item-sub">${escHtml(tool.category)}</span><span class="cmd-item-enter">↵</span></div>`;
     });
   }
   if (actions.length) {
-    html += `<div class="cmd-section-label">操作</div>`;
+    html += `<div class="cmd-section-label">${t('cmd_section_actions') || 'Actions'}</div>`;
     const base = recentTools.length;
     actions.forEach((a,i) => {
       html += `<div class="cmd-item" data-idx="${base+i}" onclick="_paletteActions.find(x=>x.id==='${a.id}')?.action()"><span class="cmd-item-icon">${a.icon}</span><span class="cmd-item-label">${escHtml(a.label)}</span><span class="cmd-item-sub">${escHtml(a.sub)}</span><span class="cmd-item-enter">↵</span></div>`;
     });
   }
   if (tools.length) {
-    html += `<div class="cmd-section-label">工具</div>`;
+    html += `<div class="cmd-section-label">${t('cmd_section_tools')}</div>`;
     const base = recentTools.length + actions.length;
-    tools.forEach((t,i) => {
-      html += `<div class="cmd-item" data-idx="${base+i}" onclick="navigateTo('${t.id}');closeCmdPalette()"><span class="cmd-item-icon" style="background:${t.color}22">${t.icon}</span><span class="cmd-item-label">${escHtml(t.name)}</span><span class="cmd-item-sub">${escHtml(t.category)}</span><span class="cmd-item-enter">↵</span></div>`;
+    tools.forEach((tool,i) => {
+      html += `<div class="cmd-item" data-idx="${base+i}" onclick="navigateTo('${tool.id}');closeCmdPalette()"><span class="cmd-item-icon" style="background:${tool.color}22">${tool.icon}</span><span class="cmd-item-label">${escHtml(tool.name)}</span><span class="cmd-item-sub">${escHtml(tool.category)}</span><span class="cmd-item-enter">↵</span></div>`;
     });
   }
   res.innerHTML = html;

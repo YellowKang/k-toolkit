@@ -177,25 +177,26 @@ function addUsage(id) {
 function renderHomePage(mode) {
   const content = document.getElementById('content');
   if (!content) return;
+  const tools = getLocalizedTools(TOOLS);
   let html = '';
 
   if (mode === 'favorites') {
-    const favTools = favorites.map(id => TOOLS.find(t => t.id === id)).filter(Boolean);
+    const favTools = favorites.map(id => tools.find(t => t.id === id)).filter(Boolean);
     if (!favTools.length) {
-      html = `<div class="empty-state"><div class="empty-icon">⭐</div><div class="empty-title">暂无收藏</div><div class="empty-sub">点击工具卡片右上角 ★ 收藏常用工具</div></div>`;
+      html = `<div class="empty-state"><div class="empty-icon">⭐</div><div class="empty-title">${t('fav_empty_title')}</div><div class="empty-sub">${t('fav_empty_sub')}</div></div>`;
     } else {
-      html = `<div class="home-section"><div class="section-title">我的收藏 <span class="section-count">${favTools.length}</span></div><div class="tools-grid">${favTools.map(renderToolCard).join('')}</div></div>`;
+      html = `<div class="home-section"><div class="section-title">${t('fav_title')} <span class="section-count">${favTools.length}</span></div><div class="tools-grid">${favTools.map(renderToolCard).join('')}</div></div>`;
     }
     content.innerHTML = html;
     return;
   }
 
   if (mode === 'recent') {
-    const recentTools = recent.map(id => TOOLS.find(t => t.id === id)).filter(Boolean);
+    const recentTools = recent.map(id => tools.find(t => t.id === id)).filter(Boolean);
     if (!recentTools.length) {
-      html = `<div class="empty-state"><div class="empty-icon">🕐</div><div class="empty-title">暂无使用记录</div><div class="empty-sub">打开任意工具后会在这里显示</div></div>`;
+      html = `<div class="empty-state"><div class="empty-icon">🕐</div><div class="empty-title">${t('recent_empty_title')}</div><div class="empty-sub">${t('recent_empty_sub')}</div></div>`;
     } else {
-      html = `<div class="home-section"><div class="section-title">最近使用 <span class="section-count">${recentTools.length}</span></div><div class="tools-grid">${recentTools.map(renderToolCard).join('')}</div></div>`;
+      html = `<div class="home-section"><div class="section-title">${t('recent_title')} <span class="section-count">${recentTools.length}</span></div><div class="tools-grid">${recentTools.map(renderToolCard).join('')}</div></div>`;
     }
     content.innerHTML = html;
     return;
@@ -203,57 +204,68 @@ function renderHomePage(mode) {
 
   // 主页 Hero
   const hour = new Date().getHours();
-  const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
+  const greeting = hour < 6 ? t('greet_late') : hour < 12 ? t('greet_morning') : hour < 18 ? t('greet_afternoon') : t('greet_evening');
+  const tools = getLocalizedTools(TOOLS);
   // 热门工具 top5（使用次数）
   const topTools = Object.entries(usageCounts)
     .sort((a,b) => b[1]-a[1]).slice(0,5)
-    .map(([id]) => TOOLS.find(t => t.id===id)).filter(Boolean);
+    .map(([id]) => tools.find(t => t.id===id)).filter(Boolean);
   const topHtml = topTools.length ? `
     <div class="home-hero-quick">
-      <span style="font-size:11px;color:var(--text-muted)">热门：</span>
-      ${topTools.map(t => `<button class="hero-quick-btn" onclick="navigateTo('${t.id}')" style="--qc:${t.color}">${t.icon} ${t.name}</button>`).join('')}
+      <span style="font-size:11px;color:var(--text-muted)">${t('hero_hot')}</span>
+      ${topTools.map(tool => `<button class="hero-quick-btn" onclick="navigateTo('${tool.id}')" style="--qc:${tool.color}">${tool.icon} ${tool.name}</button>`).join('')}
     </div>` : '';
   html += `<div class="home-hero">
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
       <div>
         <div class="home-hero-title">🔧 DevToolbox</div>
-        <div class="home-hero-sub">${greeting}，${TOOLS.length} 个开发工具 · <kbd class="kbd-hint">/</kbd> 或 <kbd class="kbd-hint">⌘K</kbd> 搜索 · <kbd class="kbd-hint">?</kbd> 快捷键</div>
+        <div class="home-hero-sub">${greeting}，${t('hero_sub', tools.length)}</div>
       </div>
       <div class="home-hero-stats" style="margin-left:auto">
-        <div class="home-hero-stat"><strong>${TOOLS.length}</strong>工具</div>
-        <div class="home-hero-stat"><strong>${favorites.length || 0}</strong>收藏</div>
-        <div class="home-hero-stat"><strong>${recent.length || 0}</strong>最近</div>
+        <div class="home-hero-stat"><strong>${tools.length}</strong>${t('stat_tools')}</div>
+        <div class="home-hero-stat"><strong>${favorites.length || 0}</strong>${t('stat_favs')}</div>
+        <div class="home-hero-stat"><strong>${recent.length || 0}</strong>${t('stat_recent')}</div>
       </div>
     </div>
     ${topHtml}
   </div>`;
 
   // 分类 tab
-  html += `<div class="cat-tabs-wrap"><div class="cat-tabs"><button class="cat-tab ${currentCatFilter === 'all' ? 'active' : ''}" onclick="setCatFilter('all')">全部 <span class="cat-tab-count">${TOOLS.length}</span></button>`;
+  const localCats = getLocalizedTools(TOOLS).reduce((acc, tool) => { if (!acc.includes(tool.category)) acc.push(tool.category); return acc; }, []);
+  const localizedTools = getLocalizedTools(TOOLS);
+  const localCatIcons = getLocalizedCatIcons(CAT_ICONS);
+  html += `<div class="cat-tabs-wrap"><div class="cat-tabs"><button class="cat-tab ${currentCatFilter === 'all' ? 'active' : ''}" onclick="setCatFilter('all')">${t('cat_all')} <span class="cat-tab-count">${localizedTools.length}</span></button>`;
   CATEGORIES.forEach(cat => {
+    const localCat = getLocalizedTools(TOOLS).find(tool => {
+      const orig = TOOLS.find(x => x.id === tool.id);
+      return orig && orig.category === cat;
+    });
+    const localCatName = localCat ? localCat.category : cat;
     const n = CAT_COUNTS[cat];
-    html += `<button class="cat-tab ${currentCatFilter === cat ? 'active' : ''}" onclick="setCatFilter('${cat}')">${CAT_ICONS[cat] || ''} ${cat} <span class="cat-tab-count">${n}</span></button>`;
+    html += `<button class="cat-tab ${currentCatFilter === cat ? 'active' : ''}" onclick="setCatFilter('${cat}')">${localCatIcons[cat] || CAT_ICONS[cat] || ''} ${localCatName} <span class="cat-tab-count">${n}</span></button>`;
   });
   html += `</div></div>`;
 
   // 收藏区
   if (currentCatFilter === 'all' && favorites.length) {
-    const favTools = favorites.slice(0,6).map(id => TOOLS.find(t => t.id === id)).filter(Boolean);
-    html += `<div class="home-section"><div class="section-title">⭐ 我的收藏 <span class="section-count">${favorites.length}</span></div><div class="tools-grid">${favTools.map(renderToolCard).join('')}</div></div>`;
+    const favTools = favorites.slice(0,6).map(id => localizedTools.find(t => t.id === id)).filter(Boolean);
+    html += `<div class="home-section"><div class="section-title">⭐ ${t('fav_title')} <span class="section-count">${favorites.length}</span></div><div class="tools-grid">${favTools.map(renderToolCard).join('')}</div></div>`;
   }
 
   // 最近使用
   if (currentCatFilter === 'all' && recent.length) {
-    const recentTools = recent.slice(0,6).map(id => TOOLS.find(t => t.id === id)).filter(Boolean);
-    html += `<div class="home-section"><div class="section-title">🕐 最近使用 <span class="section-count">${recent.length}</span></div><div class="tools-grid">${recentTools.map(renderToolCard).join('')}</div></div>`;
+    const recentTools = recent.slice(0,6).map(id => localizedTools.find(t => t.id === id)).filter(Boolean);
+    html += `<div class="home-section"><div class="section-title">🕐 ${t('recent_title')} <span class="section-count">${recent.length}</span></div><div class="tools-grid">${recentTools.map(renderToolCard).join('')}</div></div>`;
   }
 
   // 分类工具区（IntersectionObserver 懒加载）
   const filteredCats = currentCatFilter === 'all' ? CATEGORIES : [currentCatFilter];
   filteredCats.forEach(cat => {
-    const catTools = TOOLS.filter(t => t.category === cat);
-    const icon = CAT_ICONS[cat] || '';
-    html += `<div class="home-section" data-lazy-cat="${cat}"><div class="section-title">${icon} ${cat} <span class="section-count">${catTools.length}</span></div><div class="tools-grid"></div></div>`;
+    const sampleTool = localizedTools.find(tool => TOOLS.find(x => x.id === tool.id && x.category === cat));
+    const localCatName = sampleTool ? sampleTool.category : cat;
+    const catTools = TOOLS.filter(tool => tool.category === cat);
+    const icon = localCatIcons[cat] || CAT_ICONS[cat] || '';
+    html += `<div class="home-section" data-lazy-cat="${cat}"><div class="section-title">${icon} ${localCatName} <span class="section-count">${catTools.length}</span></div><div class="tools-grid"></div></div>`;
   });
 
   content.innerHTML = html;
@@ -272,7 +284,7 @@ function _initLazyCats() {
       const cat = entry.target.dataset.lazyCat;
       const grid = entry.target.querySelector('.tools-grid');
       if (!grid || grid.children.length) return;
-      grid.innerHTML = TOOLS.filter(t => t.category === cat).map(renderToolCard).join('');
+      grid.innerHTML = getLocalizedTools(TOOLS).filter(tool => TOOLS.find(x => x.id === tool.id && x.category === cat)).map(renderToolCard).join('');
       _lazyCatObserver.unobserve(entry.target);
     });
   }, { rootMargin: '200px' });
@@ -290,7 +302,7 @@ function renderToolCard(tool) {
   const badge = useCount >= 3 ? `<span class="tool-card-badge">${useCount >= 99 ? '99+' : useCount}</span>` : '';
   const newBadge = tool.isNew ? `<span class="tool-card-new">NEW</span>` : '';
   return `<div class="tool-card" onclick="navigateTo('${tool.id}')" onmouseenter="prefetchTool('${tool.id}')" style="--card-color:${tool.color}">
-    <button class="fav-btn ${isFav ? 'active' : ''}" data-id="${tool.id}" onclick="toggleFavorite('${tool.id}',event)" title="${isFav ? '取消收藏' : '收藏'}">★</button>
+    <button class="fav-btn ${isFav ? 'active' : ''}" data-id="${tool.id}" onclick="toggleFavorite('${tool.id}',event)" title="${isFav ? t('fav_remove') : t('fav_add')}">★</button>
     ${badge}${newBadge}
     <div class="tool-card-icon">${tool.icon}</div>
     <div class="tool-card-name">${tool.name}</div>
@@ -351,9 +363,9 @@ function buildSidebarNav() {
   const nav = document.getElementById('sidebarNav');
   if (!nav) return;
   const fixed = [
-    { page: 'home', icon: '🏠', label: '工具首页' },
-    { page: 'favorites', icon: '⭐', label: '我的收藏' },
-    { page: 'recent', icon: '🕐', label: '最近使用' },
+    { page: 'home', icon: '🏠', label: t('nav_home') },
+    { page: 'favorites', icon: '⭐', label: t('nav_favs') },
+    { page: 'recent', icon: '🕐', label: t('nav_recent') },
   ];
   let html = '<div class="nav-section nav-section-fixed">';
   fixed.forEach(i => {
@@ -484,14 +496,14 @@ function toggleFavorite(id, event) {
   const adding = !favorites.includes(id);
   favorites = adding ? [id, ...favorites] : favorites.filter(x => x !== id);
   LS.set('dtb_favorites', favorites);
-  showToast(adding ? '已收藏' : '已取消收藏', adding ? 'success' : 'info', 1500);
+  showToast(adding ? t('toast_fav_add') : t('toast_fav_remove'), adding ? 'success' : 'info', 1500);
   if (['home','favorites','recent'].includes(currentPage)) {
     renderHomePage(currentPage);
   } else {
     document.querySelectorAll('.fav-btn').forEach(btn => {
       if (btn.dataset.id === id) {
         btn.classList.toggle('active', favorites.includes(id));
-        btn.innerHTML = '★ <span>' + (favorites.includes(id) ? '已收藏' : '收藏') + '</span>';
+        btn.innerHTML = '★ <span>' + (favorites.includes(id) ? t('toast_fav_add') : t('fav_add')) + '</span>';
       }
     });
   }
@@ -580,21 +592,22 @@ function showSearchDropdown(q) {
   } else {
     const bycat = {};
     matched.forEach(t => { (bycat[t.category] = bycat[t.category] || []).push(t); });
-    let html = `<div class="sdrop-header">${matched.length} 个结果</div>`;
+    let html = `<div class="sdrop-header">${t('search_results', matched.length)}</div>`;
     Object.entries(bycat).forEach(([cat, tools]) => {
-      html += `<div class="sdrop-cat">${CAT_ICONS[cat] || ''} ${cat}</div>`;
+      const localCatIcons = getLocalizedCatIcons(CAT_ICONS);
+      html += `<div class="sdrop-cat">${localCatIcons[cat] || CAT_ICONS[cat] || ''} ${cat}</div>`;
       const visible = tools.slice(0, 3);
-      visible.forEach(t => {
-        const hlName = _hlMatch(t.name, q);
-        const hlDesc = _hlMatch(t.desc, q);
-        html += `<div class="sdrop-item" data-id="${t.id}" onclick="sdropClick('${t.id}')">`;
-        html += `<span class="sdrop-icon" style="background:${t.color}22">${t.icon}</span>`;
+      visible.forEach(tool => {
+        const hlName = _hlMatch(tool.name, q);
+        const hlDesc = _hlMatch(tool.desc, q);
+        html += `<div class="sdrop-item" data-id="${tool.id}" onclick="sdropClick('${tool.id}')">`;
+        html += `<span class="sdrop-icon" style="background:${tool.color}22">${tool.icon}</span>`;
         html += `<span class="sdrop-info"><span class="sdrop-name">${hlName}</span><span class="sdrop-desc">${hlDesc}</span></span>`;
         html += `<span class="sdrop-cat-tag">${cat}</span>`;
         html += `</div>`;
       });
       if (tools.length > 3) {
-        html += `<div class="sdrop-more" onclick="sdropViewAll('${escHtml(q)}')">查看全部 ${tools.length} 个结果 →</div>`;
+        html += `<div class="sdrop-more" onclick="sdropViewAll('${escHtml(q)}')">  ${t('search_view_all', tools.length)}</div>`;
       }
     });
     drop.innerHTML = html;
@@ -656,7 +669,7 @@ function _showSearchHistory() {
   const items = searchHistory.map(h =>
     `<div class="sdrop-item" onclick="_useHistory('${escHtml(h)}')"><span style="color:var(--text-muted);margin-right:8px">🕐</span>${escHtml(h)}</div>`
   ).join('');
-  drop.innerHTML = `<div class="sdrop-header">最近搜索</div>${items}`;
+  drop.innerHTML = `<div class="sdrop-header">${t('search_history')}</div>${items}`;
   drop.style.display = '';
 }
 
@@ -671,31 +684,33 @@ function _useHistory(q) {
 
 function renderSearchResults(q) {
   const ql = q.toLowerCase();
-  const score = t => {
-    if (t.name.toLowerCase() === ql) return 100;
-    if (t.name.toLowerCase().startsWith(ql)) return 80;
-    if (t.name.toLowerCase().includes(ql)) return 60;
-    if (t.category.toLowerCase().includes(ql)) return 40;
-    if (t.desc.toLowerCase().includes(ql)) return 20;
+  const score = tool => {
+    if (tool.name.toLowerCase() === ql) return 100;
+    if (tool.name.toLowerCase().startsWith(ql)) return 80;
+    if (tool.name.toLowerCase().includes(ql)) return 60;
+    if (tool.category.toLowerCase().includes(ql)) return 40;
+    if (tool.desc.toLowerCase().includes(ql)) return 20;
     return 0;
   };
   // 使用频率加权：高频工具在同分段内靠前
-  const matched = TOOLS.map(t => ({ t, s: score(t) })).filter(x => x.s > 0)
-    .sort((a, b) => b.s - a.s || (usageCounts[b.t.id] || 0) - (usageCounts[a.t.id] || 0))
-    .map(x => x.t);
+  const localizedTools = getLocalizedTools(TOOLS);
+  const matched = localizedTools.map(tool => ({ tool, s: score(tool) })).filter(x => x.s > 0)
+    .sort((a, b) => b.s - a.s || (usageCounts[b.tool.id] || 0) - (usageCounts[a.tool.id] || 0))
+    .map(x => x.tool);
   const content = document.getElementById('content');
   if (!content) return;
   if (!matched.length) {
-    content.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">未找到「${escHtml(q)}」相关工具</div><div class="empty-sub">试试其他关键词</div></div>`;
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">${t('search_no_result', escHtml(q))}</div></div>`;
     return;
   }
-  const categories = [...new Set(matched.map(t => t.category))];
+  const localCatIcons = getLocalizedCatIcons(CAT_ICONS);
+  const categories = [...new Set(matched.map(tool => tool.category))];
   let html = '';
   categories.forEach(cat => {
-    const catMatched = matched.filter(t => t.category === cat);
-    html += `<div class="home-section"><div class="section-title">${CAT_ICONS[cat] || ''} ${cat} <span class="section-count">${catMatched.length}</span></div><div class="tools-grid">${catMatched.map(renderToolCard).join('')}</div></div>`;
+    const catMatched = matched.filter(tool => tool.category === cat);
+    html += `<div class="home-section"><div class="section-title">${localCatIcons[cat] || CAT_ICONS[cat] || ''} ${cat} <span class="section-count">${catMatched.length}</span></div><div class="tools-grid">${catMatched.map(renderToolCard).join('')}</div></div>`;
   });
-  content.innerHTML = `<div class="search-results-header">搜索「${escHtml(q)}」共 ${matched.length} 个结果</div>` + html;
+  content.innerHTML = `<div class="search-results-header">${t('search_results_header', escHtml(q), matched.length)}</div>` + html;
 }
 
 // ── 主题 ──
@@ -810,43 +825,45 @@ function bindKeyboard() {
 async function renderToolPageFull(tool) {
   const content = document.getElementById('content');
   if (!content) return;
-  content.innerHTML = `<div class="tool-loading"><div class="tool-loading-spinner"></div><span>加载中...</span></div>`;
+  content.innerHTML = `<div class="tool-loading"><div class="tool-loading-spinner"></div><span>${t('loading')}</span></div>`;
   try { await loadTool(tool.id); } catch(e) {
-    content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">工具加载失败</div><div class="empty-sub">${escHtml(e.message)}</div><div style="display:flex;gap:10px;justify-content:center;margin-top:16px"><button class="btn btn-primary" onclick="navigateTo('${tool.id}')">重试</button><button class="btn btn-secondary" onclick="navigateTo('home')">返回首页</button></div></div>`;
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">${t('load_fail')}</div><div class="empty-sub">${escHtml(e.message)}</div><div style="display:flex;gap:10px;justify-content:center;margin-top:16px"><button class="btn btn-primary" onclick="navigateTo('${tool.id}')">${t('retry')}</button><button class="btn btn-secondary" onclick="navigateTo('home')">${t('back_home')}</button></div></div>`;
     return;
   }
   const fn = window[tool.render];
   const isFav = favorites.includes(tool.id);
+  const localTool = getLocalizedTools(TOOLS).find(x => x.id === tool.id) || tool;
+  const localCatIcons = getLocalizedCatIcons(CAT_ICONS);
   content.innerHTML = `
     <div class="tool-page">
       <div class="tool-page-header">
-        <button class="back-btn" onclick="navigateTo('home')">← 返回</button>
+        <button class="back-btn" onclick="navigateTo('home')">${t('back')}</button>
         <div class="tool-page-title-wrap">
           <span class="tool-page-icon" style="background:${tool.color}20;color:${tool.color}">${tool.icon}</span>
           <div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap">
-              <div class="tool-page-name">${tool.name}</div>
-              <span class="tool-breadcrumb" onclick="setCatFilter('${tool.category}');navigateTo('home')" title="返回并筛选此分类">${CAT_ICONS[tool.category]||'📁'} ${tool.category}</span>
+              <div class="tool-page-name">${localTool.name}</div>
+              <span class="tool-breadcrumb" onclick="setCatFilter('${tool.category}');navigateTo('home')" title="${localTool.category}">${localCatIcons[tool.category]||CAT_ICONS[tool.category]||'📁'} ${localTool.category}</span>
             </div>
-            <div class="tool-page-desc">${tool.desc}</div>
+            <div class="tool-page-desc">${localTool.desc}</div>
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <button class="icon-btn" onclick="shareTool('${tool.id}')" title="分享工具">🔗</button>
-          <button class="fav-btn ${isFav?'active':''}" data-id="${tool.id}" onclick="toggleFavorite('${tool.id}',event)">★ <span>${isFav?'已收藏':'收藏'}</span></button>
+          <button class="icon-btn" onclick="shareTool('${tool.id}')" title="${t('share')}">🔗</button>
+          <button class="fav-btn ${isFav?'active':''}" data-id="${tool.id}" onclick="toggleFavorite('${tool.id}',event)">★ <span>${isFav?t('toast_fav_add'):t('fav_add')}</span></button>
         </div>
       </div>
       <div class="tool-body" id="toolBody"></div>
     </div>`;
   if (fn) fn(document.getElementById('toolBody'));
-  else document.getElementById('toolBody').innerHTML = `<div class="empty-state"><div class="empty-icon">🔧</div><div class="empty-title">渲染器未注册</div></div>`;
+  else document.getElementById('toolBody').innerHTML = `<div class="empty-state"><div class="empty-icon">🔧</div><div class="empty-title">${t('load_fail')}</div></div>`;
 
   // 相关工具推荐
-  const related = TOOLS.filter(t => t.id !== tool.id && t.category === tool.category).slice(0, 4);
+  const related = getLocalizedTools(TOOLS).filter(tool2 => tool2.id !== tool.id && TOOLS.find(x => x.id === tool2.id && x.category === tool.category)).slice(0, 4);
   if (related.length) {
     const relDiv = document.createElement('div');
     relDiv.className = 'related-tools';
-    relDiv.innerHTML = `<div class="section-title" style="margin-top:32px">你可能还需要</div><div class="tools-grid">${related.map(renderToolCard).join('')}</div>`;
+    relDiv.innerHTML = `<div class="section-title" style="margin-top:32px">${t('related_tools')}</div><div class="tools-grid">${related.map(renderToolCard).join('')}</div>`;
     document.querySelector('.tool-page').appendChild(relDiv);
   }
 }
@@ -915,12 +932,12 @@ function closeCmdPalette() { const el = document.getElementById('cmdPalette'); i
 document.addEventListener('DOMContentLoaded', init);
 
 // ── 离线状态提示 ──
-window.addEventListener('online',  () => showToast('网络已恢复', 'success'));
-window.addEventListener('offline', () => showToast('已离线，本地工具仍可使用', 'warn'));
+window.addEventListener('online',  () => showToast(t('toast_online'), 'success'));
+window.addEventListener('offline', () => showToast(t('toast_offline'), 'warn'));
 
 // ── SW 更新提示 ──
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', e => {
-    if (e.data === 'sw-updated') showToast('已更新，点击刷新', 'info', 8000, () => location.reload());
+    if (e.data === 'sw-updated') showToast(t('toast_sw_update'), 'info', 8000, () => location.reload());
   });
 }

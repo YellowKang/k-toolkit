@@ -58,7 +58,7 @@ for (const name of cssFiles) {
 }
 
 // ── Copy JS files ──
-const jsFiles = ['dashboard.js', 'dashboard-cmd.js', 'sw.js'];
+const jsFiles = ['dashboard.js', 'dashboard-cmd.js', 'sw.js', 'i18n.js'];
 console.log('\nCopying JS:');
 for (const name of jsFiles) {
   const src = path.join(PUB, name);
@@ -68,7 +68,7 @@ for (const name of jsFiles) {
 }
 
 // ── Copy HTML ──
-const htmlFiles = ['dashboard.html'];
+const htmlFiles = ['dashboard.html', 'index.html'];
 console.log('\nCopying HTML:');
 for (const name of htmlFiles) {
   const src = path.join(PUB, name);
