@@ -159,13 +159,24 @@ this.abortController = new AbortController();
 this.emit('thinking', {});
 let resp;
 try {
+let safeBaseUrl = this.config.baseUrl || '';
+if (safeBaseUrl && location.protocol === 'https:' && safeBaseUrl.startsWith('http:
+safeBaseUrl = safeBaseUrl.replace(/^http:\/\
+if (!this._mixedContentWarned) {
+this._mixedContentWarned = true;
+const msg = (this.config.lang || 'zh') === 'en'
+? 'HTTPS page cannot access HTTP API. Auto-upgraded to HTTPS. If it fails, please configure an HTTPS API address.'
+: '当前 HTTPS 页面无法访问 HTTP API，已自动升级为 HTTPS。如果连接失败，请配置 HTTPS 地址的 API。';
+if (typeof showToast === 'function') showToast(msg, 'warn', 6000);
+}
+}
 const chatParams = {
 messages:    [this._buildSystemMsg(), ...this.messages],
 tools:       this._getEffectiveTools(),
 model:       this.config.model || this.adapter.defaultModel,
 max_tokens:  this.config.max_tokens || 2000,
 temperature: this.config.temperature ?? 0.7,
-baseUrl:     this.config.baseUrl || '',
+baseUrl:     safeBaseUrl,
 apiKey:      this.config.apiKey || window.AgentConfig.AG.getKey(this.adapter.id),
 signal:      this.abortController.signal,
 };
