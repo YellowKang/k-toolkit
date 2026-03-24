@@ -81,5 +81,3 @@ function doTc() {
   document.getElementById('tcPreview').innerHTML =
     `<span style="${fgStyle};${bgStyle};${txStyle};padding:2px 4px">${text}</span>`;
 }
-
-window._activeCleanup = function() {};

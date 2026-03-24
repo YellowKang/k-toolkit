@@ -103,7 +103,6 @@ function mcToggle() {
       const t = document.getElementById('mcTime');
       if (t) t.textContent = [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
     }, 1000);
-    window._activeCleanup = () => clearInterval(window._mcTimer);
   }
 }
 
@@ -151,4 +150,4 @@ function mcClearHistory() {
   localStorage.removeItem('dtb_mc_history');
   mcRenderHistory();
 }
-// _activeCleanup is set inside mcToggle() when the timer starts
+// _activeCleanup is set in renderMeetingCost and covers mcToggle's timer

@@ -41,5 +41,3 @@ function doLineSort(op) {
   document.getElementById('lsOutput').value = lines.join('\n');
   document.getElementById('lsStats').textContent = `结果（${lines.length} 行）`;
 }
-
-window._activeCleanup = function() {};

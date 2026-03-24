@@ -47,5 +47,3 @@ async function doDnsLookup() {
     data.innerHTML = `<span style="color:#ef4444">查询失败：${e.message}</span>`;
   }
 }
-
-window._activeCleanup = function() {};

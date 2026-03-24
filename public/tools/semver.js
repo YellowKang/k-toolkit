@@ -55,5 +55,3 @@ function doSvParse() {
   el.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap">'+fields.map(([k,v])=>
     `<div style="background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);border-radius:8px;padding:8px 14px;text-align:center"><div style="font-size:11px;color:var(--text-muted)">${k}</div><div style="font-size:16px;font-weight:600;color:var(--text)">${v}</div></div>`).join('')+'</div>';
 }
-
-window._activeCleanup = function() {};

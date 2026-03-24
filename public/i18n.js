@@ -155,110 +155,101 @@ const CAT_NAME_EN = {
   '趣味工具': 'Fun',
 };
 
-// ── 工具英文数据（顺序必须与 dashboard.js TOOLS 完全一致）──
-const TOOLS_EN = [
+// ── 工具英文数据（按 id 索引，无需与 TOOLS 数组顺序对齐）──
+const TOOLS_EN = {
   // Text (文本处理)
-  { name:'UUID Generator',    desc:'Batch generate UUID v4, one-click copy, custom count',                        category:'Text' },
-  { name:'JSON Formatter',    desc:'Format, minify and validate JSON with instant syntax highlighting',            category:'Text' },
-  { name:'Base64',            desc:'Encode/decode text and Base64, supports URL-safe mode',                       category:'Text' },
-  { name:'Word Count',        desc:'Count characters, words, lines, paragraphs and CJK characters',              category:'Text' },
-  { name:'Regex Tester',      desc:'Real-time highlight matches, capture group details, multiple flags',          category:'Text' },
-  { name:'JSON/CSV Convert',  desc:'Bidirectional conversion between JSON arrays and CSV, download support',      category:'Text' },
-  { name:'Text Diff',         desc:'Line-by-line comparison of two texts with highlighted differences',           category:'Text' },
-  { name:'Markdown Preview',  desc:'Real-time Markdown rendering with syntax highlighting',                       category:'Text' },
-  { name:'Case Convert',      desc:'Convert between camelCase, snake_case, UPPERCASE and more',                  category:'Text' },
-  { name:'Unicode Convert',   desc:'Convert Unicode code points and characters, escape sequences',               category:'Text' },
-  { name:'HTML Entity',       desc:'HTML entity encode/decode with swap, reference for special characters',      category:'Text' },
-  { name:'Lorem Ipsum',       desc:'Generate Lorem Ipsum placeholder text, custom paragraphs and word count',    category:'Text' },
+  'uuid':             { name:'UUID Generator',     desc:'Batch generate UUID v4, one-click copy, custom count',                        category:'Text' },
+  'json':             { name:'JSON Formatter',     desc:'Format, minify and validate JSON with instant syntax highlighting',            category:'Text' },
+  'base64':           { name:'Base64',             desc:'Encode/decode text and Base64, supports URL-safe mode',                       category:'Text' },
+  'wordcount':        { name:'Word Count',         desc:'Count characters, words, lines, paragraphs and CJK characters',              category:'Text' },
+  'regex':            { name:'Regex Tester',       desc:'Real-time highlight matches, capture group details, multiple flags',          category:'Text' },
+  'json-csv':         { name:'JSON/CSV Convert',   desc:'Bidirectional conversion between JSON arrays and CSV, download support',      category:'Text' },
+  'text-diff':        { name:'Text Diff',          desc:'Line-by-line comparison of two texts with highlighted differences',           category:'Text' },
+  'markdown':         { name:'Markdown Preview',   desc:'Real-time Markdown rendering with syntax highlighting',                       category:'Text' },
+  'case-convert':     { name:'Case Convert',       desc:'Convert between camelCase, snake_case, UPPERCASE and more',                  category:'Text' },
+  'unicode-convert':  { name:'Unicode Convert',    desc:'Convert Unicode code points and characters, escape sequences',               category:'Text' },
+  'html-entity':      { name:'HTML Entity',        desc:'HTML entity encode/decode with swap, reference for special characters',      category:'Text' },
+  'lorem':            { name:'Lorem Ipsum',        desc:'Generate Lorem Ipsum placeholder text, custom paragraphs and word count',    category:'Text' },
+  'text-escape':      { name:'Text Escape',        desc:'Escape/unescape JSON/regex/HTML/URL special characters',                     category:'Text' },
+  'diff-json':        { name:'JSON Diff',          desc:'Diff two JSON or YAML objects with highlighted differences',                  category:'Text' },
+  'toml-json':        { name:'TOML/JSON',          desc:'Bidirectional conversion between TOML and JSON',                             category:'Text' },
+  'slug-gen':         { name:'Slug Generator',     desc:'Convert text to URL-friendly slug with pinyin support',                      category:'Text' },
+  'line-sort':        { name:'Line Sort',          desc:'Sort lines alphabetically, reverse, deduplicate, shuffle or remove blanks',  category:'Text' },
   // Dev Tools (开发工具)
-  { name:'Timestamp',         desc:'Real-time timestamp, ms/s conversion, date parsing, multi-format output',    category:'Dev Tools' },
-  { name:'URL Toolkit',       desc:'URL parse, encode/decode, and query param builder in one tool',              category:'Dev Tools' },
-  { name:'Hash Generator',    desc:'SHA-1/256/384/512, supports text and file hash verification',                category:'Dev Tools' },
-  { name:'JWT Tool',          desc:'Decode/generate JWT tokens with HS256 signing support',                      category:'Dev Tools' },
-  { name:'Number Base',       desc:'Convert between binary, octal, decimal and hex, ASCII/Unicode code points',  category:'Dev Tools' },
-  { name:'YAML/JSON',         desc:'Bidirectional conversion between YAML and JSON',                            category:'Dev Tools' },
-  { name:'SQL Formatter',     desc:'Beautify/minify SQL, supports SELECT/INSERT/UPDATE/DELETE',                  category:'Dev Tools' },
-  { name:'cURL Generator',    desc:'Visually generate curl/fetch/axios code snippets',                          category:'Dev Tools' },
-  { name:'HTTP Status',       desc:'Look up HTTP status code meanings, search and browse by category',           category:'Dev Tools' },
-  { name:'Cron Expression',   desc:'Visually parse Cron expressions, show next execution times',                 category:'Dev Tools' },
-  { name:'Password Generator',desc:'Generate strong passwords with custom rules, strength evaluation',           category:'Dev Tools' },
+  'timestamp':        { name:'Timestamp',          desc:'Real-time timestamp, ms/s conversion, date parsing, multi-format output',    category:'Dev Tools' },
+  'url-parser':       { name:'URL Toolkit',        desc:'URL parse, encode/decode, and query param builder in one tool',              category:'Dev Tools' },
+  'hash':             { name:'Hash Generator',     desc:'SHA-1/256/384/512, supports text and file hash verification',                category:'Dev Tools' },
+  'jwt':              { name:'JWT Tool',           desc:'Decode/generate JWT tokens with HS256 signing support',                      category:'Dev Tools' },
+  'number-base':      { name:'Number Base',        desc:'Convert between binary, octal, decimal and hex, ASCII/Unicode code points',  category:'Dev Tools' },
+  'yaml-json':        { name:'YAML/JSON',          desc:'Bidirectional conversion between YAML and JSON',                             category:'Dev Tools' },
+  'sql-format':       { name:'SQL Formatter',      desc:'Beautify/minify SQL, supports SELECT/INSERT/UPDATE/DELETE',                  category:'Dev Tools' },
+  'curl-gen':         { name:'cURL Generator',     desc:'Visually generate curl/fetch/axios code snippets with cURL import',          category:'Dev Tools' },
+  'http-status':      { name:'HTTP Status',        desc:'Look up HTTP status code meanings, search and browse by category',           category:'Dev Tools' },
+  'cron':             { name:'Cron Expression',    desc:'Visually parse Cron expressions, show next execution times',                 category:'Dev Tools' },
+  'password-gen':     { name:'Password Generator', desc:'Generate strong passwords with HIBP breach detection and Diceware mode',     category:'Dev Tools' },
+  'env-parse':        { name:'Env Parser',         desc:'Parse .env files, format checking and key extraction',                       category:'Dev Tools' },
+  'docker-gen':       { name:'Dockerfile Gen',     desc:'Generate best-practice Dockerfile for Node/Python/Go/Java',                  category:'Dev Tools' },
+  'nginx-gen':        { name:'Nginx Config',       desc:'Generate Nginx config for static site/reverse proxy/HTTPS redirect',         category:'Dev Tools' },
+  'git-commit':       { name:'Git Commit',         desc:'Generate conventional commit messages following Angular convention',          category:'Dev Tools' },
+  'semver':           { name:'Semver',             desc:'Parse semantic versions, compare ranges, check compatibility',               category:'Dev Tools' },
+  'dns-lookup':       { name:'DNS Lookup',         desc:'DNS over HTTPS query for A/AAAA/MX/TXT/CNAME/NS records',                   category:'Dev Tools' },
+  'terminal-color':   { name:'Terminal Color',     desc:'ANSI color code generator with foreground/background/style preview',         category:'Dev Tools' },
   // CSS Tools (CSS 工具)
-  { name:'Gradient',          desc:'CSS gradient generator, linear/radial/conic, multi-stop preview',           category:'CSS Tools' },
-  { name:'Color Tool',        desc:'Color picker, format converter, WCAG contrast checker in one tool',         category:'CSS Tools' },
-  { name:'Box Shadow',        desc:'Visual CSS box-shadow generator, multiple layers, real-time preview',        category:'CSS Tools' },
-  { name:'Flexbox',           desc:'Visual Flexbox layout debugger, all properties adjustable',                  category:'CSS Tools' },
+  'gradient':         { name:'Gradient',           desc:'CSS gradient generator with 20 presets, animation preview and Tailwind export', category:'CSS Tools' },
+  'color':            { name:'Color Tool',         desc:'Color picker, format converter, WCAG contrast checker in one tool',          category:'CSS Tools' },
+  'shadow':           { name:'Box Shadow',         desc:'Visual CSS box-shadow generator, multiple layers, real-time preview',        category:'CSS Tools' },
+  'flexbox':          { name:'Flexbox',            desc:'Visual Flexbox layout debugger, all properties adjustable',                  category:'CSS Tools' },
+  'svg-preview':      { name:'SVG Preview',        desc:'Paste SVG code for live preview with zoom support',                          category:'CSS Tools' },
+  'palette-gen':      { name:'Palette Generator',  desc:'Generate full color scale from base color, export CSS variables',            category:'CSS Tools' },
+  'clip-path':        { name:'Clip-path',          desc:'CSS clip-path generator, polygon/ellipse/inset shape editor',                category:'CSS Tools' },
+  'css-unit':         { name:'CSS Unit Convert',   desc:'px/rem/em/vw/vh/pt conversions with configurable base font size',            category:'CSS Tools' },
   // Image (图片工具)
-  { name:'Image Base64',      desc:'Convert images to Base64 data URI and back',                              category:'Image' },
-  { name:'Image Compress',    desc:'Client-side image compression with quality adjustment',                    category:'Image' },
-  { name:'QR Code',           desc:'Generate QR codes from text or URLs, custom size and download',             category:'Image' },
-  { name:'QR Decode',         desc:'Decode QR codes from image files',                                       category:'Image' },
+  'img-base64':       { name:'Image Base64',       desc:'Convert images to Base64 data URI and back',                                 category:'Image' },
+  'img-compress':     { name:'Image Compress',     desc:'Client-side image compression with quality adjustment',                      category:'Image' },
+  'qrcode':           { name:'QR Code',            desc:'Generate QR codes with dot/rounded styles and logo embedding',               category:'Image' },
+  'qrcode-decode':    { name:'QR Decode',          desc:'Decode QR codes from image files',                                           category:'Image' },
+  'img-webp':         { name:'Image to WebP',      desc:'Batch convert images to WebP with quality control',                          category:'Image' },
+  'img-exif':         { name:'EXIF Viewer',        desc:'Read image EXIF data: camera model, ISO, exposure time and more',            category:'Image' },
   // Crypto (编码加密)
-  { name:'AES Encrypt',       desc:'AES-GCM symmetric encryption and decryption, SubtleCrypto',               category:'Crypto' },
-  { name:'Morse Code',        desc:'Convert text to Morse code and decode back',                                 category:'Crypto' },
-  { name:'XML Formatter',     desc:'Format and validate XML with collapsible nodes',                         category:'Crypto' },
+  'aes':              { name:'AES Encrypt',        desc:'AES-GCM symmetric encryption and decryption, SubtleCrypto',                  category:'Crypto' },
+  'morse':            { name:'Morse Code',         desc:'Convert text to Morse code and decode back',                                 category:'Crypto' },
+  'xml-format':       { name:'XML Formatter',      desc:'Format and validate XML with collapsible nodes',                             category:'Crypto' },
   // Calculator (计算工具)
-  { name:'Calculator',        desc:'Scientific calculator with history, supports keyboard input',               category:'Calculator' },
-  { name:'Unit Convert',      desc:'Convert length, weight, temperature, area, storage, speed and number formats',  category:'Calculator' },
-  { name:'Loan Calculator',   desc:'Monthly payment, total interest and amortization schedule',                 category:'Calculator' },
-  { name:'Byte Convert',      desc:'Convert B/KB/MB/GB/TB/PB storage units',                                   category:'Calculator' },
-  { name:'Number Chinese',    desc:'Convert numbers to Chinese uppercase for financial documents',               category:'Calculator' },
-  { name:'IP Subnet Calc',    desc:'IPv4 subnet calculator, CIDR, network and broadcast address',               category:'Calculator' },
+  'calculator':       { name:'Calculator',         desc:'Scientific calculator with history, supports keyboard input',                category:'Calculator' },
+  'unit-convert':     { name:'Unit Convert',       desc:'Convert length, weight, temperature, area, storage, speed and number formats', category:'Calculator' },
+  'loan-calc':        { name:'Loan Calculator',    desc:'Monthly payment, total interest and amortization schedule',                  category:'Calculator' },
+  'byte-convert':     { name:'Byte Convert',       desc:'Convert B/KB/MB/GB/TB/PB storage units',                                    category:'Calculator' },
+  'number-chinese':   { name:'Number Chinese',     desc:'Convert numbers to Chinese uppercase for financial documents',               category:'Calculator' },
+  'ip-calc':          { name:'IP Subnet Calc',     desc:'IPv4 subnet calculator, CIDR, network and broadcast address',                category:'Calculator' },
+  'aspect-ratio':     { name:'Aspect Ratio',       desc:'Calculate dimensions from aspect ratio, common presets',                     category:'Calculator' },
+  'age-calc':         { name:'Age Calculator',     desc:'Exact age (years/months/days), days to birthday, zodiac sign',               category:'Calculator' },
+  'tax-calc':         { name:'Tax Calculator',     desc:'2024 personal income tax calculator with deductions',                        category:'Calculator' },
   // Time (时间工具)
-  { name:'Date Diff',         desc:'Days between two dates, with weekday/holiday calculation',                  category:'Time' },
-  { name:'Timezone Convert',  desc:'13 major timezones real-time comparison',                                   category:'Time' },
-  { name:'Countdown',         desc:'Custom target date countdown with SVG arc progress',                        category:'Time' },
+  'date-diff':        { name:'Date Diff',          desc:'Days between two dates, with weekday/holiday calculation',                   category:'Time' },
+  'timezone':         { name:'Timezone Convert',   desc:'13 major timezones real-time comparison',                                    category:'Time' },
+  'countdown':        { name:'Countdown',          desc:'Custom target date countdown with SVG arc progress',                         category:'Time' },
+  'world-clock':      { name:'World Clock',        desc:'8 major timezones displayed simultaneously in real time',                    category:'Time' },
+  'lunar-calendar':   { name:'Lunar Calendar',     desc:'Query Chinese lunar date, zodiac, solar terms for any date',                 category:'Time' },
   // Productivity (效率工具)
-  { name:'Pomodoro',          desc:'25-min focus + 5-min break timer with SVG progress ring',                   category:'Productivity' },
-  { name:'Meeting Cost',      desc:'Real-time meeting cost calculator, input headcount and salary',             category:'Productivity' },
-  { name:'Random Picker',     desc:'Random draw from custom list with spinning wheel animation',                category:'Productivity' },
+  'pomodoro':         { name:'Pomodoro',           desc:'25-min focus + 5-min break timer with SVG progress ring',                    category:'Productivity' },
+  'meeting-cost':     { name:'Meeting Cost',       desc:'Real-time meeting cost calculator, input headcount and salary',              category:'Productivity' },
+  'spinner':          { name:'Random Picker',      desc:'Random draw from custom list with Canvas spinning wheel animation',          category:'Productivity' },
+  'stopwatch':        { name:'Stopwatch',          desc:'Start/pause/reset/lap with millisecond precision and lap history',           category:'Productivity' },
+  'text-template':    { name:'Text Template',      desc:'{{variable}} placeholder replacement with batch JSON mode',                  category:'Productivity' },
+  'todo':             { name:'Todo',               desc:'Local storage todo list with complete/delete/clear support',                 category:'Productivity' },
+  'note':             { name:'Quick Note',         desc:'Auto-saved text note with word count, persists after close',                 category:'Productivity' },
+  'typing-speed':     { name:'Typing Practice',    desc:'Sentence/word/code mode, WPM test with stats chart',                         category:'Productivity' },
   // Network (网络工具)
-  { name:'User Agent',        desc:'Parse browser User-Agent, detect OS/browser/device',                       category:'Network' },
-  { name:'HTTP Tester',       desc:'Send GET/POST requests visually in browser, simple Postman',               category:'Network' },
+  'user-agent':       { name:'User Agent',         desc:'Parse browser User-Agent, detect OS/browser/device',                         category:'Network' },
+  'http-tester':      { name:'HTTP Tester',        desc:'Send GET/POST requests visually in browser, simple Postman',                 category:'Network' },
+  'ip-info':          { name:'IP Info',            desc:'Query your public IP and geolocation info',                                  category:'Network' },
+  'speed-test':       { name:'Speed Test',         desc:'Test network download/upload speed in browser',                              category:'Network' },
   // Fun (趣味工具)
-  { name:'ASCII Art',         desc:'Convert text to ASCII art with 4 font styles',                             category:'Fun' },
-  // New tools
-  { name:'IP Info',           desc:'Query your public IP and geolocation info',                               category:'Network' },
-  { name:'Text Escape',       desc:'Escape/unescape JSON/regex/HTML/URL special characters',                   category:'Text' },
-  { name:'SVG Preview',       desc:'Paste SVG code for live preview with zoom support',                        category:'CSS Tools' },
-  { name:'Aspect Ratio',      desc:'Calculate dimensions from aspect ratio, common presets',                   category:'Calculator' },
-  { name:'Palette Generator', desc:'Generate full color scale from base color, export CSS variables',          category:'CSS Tools' },
-  { name:'Image to WebP',     desc:'Batch convert images to WebP with quality control',                        category:'Image' },
-  { name:'Git Commit',        desc:'Generate conventional commit messages following Angular convention',       category:'Dev Tools' },
-  { name:'Nginx Config',      desc:'Generate Nginx config for static site/reverse proxy/HTTPS redirect',     category:'Dev Tools' },
-  { name:'Clip-path',         desc:'CSS clip-path generator, polygon/ellipse/inset shape editor',               category:'CSS Tools' },
-  { name:'IP Speed Test',     desc:'Test network download speed in browser',                                 category:'Network' },
-  // Batch 2
-  { name:'JSON Diff',         desc:'Diff two JSON or YAML objects with highlighted differences',              category:'Text' },
-  { name:'TOML/JSON',         desc:'Bidirectional conversion between TOML and JSON',                          category:'Text' },
-  { name:'Env Parser',        desc:'Parse .env files, format checking and key extraction',                    category:'Dev Tools' },
-  { name:'Dockerfile Gen',    desc:'Generate best-practice Dockerfile for Node/Python/Go/Java',              category:'Dev Tools' },
-  { name:'CSS Unit Convert',  desc:'px/rem/em/vw/vh/pt conversions with configurable base font size',        category:'CSS Tools' },
-  { name:'World Clock',       desc:'8 major timezones displayed simultaneously in real time',                 category:'Time' },
-  { name:'Stopwatch',         desc:'Start/pause/reset/lap with millisecond precision and lap history',        category:'Productivity' },
-  { name:'Text Template',     desc:'{{variable}} placeholder replacement with auto-generated form',          category:'Productivity' },
-  { name:'Matrix Rain',       desc:'Matrix digital rain canvas animation, classic green characters',          category:'Fun' },
-  // Text batch
-  { name:'Slug Generator',    desc:'Convert text to URL-friendly slug with pinyin support',                   category:'Text' },
-  { name:'Line Sort',         desc:'Sort lines alphabetically, reverse, deduplicate, shuffle or remove blanks',category:'Text' },
-  // Dev batch
-  { name:'Semver',            desc:'Parse semantic versions, compare ranges, check compatibility',             category:'Dev Tools' },
-  { name:'DNS Lookup',        desc:'DNS over HTTPS query for A/AAAA/MX/TXT/CNAME/NS records',                category:'Dev Tools' },
-  { name:'Terminal Color',    desc:'ANSI color code generator with foreground/background/style preview',       category:'Dev Tools' },
-  // Calc batch
-  { name:'Age Calculator',    desc:'Exact age (years/months/days), days to birthday, zodiac sign',           category:'Calculator' },
-  { name:'Tax Calculator',    desc:'2024 personal income tax calculator with deductions',                    category:'Calculator' },
-  // Time batch
-  { name:'Lunar Calendar',    desc:'Query Chinese lunar date, zodiac, solar terms for any date',             category:'Time' },
-  // Productivity batch
-  { name:'Todo',              desc:'Local storage todo list with complete/delete/clear support',              category:'Productivity' },
-  { name:'Quick Note',        desc:'Auto-saved text note with word count, persists after close',             category:'Productivity' },
-  { name:'Typing Practice',   desc:'Sentence & word mode, WPM test with 60s timed challenge',               category:'Productivity' },
-  // Image batch
-  { name:'EXIF Viewer',       desc:'Read image EXIF data: camera model, ISO, exposure time and more',       category:'Image' },
-  // Fun batch
-  { name:'Emoji Picker',      desc:'Browse Emoji by category, one-click copy, searchable',                  category:'Fun' },
-  { name:'White Noise',       desc:'White/pink/brown noise and rain sounds, adjustable volume',             category:'Fun' },
-];
+  'ascii-art':        { name:'ASCII Art',          desc:'Convert text to ASCII art with 4 font styles',                               category:'Fun' },
+  'emoji-picker':     { name:'Emoji Picker',       desc:'Browse Emoji by category, one-click copy, searchable',                       category:'Fun' },
+  'noise-gen':        { name:'White Noise',        desc:'White/pink/brown noise and rain sounds, adjustable volume',                  category:'Fun' },
+  'matrix-rain':      { name:'Matrix Rain',        desc:'Matrix digital rain canvas animation, classic green characters',              category:'Fun' },
+};
 
 // ── 核心 i18n 函数 ──
 let _currentLang = localStorage.getItem('dtb_lang') || 'zh';
@@ -309,8 +300,8 @@ function setLang(lang) {
 // ── 获取当前语言下的工具数据（覆盖 name/desc/category）──
 function getLocalizedTools(tools) {
   if (_currentLang === 'zh') return tools;
-  return tools.map((t, i) => {
-    const en = TOOLS_EN[i];
+  return tools.map(t => {
+    const en = TOOLS_EN[t.id];
     if (!en) return t;
     return Object.assign({}, t, {
       name: en.name,

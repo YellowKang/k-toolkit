@@ -73,5 +73,3 @@ function epCopy() {
   if (!el || !el.textContent) return;
   navigator.clipboard.writeText(el.textContent).then(() => showToast('已复制'));
 }
-
-window._activeCleanup = function() {};

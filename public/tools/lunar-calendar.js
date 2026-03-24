@@ -57,5 +57,3 @@ function doLunar() {
     cards.map(c=>`<div style="background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:10px;padding:12px;text-align:center"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${c.label}</div><div style="font-size:15px;font-weight:600;color:var(--text)">${c.val}</div></div>`).join('') + '</div>';
   document.getElementById('lcResult').style.display = '';
 }
-
-window._activeCleanup = function() {};

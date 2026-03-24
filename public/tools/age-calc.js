@@ -52,5 +52,3 @@ function doAgeCalc() {
     </div>`).join('');
   document.getElementById('ageResult').style.display = '';
 }
-
-window._activeCleanup = function() {};

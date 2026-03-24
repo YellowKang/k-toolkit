@@ -1,7 +1,7 @@
 {
   "name": "k-toolkit",
   "version": "2.0.0",
-  "description": "Agentic 智能体开发者工具箱 - 92+ 工具 · AI 助手 · 纯前端，无需登录",
+  "description": "Agentic 智能体开发者工具箱 - 82 个精选工具 · AI Agent 助手 · 纯前端，无需登录",
   "main": "server.js",
   "repository": {
     "type": "git",

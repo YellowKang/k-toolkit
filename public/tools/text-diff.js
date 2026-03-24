@@ -214,5 +214,3 @@ function diffClear() {
   if (ca) ca.textContent = '';
   if (cb) cb.textContent = '';
 }
-
-window._activeCleanup = function() {};

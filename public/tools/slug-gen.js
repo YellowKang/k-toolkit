@@ -52,5 +52,3 @@ function doSlugGen() {
   const el = document.getElementById('sgResult');
   if (el) el.textContent = result;
 }
-
-window._activeCleanup = function() {};

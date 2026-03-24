@@ -68,5 +68,3 @@ function clearDoneTodos() {
   _saveTodos(_getTodos().filter(t => !t.done));
   renderTodoList();
 }
-
-window._activeCleanup = function() {};

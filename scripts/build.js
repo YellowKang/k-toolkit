@@ -2,6 +2,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..');
 const PUB = path.join(ROOT, 'public');
@@ -19,6 +20,15 @@ function minifyCSS(src) {
     .trim();
 }
 
+function minifyJS(src) {
+  return src
+    .replace(/\/\/[^\n]*/g, '')            // strip single-line comments (rough)
+    .replace(/\/\*[\s\S]*?\*\//g, '')      // strip block comments
+    .replace(/\n\s*\n/g, '\n')            // collapse blank lines
+    .replace(/^\s+/gm, '')                // strip leading whitespace per line
+    .trim();
+}
+
 function fmtKB(bytes) {
   return (bytes / 1024).toFixed(1) + ' KB';
 }
@@ -28,22 +38,54 @@ function copyFile(src, dest) {
   fs.copyFileSync(src, dest);
 }
 
-function copyDir(srcDir, destDir) {
-  if (!fs.existsSync(srcDir)) return;
+function minifyAndWrite(src, dest) {
+  const original = fs.readFileSync(src, 'utf8');
+  const minified = minifyJS(original);
+  ensureDir(path.dirname(dest));
+  fs.writeFileSync(dest, minified, 'utf8');
+  return { before: Buffer.byteLength(original, 'utf8'), after: Buffer.byteLength(minified, 'utf8') };
+}
+
+function processDir(srcDir, destDir, ext, processor) {
+  if (!fs.existsSync(srcDir)) return 0;
   ensureDir(destDir);
+  let count = 0;
   for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
     const s = path.join(srcDir, entry.name);
     const d = path.join(destDir, entry.name);
-    if (entry.isDirectory()) copyDir(s, d);
-    else fs.copyFileSync(s, d);
+    if (entry.isDirectory()) {
+      count += processDir(s, d, ext, processor);
+    } else if (ext && entry.name.endsWith(ext)) {
+      processor(s, d);
+      count++;
+    } else {
+      fs.copyFileSync(s, d);
+      count++;
+    }
   }
+  return count;
 }
 
+// ── Clean dist ──
+if (fs.existsSync(DIST)) {
+  fs.rmSync(DIST, { recursive: true, force: true });
+}
 ensureDir(DIST);
+
+// ── Generate version hash from source files ──
+const hashSrc = crypto.createHash('md5');
+const coreFiles = ['dashboard.js', 'dashboard-cmd.js', 'i18n.js', 'dashboard-base.css', 'dashboard-components.css', 'dashboard-theme.css'];
+for (const f of coreFiles) {
+  const p = path.join(PUB, f);
+  if (fs.existsSync(p)) hashSrc.update(fs.readFileSync(p));
+}
+const BUILD_VERSION = hashSrc.digest('hex').slice(0, 8);
+console.log(`\nBuild version: ${BUILD_VERSION}`);
 
 // ── Minify CSS ──
 const cssFiles = ['dashboard-base.css', 'dashboard-components.css', 'dashboard-theme.css'];
 console.log('\nCSS Minification:');
+let totalSavedCSS = 0;
 for (const name of cssFiles) {
   const src = path.join(PUB, name);
   if (!fs.existsSync(src)) { console.log(`  SKIP ${name} (not found)`); continue; }
@@ -53,18 +95,36 @@ for (const name of cssFiles) {
   fs.writeFileSync(dest, minified, 'utf8');
   const before = Buffer.byteLength(original, 'utf8');
   const after = Buffer.byteLength(minified, 'utf8');
+  totalSavedCSS += before - after;
   const pct = (((before - after) / before) * 100).toFixed(1);
   console.log(`  ${name}: ${fmtKB(before)} → ${fmtKB(after)} (-${pct}%)`);
 }
 
-// ── Copy JS files ──
-const jsFiles = ['dashboard.js', 'dashboard-cmd.js', 'sw.js', 'i18n.js'];
-console.log('\nCopying JS:');
+// ── Minify core JS ──
+const jsFiles = ['dashboard.js', 'dashboard-cmd.js', 'i18n.js'];
+console.log('\nJS Minification:');
+let totalSavedJS = 0;
 for (const name of jsFiles) {
   const src = path.join(PUB, name);
   if (!fs.existsSync(src)) continue;
-  copyFile(src, path.join(DIST, name));
-  console.log(`  ${name}`);
+  const { before, after } = minifyAndWrite(src, path.join(DIST, name));
+  totalSavedJS += before - after;
+  const pct = (((before - after) / before) * 100).toFixed(1);
+  console.log(`  ${name}: ${fmtKB(before)} → ${fmtKB(after)} (-${pct}%)`);
+}
+
+// ── Process SW: inject version ──
+console.log('\nService Worker:');
+const swSrc = path.join(PUB, 'sw.js');
+if (fs.existsSync(swSrc)) {
+  let swContent = fs.readFileSync(swSrc, 'utf8');
+  swContent = swContent.replace(
+    "self.__SW_VERSION__ || 'dev'",
+    `'${BUILD_VERSION}'`
+  );
+  const minified = minifyJS(swContent);
+  fs.writeFileSync(path.join(DIST, 'sw.js'), minified, 'utf8');
+  console.log(`  sw.js (version: ${BUILD_VERSION})`);
 }
 
 // ── Copy HTML ──
@@ -77,16 +137,22 @@ for (const name of htmlFiles) {
   console.log(`  ${name}`);
 }
 
-// ── Copy tools/ ──
-console.log('\nCopying tools/:');
-copyDir(path.join(PUB, 'tools'), path.join(DIST, 'tools'));
-const toolCount = fs.existsSync(path.join(DIST, 'tools'))
-  ? fs.readdirSync(path.join(DIST, 'tools')).length : 0;
+// ── Minify tools/ JS ──
+console.log('\nMinifying tools/:');
+const toolCount = processDir(path.join(PUB, 'tools'), path.join(DIST, 'tools'), '.js', (s, d) => {
+  minifyAndWrite(s, d);
+});
 console.log(`  ${toolCount} files`);
 
-// ── Copy agent/ ──
-console.log('\nCopying agent/:');
-copyDir(path.join(PUB, 'agent'), path.join(DIST, 'agent'));
-console.log('  done');
+// ── Minify agent/ JS ──
+console.log('\nMinifying agent/:');
+const agentCount = processDir(path.join(PUB, 'agent'), path.join(DIST, 'agent'), '.js', (s, d) => {
+  minifyAndWrite(s, d);
+});
+console.log(`  ${agentCount} files`);
 
-console.log('\nBuild complete → dist/');
+// ── Summary ──
+const totalSaved = totalSavedCSS + totalSavedJS;
+console.log(`\nBuild complete → dist/`);
+console.log(`  Core savings: ${fmtKB(totalSaved)} (CSS: ${fmtKB(totalSavedCSS)}, JS: ${fmtKB(totalSavedJS)})`);
+console.log(`  SW cache version: ${BUILD_VERSION}`);

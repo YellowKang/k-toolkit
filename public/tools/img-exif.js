@@ -94,5 +94,3 @@ function _exifParseJpeg(data) {
   }
   return results;
 }
-
-window._activeCleanup = function() {};

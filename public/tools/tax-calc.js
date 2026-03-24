@@ -52,5 +52,3 @@ function doTaxCalc() {
   ).join('');
   document.getElementById('taxResult').style.display = '';
 }
-
-window._activeCleanup = function() {};
