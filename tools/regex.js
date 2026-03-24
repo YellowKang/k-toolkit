@@ -17,13 +17,22 @@ function renderRegex(el) {
         <div style="font-size:11px;color:var(--text-muted);margin-bottom:7px">常用片段</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${[
-            {label:'邮箱', pattern:'[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2}'},
+            {label:'邮箱', pattern:'[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}'},
             {label:'URL',  pattern:'https?:\\/\\/[\\w\\-.]+(?:\\.[\\w\\-.]+)+[\\w\\-._~:/?#[\\]@!$&\'()*+,;=%]*'},
             {label:'手机', pattern:'1[3-9]\\d{9}'},
             {label:'IP',   pattern:'(?:(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)'},
             {label:'日期', pattern:'\\d{4}[-/](?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\\d|3[01])'},
             {label:'数字', pattern:'-?\\d+(?:\\.\\d+)?'},
-          ].map(s => `<button onclick="_regexFillSnippet(this)" data-pattern="${s.pattern.replace(/"/g,'&quot;')}" style="padding:2px 10px;border-radius:16px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:var(--text-muted);font-size:11px;cursor:pointer;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(102,126,234,0.5)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-muted)'">${s.label}</button>`).join('')}
+            {label:'身份证', pattern:'[1-9]\\d{5}(?:19|20)\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])\\d{3}[\\dXx]'},
+            {label:'中文',   pattern:'[\\u4e00-\\u9fa5]+'},
+            {label:'HTML标签',pattern:'<\\/?[a-zA-Z][^>]*>'},
+            {label:'HEX颜色',pattern:'#[0-9a-fA-F]{3,8}'},
+            {label:'域名',   pattern:'[a-zA-Z0-9][-a-zA-Z0-9]{0,62}(?:\\.[a-zA-Z0-9][-a-zA-Z0-9]{0,62})+'},
+            {label:'邮编',   pattern:'\\d{6}'},
+            {label:'UUID',   pattern:'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'},
+            {label:'MAC', pattern:'[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}'},
+            {label:'版本号',  pattern:'v?\\d+\\.\\d+(?:\\.\\d+)?(?:-[\\w.]+)?'},
+          ].map(s => `<button onclick="_regexFillSnippet(this)" data-pattern="${s.pattern.replace(/"/g,'&quot;')}" title="${s.label}: ${s.pattern.replace(/"/g,'&quot;')}" style="padding:2px 10px;border-radius:16px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:var(--text-muted);font-size:11px;cursor:pointer;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(102,126,234,0.5)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--glass-border)';this.style.color='var(--text-muted)'">${s.label}</button>`).join('')}
         </div>
       </div>
     </div>

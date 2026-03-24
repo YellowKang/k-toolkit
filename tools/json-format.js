@@ -141,7 +141,7 @@ function jsonToggleView() {
   if (_jsonViewMode === 'tree') {
     const raw = textEl.textContent;
     try {
-      treeEl.innerHTML = _jsonBuildTree(JSON.parse(raw));
+      treeEl.innerHTML = _jsonBuildTree(JSON.parse(raw), 0, '$');
       textEl.style.display = 'none';
       treeEl.style.display = '';
       btn.textContent = '文本视图';
@@ -153,20 +153,30 @@ function jsonToggleView() {
   }
 }
 
-function _jsonBuildTree(val, depth) {
+function _jPathKey(key) {
+  if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)) return '.' + key;
+  return "['" + key.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "']";
+}
+
+function _jsonBuildTree(val, depth, path) {
   depth = depth || 0;
-  if (val === null) return '<span style="color:#ef4444">null</span>';
-  if (typeof val === 'boolean') return `<span style="color:#f59e0b">${val}</span>`;
-  if (typeof val === 'number') return `<span style="color:#06b6d4">${val}</span>`;
-  if (typeof val === 'string') return `<span style="color:#10b981">"${val.replace(/</g,'&lt;').replace(/>/g,'&gt;')}"</span>`;
+  path = path || '$';
+  const esc = (s) => s.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const pathAttr = `data-jpath="${esc(path)}"`;
+  if (val === null) return `<span class="jt-clickable" ${pathAttr} onclick="_jShowPath(this,event)" style="color:#ef4444">null</span>`;
+  if (typeof val === 'boolean') return `<span class="jt-clickable" ${pathAttr} onclick="_jShowPath(this,event)" style="color:#f59e0b">${val}</span>`;
+  if (typeof val === 'number') return `<span class="jt-clickable" ${pathAttr} onclick="_jShowPath(this,event)" style="color:#06b6d4">${val}</span>`;
+  if (typeof val === 'string') return `<span class="jt-clickable" ${pathAttr} onclick="_jShowPath(this,event)" style="color:#10b981">"${esc(val)}"</span>`;
   const isArr = Array.isArray(val);
   const keys = isArr ? val.map((_,i)=>i) : Object.keys(val);
   if (!keys.length) return isArr ? '[]' : '{}';
   const id = 'jt_' + Math.random().toString(36).slice(2);
   const bracket = isArr ? ['[',']'] : ['{','}'];
   const items = keys.map(k => {
-    const keyHtml = isArr ? '' : `<span style="color:#c4b5fd">"${k}"</span>: `;
-    return `<div style="padding-left:18px">${keyHtml}${_jsonBuildTree(val[k], depth+1)}</div>`;
+    const childPath = isArr ? path + '[' + k + ']' : path + _jPathKey(String(k));
+    const childPathAttr = `data-jpath="${esc(childPath)}"`;
+    const keyHtml = isArr ? '' : `<span class="jt-clickable" ${childPathAttr} onclick="_jShowPath(this,event)" style="color:#c4b5fd">"${esc(String(k))}"</span>: `;
+    return `<div style="padding-left:18px">${keyHtml}${_jsonBuildTree(val[k], depth+1, childPath)}</div>`;
   }).join('');
   return `<span onclick="_jCollapse('${id}')" style="cursor:pointer;user-select:none;color:var(--text-muted)">${bracket[0]}▾</span><div id="${id}">${items}</div><span>${bracket[1]}</span>`;
 }
@@ -179,6 +189,39 @@ function _jCollapse(id) {
   const toggle = el.previousElementSibling;
   if (toggle) toggle.textContent = toggle.textContent.replace(hidden ? '▸' : '▾', hidden ? '▾' : '▸');
 }
+
+function _jShowPath(el, e) {
+  e.stopPropagation();
+  const path = el.getAttribute('data-jpath');
+  if (!path) return;
+  // remove previous active
+  const prev = document.querySelector('.jt-active');
+  if (prev) prev.classList.remove('jt-active');
+  el.classList.add('jt-active');
+  // compute wildcard path
+  const wildcard = path.replace(/\[\d+\]/g, '[*]');
+  const hasWildcard = wildcard !== path;
+  // render path bar
+  let bar = document.getElementById('jsonPathBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'jsonPathBar';
+    const treeEl = document.getElementById('jsonTreeOutput');
+    treeEl.insertBefore(bar, treeEl.firstChild);
+  }
+  const row = (p) => `<div style="display:flex;align-items:center;gap:8px"><code style="flex:1;font-size:13px;word-break:break-all">${p.replace(/</g,'&lt;')}</code><button class="btn btn-secondary" style="padding:2px 10px;font-size:11px;flex-shrink:0" onclick="copyText('${p.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}',this)">复制</button></div>`;
+  bar.innerHTML = row(path) + (hasWildcard ? row(wildcard) : '');
+  bar.style.cssText = 'position:sticky;top:0;z-index:2;background:rgba(30,30,40,0.95);border:1px solid var(--glass-border);border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:4px;backdrop-filter:blur(8px)';
+}
+
+// inject hover/active styles once
+(function() {
+  if (document.getElementById('jt-click-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'jt-click-styles';
+  style.textContent = `.jt-clickable{cursor:pointer;border-radius:3px;padding:0 2px;transition:background .15s}.jt-clickable:hover{background:rgba(255,255,255,0.08)}.jt-clickable.jt-active{background:rgba(99,102,241,0.25);outline:1px solid rgba(99,102,241,0.4)}`;
+  document.head.appendChild(style);
+})();
 
 function jsonPathQuery() {
   const path = (document.getElementById('jsonPathInput') || {}).value || '';

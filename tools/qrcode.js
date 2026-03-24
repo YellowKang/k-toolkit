@@ -14,19 +14,41 @@ function renderQrCode(el) {
     '<select id="qrEcc" class="tool-input" style="width:auto">' +
     '<option value="L">L (低)</option><option value="M" selected>M (中)</option><option value="Q">Q (较高)</option><option value="H">H (高)</option>' +
     '</select>' +
+    '<label style="font-size:13px;color:var(--text-muted)">样式</label>' +
+    '<select id="qrStyle" class="tool-input" style="width:auto" onchange="qrAutoGen()">' +
+    '<option value="square">方块</option><option value="rounded">圆角</option><option value="dots">圆点</option>' +
+    '</select>' +
     '<label style="font-size:13px;color:var(--text-muted)">前景色</label>' +
     '<input type="color" id="qrFg" value="#000000" style="width:36px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px" onchange="qrAutoGen()">' +
     '<label style="font-size:13px;color:var(--text-muted)">背景色</label>' +
     '<input type="color" id="qrBg" value="#ffffff" style="width:36px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px" onchange="qrAutoGen()">' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;align-items:center">' +
+    '<label style="font-size:13px;color:var(--text-muted)">Logo</label>' +
+    '<input type="file" id="qrLogo" accept="image/*" style="font-size:12px;color:var(--text-muted)">' +
+    '<button class="btn btn-secondary" onclick="_qrLogoImg=null;document.getElementById(\'qrLogo\').value=\'\';qrAutoGen()" style="font-size:12px">清除 Logo</button>' +
     '<button class="btn btn-primary" onclick="generateQr()">生成</button>' +
-    '</div></div>' +
+    '</div>' +
+    '</div>' +
     '<div class="tool-card-panel" id="qrResult" style="display:none"></div>';
   loadQrLib();
+  document.getElementById('qrLogo').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) { _qrLogoImg = null; return; }
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var img = new Image();
+      img.onload = function() { _qrLogoImg = img; qrAutoGen(); };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 var _qrLibLoaded = false;
 var _qrLibLoading = false;
 var _qrAutoTimer = null;
+var _qrLogoImg = null;
 
 function loadQrLib() {
   if (_qrLibLoaded || _qrLibLoading) return;
@@ -56,6 +78,7 @@ function generateQr() {
   var ecc = document.getElementById('qrEcc').value;
   var fg = document.getElementById('qrFg').value;
   var bg = document.getElementById('qrBg').value;
+  if (_qrLogoImg) ecc = 'H';
   panel.style.display = '';
   panel.innerHTML = '<div class="panel-label">二维码</div>' +
     '<div style="display:flex;flex-direction:column;align-items:center;gap:14px">' +
@@ -74,8 +97,76 @@ function generateQr() {
       colorLight: bg,
       correctLevel: QRCode.CorrectLevel[ecc]
     });
+    setTimeout(function() {
+      var canvas = document.querySelector('#qrCanvas canvas');
+      if (!canvas) return;
+      var style = document.getElementById('qrStyle').value;
+      applyQrStyle(canvas, style, _qrLogoImg);
+    }, 100);
   } catch(e) {
     panel.innerHTML = '<div style="color:#ef4444">生成失败：' + escHtml(e.message) + '</div>';
+  }
+}
+
+function applyQrStyle(canvas, style, logoImg) {
+  if (style === 'square' && !logoImg) return;
+  var ctx = canvas.getContext('2d');
+  var size = canvas.width;
+  var imageData = ctx.getImageData(0, 0, size, size);
+  var fg = document.getElementById('qrFg').value;
+  var bg = document.getElementById('qrBg').value;
+
+  // Find module size by detecting first dark pixel run
+  var moduleSize = 1;
+  for (var x = 0; x < size; x++) {
+    var i = x * 4;
+    if (imageData.data[i] < 128) {
+      var end = x;
+      while (end < size && imageData.data[end * 4] < 128) end++;
+      moduleSize = end - x;
+      break;
+    }
+  }
+  if (moduleSize < 2) moduleSize = Math.max(1, Math.round(size / 33));
+
+  // Clear and redraw with style
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = fg;
+
+  for (var y = 0; y < size; y += moduleSize) {
+    for (var xi = 0; xi < size; xi += moduleSize) {
+      var idx = (y * size + xi) * 4;
+      if (imageData.data[idx] < 128) {
+        var pad = moduleSize * 0.1;
+        if (style === 'dots') {
+          ctx.beginPath();
+          ctx.arc(xi + moduleSize / 2, y + moduleSize / 2, moduleSize / 2 - pad, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (style === 'rounded') {
+          var r = moduleSize * 0.3;
+          var mx = xi + pad, my = y + pad, ms = moduleSize - pad * 2;
+          ctx.beginPath();
+          ctx.roundRect(mx, my, ms, ms, r);
+          ctx.fill();
+        } else {
+          ctx.fillRect(xi, y, moduleSize, moduleSize);
+        }
+      }
+    }
+  }
+
+  // Logo overlay
+  if (logoImg) {
+    var logoSize = size * 0.22;
+    var lx = (size - logoSize) / 2;
+    var ly = (size - logoSize) / 2;
+    var lpad = 4;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.roundRect(lx - lpad, ly - lpad, logoSize + lpad * 2, logoSize + lpad * 2, 8);
+    ctx.fill();
+    ctx.drawImage(logoImg, lx, ly, logoSize, logoSize);
   }
 }
 
@@ -95,19 +186,19 @@ function downloadQrSvg() {
   if (!canvas) return;
   var size = canvas.width;
   var ctx = canvas.getContext('2d');
-  var data = ctx.getImageData(0,0,size,size).data;
+  var data = ctx.getImageData(0, 0, size, size).data;
   var fg = document.getElementById('qrFg').value;
   var bg = document.getElementById('qrBg').value;
-  var cell = 1;
   var rects = '';
-  for (var y=0;y<size;y++) {
-    for (var x=0;x<size;x++) {
-      var i=(y*size+x)*4;
-      if (data[i]<128) rects += '<rect x="'+x+'" y="'+y+'" width="1" height="1" fill="'+fg+'"/>';
+  for (var y = 0; y < size; y++) {
+    for (var x = 0; x < size; x++) {
+      var i = (y * size + x) * 4;
+      if (data[i] < 128) rects += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + fg + '"/>';
     }
   }
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+size+' '+size+'" width="'+size+'" height="'+size+'"><rect width="'+size+'" height="'+size+'" fill="'+bg+'"/>'+rects+'</svg>';
-  var blob = new Blob([svg],{type:'image/svg+xml'});
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '">' +
+    '<rect width="' + size + '" height="' + size + '" fill="' + bg + '"/>' + rects + '</svg>';
+  var blob = new Blob([svg], { type: 'image/svg+xml' });
   var a = document.createElement('a');
   var svgUrl = URL.createObjectURL(blob);
   a.href = svgUrl;

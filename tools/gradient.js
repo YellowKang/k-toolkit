@@ -1,9 +1,40 @@
+const GRAD_PRESETS = [
+  { name:'日落',   colors:['#ff512f','#f09819'], angle:135 },
+  { name:'极光',   colors:['#00c6ff','#0072ff','#1a1a8c'], angle:135 },
+  { name:'樱花',   colors:['#fbc2eb','#a6c1ee'], angle:120 },
+  { name:'海洋',   colors:['#2193b0','#6dd5ed'], angle:90 },
+  { name:'火焰',   colors:['#f12711','#f5af19'], angle:45 },
+  { name:'薰衣草', colors:['#e8cbc0','#636fa4'], angle:135 },
+  { name:'糖果',   colors:['#ff9a9e','#fecfef','#fdfbfb'], angle:135 },
+  { name:'森林',   colors:['#11998e','#38ef7d'], angle:120 },
+  { name:'星空',   colors:['#0f0c29','#302b63','#24243e'], angle:180 },
+  { name:'柠檬',   colors:['#f7ff00','#db36a4'], angle:90 },
+  { name:'深海',   colors:['#1a2980','#26d0ce'], angle:135 },
+  { name:'蜜桃',   colors:['#ed6ea0','#ec8c69'], angle:120 },
+  { name:'极夜',   colors:['#232526','#414345'], angle:180 },
+  { name:'彩虹',   colors:['#ff0000','#ff7700','#ffff00','#00ff00','#0000ff','#8b00ff'], angle:90 },
+  { name:'薄荷',   colors:['#00b09b','#96c93d'], angle:135 },
+  { name:'玫瑰',   colors:['#ee9ca7','#ffdde1'], angle:135 },
+  { name:'午夜',   colors:['#0f2027','#203a43','#2c5364'], angle:135 },
+  { name:'阳光',   colors:['#f6d365','#fda085'], angle:120 },
+  { name:'冰川',   colors:['#e6dada','#274046'], angle:135 },
+  { name:'霓虹',   colors:['#12c2e9','#c471ed','#f64f59'], angle:135 },
+];
+
+let _gradStops = [];
+
 function renderGradient(el) {
   el.innerHTML = `
     <div class="tool-card-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div class="panel-label" style="margin:0">渐变设置</div>
         <button class="btn btn-secondary" onclick="gradRandom()">随机</button>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:7px">预设模板</div>
+        <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px">
+          ${GRAD_PRESETS.map((p,i) => `<button onclick="gradApplyPreset(${i})" style="flex-shrink:0;width:48px;height:28px;border-radius:8px;border:1px solid var(--glass-border);cursor:pointer;background:linear-gradient(135deg, ${p.colors.join(',')})" title="${p.name}"></button>`).join('')}
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:14px">
         <div>
@@ -24,14 +55,23 @@ function renderGradient(el) {
     </div>
     <div class="tool-card-panel">
       <div style="height:120px;border-radius:12px;margin-bottom:14px;border:1px solid var(--glass-border);transition:all 0.3s" id="gradPreview"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <button class="btn btn-secondary" id="gradAnimToggle" onclick="gradToggleAnim()" style="font-size:12px">▶ 动画</button>
+      </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div class="panel-label" style="margin:0">CSS 代码</div>
         <button class="btn btn-secondary" onclick="copyText(document.getElementById('gradCode').textContent,this)">复制</button>
       </div>
       <pre class="result-box" id="gradCode" style="white-space:pre-wrap"></pre>
+      <div style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-size:11px;color:var(--text-muted)">Tailwind CSS</div>
+          <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="copyText(document.getElementById('gradTailwind').textContent,this)">复制</button>
+        </div>
+        <pre class="result-box" id="gradTailwind" style="white-space:pre-wrap;font-size:12px"></pre>
+      </div>
     </div>`;
 
-  // 初始化两个色标
   _gradStops = [
     {color:'#667eea',pos:0},
     {color:'#f093fb',pos:100},
@@ -39,8 +79,6 @@ function renderGradient(el) {
   gradRenderStops();
   gradUpdate();
 }
-
-let _gradStops = [];
 
 function gradRenderStops() {
   const container = document.getElementById('gradStops');
@@ -76,6 +114,48 @@ function gradUpdate() {
     const el = document.getElementById('gsc'+i);
     if (el) el.textContent = s.color.toUpperCase();
   });
+  // Tailwind output
+  const twEl = document.getElementById('gradTailwind');
+  if (twEl) {
+    if (type === 'linear' && sorted.length >= 2) {
+      const angleMap = {0:'to-t',45:'to-tr',90:'to-r',135:'to-br',180:'to-b',225:'to-bl',270:'to-l',315:'to-tl'};
+      const dir = angleMap[+angle] || 'to-r';
+      let tw = `bg-gradient-${dir} from-[${sorted[0].color}]`;
+      if (sorted.length === 3) tw += ` via-[${sorted[1].color}]`;
+      if (sorted.length >= 2) tw += ` to-[${sorted[sorted.length-1].color}]`;
+      twEl.textContent = tw;
+    } else {
+      twEl.textContent = '// Tailwind 仅支持 linear-gradient 的 2-3 色标';
+    }
+  }
+}
+
+function gradApplyPreset(i) {
+  const p = GRAD_PRESETS[i];
+  _gradStops = p.colors.map((c,j) => ({color:c, pos:Math.round(j/(p.colors.length-1)*100)}));
+  const angle = document.getElementById('gradAngle');
+  if (angle) { angle.value = p.angle; document.getElementById('gradAngleVal').textContent = p.angle; }
+  gradRenderStops(); gradUpdate();
+}
+
+function gradToggleAnim() {
+  const preview = document.getElementById('gradPreview');
+  const btn = document.getElementById('gradAnimToggle');
+  if (!preview) return;
+  const isAnimating = preview.style.animation;
+  if (isAnimating) {
+    preview.style.animation = '';
+    btn.textContent = '▶ 动画';
+  } else {
+    if (!document.getElementById('gradAnimStyle')) {
+      const s = document.createElement('style');
+      s.id = 'gradAnimStyle';
+      s.textContent = '@keyframes gradSpin{to{filter:hue-rotate(360deg)}}';
+      document.head.appendChild(s);
+    }
+    preview.style.animation = 'gradSpin 3s linear infinite';
+    btn.textContent = '⏸ 停止';
+  }
 }
 
 function gradAddStop() {

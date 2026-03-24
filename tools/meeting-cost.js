@@ -37,6 +37,11 @@ function renderMeetingCost(el) {
   window._mcTimer = null;
   window._mcRoleCount = 0;
   mcRenderHistory();
+
+  window._activeCleanup = function() {
+    if (window._mcTimer) { clearInterval(window._mcTimer); window._mcTimer = null; }
+    window._mcRunning = false;
+  };
 }
 
 function mcAddRole() {
@@ -146,5 +151,4 @@ function mcClearHistory() {
   localStorage.removeItem('dtb_mc_history');
   mcRenderHistory();
 }
-
-window._activeCleanup = function() { clearInterval(window._mcTimer); };
+// _activeCleanup is set inside mcToggle() when the timer starts
