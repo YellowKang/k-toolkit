@@ -1,16 +1,18 @@
 # K Toolkit
 
-> 开发者工具箱 —— 92 个常用工具，纯静态，无需登录，开箱即用。
-> A developer toolbox — 92 tools, pure static, no login required.
+> 开发者工具箱 —— 82 个精选工具 + AI 智能体助手，纯静态，无需登录，开箱即用。
+> A developer toolbox — 82 curated tools + AI Agent assistant, pure static, no login required.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub Pages](https://img.shields.io/badge/demo-GitHub%20Pages-blue)](https://yellowkang.github.io/k-toolkit/)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)](#docker)
 
-K Toolkit 是一个面向开发者的在线工具集合，涵盖文本处理、编码加密、CSS、图片、网络、时间、效率等 10 大分类共 92 个工具。
+K Toolkit 是一个面向开发者的在线工具集合，涵盖文本处理、开发工具、CSS、图片、编码加密、计算、时间、效率、网络、趣味等 10 大分类共 82 个工具。
+内置 AI 智能体助手（Alt+A 唤起），支持自然语言驱动工具执行。
 所有工具均运行在浏览器本地，无需服务器，无需登录，数据不离开你的设备。
 
-K Toolkit is an online toolbox for developers, covering 92 tools across 10 categories including text processing, encoding/encryption, CSS, image, network, time, and productivity.
+K Toolkit is an online toolbox for developers, covering 82 tools across 10 categories including text processing, dev tools, CSS, image, encoding, calculation, time, productivity, network, and fun.
+Built-in AI Agent assistant (Alt+A to open) supports natural language tool execution.
 All tools run locally in the browser — no server, no login, your data never leaves your device.
 
 **在线体验 / Live Demo：[https://yellowkang.github.io/k-toolkit/](https://yellowkang.github.io/k-toolkit/)**
@@ -19,16 +21,27 @@ All tools run locally in the browser — no server, no login, your data never le
 
 | 分类 | 工具 |
 |------|------|
-| 文本处理 | Base64、JSON 格式化、字数统计、正则测试、JSON/CSV 互转、Markdown、文本 Diff、大小写转换、Unicode、文本转义 |
-| 编码加密 | AES、Hash（MD5/SHA）、JWT、URL 编码、HTML Entity |
-| CSS 工具 | 颜色转换、调色板、渐变生成器、色彩对比度、CSS 阴影、Clip-path |
-| 图片工具 | Base64 互转、图片压缩、WebP 转换、EXIF 查看、噪声生成 |
-| 网络工具 | IP 计算器、IP 信息、DNS 查询、HTTP 状态码、HTTP 测试、速度测试 |
-| 时间工具 | 时间戳、时区转换、日期差值、倒计时、世界时钟、农历日历 |
-| 开发工具 | UUID、密码生成、二维码、QR 解码、Cron、Regex、Flexbox、SVG、Semver、Nginx 配置、Docker 命令、Git Commit |
-| 计算工具 | 单位换算、字节换算、BMI、贷款、税率、百分比、宽高比 |
-| 效率工具 | 番茄钟、秒表、记事本、Todo、打字游戏、会议成本、Emoji 选择器、ASCII Art |
-| 趣味工具 | Lorem Ipsum、Slug、Morse 码、终端色彩 |
+| 文本处理 (14) | UUID、JSON 格式化、Base64、字数统计、正则测试（15 个模板）、JSON/CSV 互转、文本对比、Markdown 预览、大小写转换、Unicode、HTML 实体、占位文本、文本转义、JSON 对比、TOML/JSON、行排序去重、Slug 生成 |
+| 开发工具 (15) | 时间戳、URL 工具箱、哈希生成器、JWT 工具、进制转换、YAML/JSON、SQL 格式化、cURL 生成器（含 import 反解析）、HTTP 状态码、Cron 表达式、密码生成器（HIBP 泄露检测 + Diceware）、ENV 解析器、Dockerfile 生成、Nginx 配置生成、Git Commit、Semver、DNS 查询、终端颜色码 |
+| CSS 工具 (7) | 渐变生成器（20 预设 + 动画 + Tailwind）、颜色工具（拾色/转换/对比度三合一）、阴影生成器、Flexbox、SVG 预览、调色板生成器、Clip-path、CSS 单位转换 |
+| 图片工具 (5) | 图片 Base64、图片压缩、二维码生成（圆点/圆角样式 + Logo 嵌入）、二维码解析、图片转 WebP、EXIF 查看器 |
+| 编码加密 (3) | AES 加解密、摩斯电码、XML 格式化 |
+| 计算工具 (6) | 科学计算器、单位换算（含数字格式化）、贷款计算器、存储换算、数字大写、IP 子网计算、比例计算、年龄计算器、个税计算器 |
+| 时间工具 (4) | 日期差计算、时区转换、倒计时、世界时钟、农历查询 |
+| 效率工具 (7) | 番茄钟、会议费用、随机抽签（Canvas 转盘动画）、秒表计时、文本模板（支持批量 JSON）、Todo 清单、临时便签、打字速度测试（句子/单词/代码模式 + 统计图表） |
+| 网络工具 (4) | UA 解析、HTTP 请求测试、IP 信息、网速测试 |
+| 趣味工具 (3) | ASCII 艺术字、Emoji 选择器、白噪音、矩阵雨 |
+
+## 特性 / Features
+
+- **AI 智能体** — `Alt+A` 唤起 AI 助手，自然语言驱动工具执行，支持多模型（Claude/OpenAI/Gemini）
+- **中/英双语** — 点击 topbar EN/ZH 按钮即可切换
+- **全局搜索** — `/` 或 `⌘K` 呼出，支持拼音/英文/标签搜索
+- **多主题** — 暗夜黑 / 纯白 / 科技蓝 / 樱花粉 / 商务橙 / 清新绿
+- **懒加载** — 工具 JS 按需加载，首屏极速
+- **收藏 & 最近** — 收藏常用工具，自动记录使用历史，持久化到 localStorage
+- **离线可用** — Service Worker 缓存，断网也能使用
+- **移动适配** — 响应式布局 + 底部导航栏
 
 ## 快速开始 / Quick Start
 
@@ -81,14 +94,18 @@ k-toolkit/
 ├── public/                 # 静态资源（可直接部署）
 │   ├── index.html          # 入口重定向
 │   ├── dashboard.html      # 主面板
-│   ├── dashboard.js        # 主逻辑
-│   ├── dashboard-cmd.js    # 命令面板
+│   ├── dashboard.js        # 工具列表 + 主逻辑
+│   ├── dashboard-cmd.js    # 命令面板（⌘K）
 │   ├── i18n.js             # 中/英双语支持
 │   ├── sw.js               # Service Worker（离线缓存）
-│   ├── dashboard-base.css
-│   ├── dashboard-components.css
-│   ├── dashboard-theme.css
-│   └── tools/              # 各工具独立 JS 文件
+│   ├── dashboard-*.css     # 样式（基础/组件/主题）
+│   ├── tools/              # 各工具独立 JS 文件
+│   └── agent/              # AI 智能体模块
+│       ├── agent-core.js   # Agent 会话核心
+│       ├── agent-router.js # 页面上下文同步
+│       ├── agent-ui*.js    # 聊天 UI
+│       ├── actions/        # 工具执行器（nav/text/dev/css/calc...）
+│       └── adapters/       # 模型适配器（Claude/OpenAI/Gemini）
 ├── scripts/
 │   └── build.js            # 构建脚本（CSS 压缩 + 文件复制）
 ├── .github/workflows/
@@ -99,16 +116,6 @@ k-toolkit/
 ├── server.js               # 本地开发服务器
 └── package.json
 ```
-
-## 特性 / Features
-
-- 🌐 中/英双语切换，点击 topbar EN/ZH 按钮即可切换
-- ⚡ 工具懒加载，按需加载 JS，首屏极速
-- 🔍 全局搜索（`/` 或 `⌘K`），支持拼音/英文搜索
-- ⭐ 收藏 + 最近使用，持久化到 localStorage
-- 🎨 多主题切换（暗夜/浅色/科技蓝/樱花粉等）
-- 📱 移动端适配，底部导航栏
-- 🔌 离线可用（Service Worker 缓存）
 
 ## 贡献 / Contributing
 
