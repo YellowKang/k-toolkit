@@ -36,6 +36,13 @@ function renderCurlGen(el) {
         <button class="btn btn-secondary" onclick="cgLoadSample()">示例</button>
       </div>
     </div>
+    <div class="tool-card-panel">
+      <div class="panel-label" style="margin-bottom:8px">导入 cURL 命令</div>
+      <textarea class="tool-textarea" id="cgImportInput" rows="4" placeholder="粘贴 cURL 命令，如：curl -X POST -H 'Content-Type: application/json' -d '{&quot;key&quot;:&quot;value&quot;}' https://api.example.com/data"></textarea>
+      <div class="tool-actions" style="margin-top:8px">
+        <button class="btn btn-secondary" onclick="cgImportParse()">解析导入</button>
+      </div>
+    </div>
     <div class="tool-card-panel" id="cgResultPanel" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div style="display:flex;gap:6px" id="cgTabs"></div>
@@ -166,5 +173,73 @@ function cgLoadSample() {
     rows[0].querySelectorAll('input')[0].value='Authorization';
     rows[0].querySelectorAll('input')[1].value='Bearer your-token-here';
   }
+  cgGenerate();
+}
+
+// ── cURL Import 反解析 ──
+function parseCurlCommand(str) {
+  const result = { method:'GET', url:'', headers:{}, body:'' };
+  // Normalize: remove line continuations, collapse whitespace
+  const normalized = str.replace(/\\\s*\n/g,' ').replace(/\s+/g,' ').trim();
+  // Extract method
+  const methodMatch = normalized.match(/-X\s+([A-Z]+)/i);
+  if (methodMatch) result.method = methodMatch[1].toUpperCase();
+  // Extract URL
+  const urlMatch = normalized.match(/(?:curl\s+)?(?:.*?\s+)?((?:https?|ftp):\/\/[^\s'"]+)/i)
+    || normalized.match(/['"]?(https?:\/\/[^\s'"]+)['"]?/i);
+  if (urlMatch) result.url = urlMatch[1].replace(/['"]$/,'');
+  // Extract headers -H 'Key: Value' or -H "Key: Value"
+  const headerRe = /-H\s+['"]([^'"]+)['"]/gi;
+  let hm;
+  while ((hm = headerRe.exec(normalized)) !== null) {
+    const colonIdx = hm[1].indexOf(':');
+    if (colonIdx > 0) {
+      result.headers[hm[1].slice(0,colonIdx).trim()] = hm[1].slice(colonIdx+1).trim();
+    }
+  }
+  // Extract body -d or --data or --data-raw
+  const bodyMatch = normalized.match(/(?:-d|--data(?:-raw)?)\s+['"](.+?)['"]\s*(?:-|$)/i)
+    || normalized.match(/(?:-d|--data(?:-raw)?)\s+['"](.+?)['"]$/i)
+    || normalized.match(/(?:-d|--data(?:-raw)?)\s+(\S+)/i);
+  if (bodyMatch) result.body = bodyMatch[1];
+  // Auto-detect method from body
+  if (result.body && result.method === 'GET') result.method = 'POST';
+  return result;
+}
+
+function cgImportParse() {
+  const input = document.getElementById('cgImportInput').value.trim();
+  if (!input) { showToast('请粘贴 cURL 命令', 'error'); return; }
+  const parsed = parseCurlCommand(input);
+  // Fill form
+  document.getElementById('cgMethod').value = parsed.method;
+  document.getElementById('cgUrl').value = parsed.url;
+  // Clear existing headers and add parsed ones
+  document.getElementById('cgHeaders').innerHTML = '';
+  const headerEntries = Object.entries(parsed.headers);
+  if (headerEntries.length === 0) {
+    cgAddHeader();
+  } else {
+    headerEntries.forEach(([k,v]) => {
+      cgAddHeader();
+      const rows = document.querySelectorAll('.cg-header-row');
+      const lastRow = rows[rows.length-1];
+      const inputs = lastRow.querySelectorAll('input');
+      inputs[0].value = k;
+      inputs[1].value = v;
+    });
+  }
+  // Set body
+  if (parsed.body) {
+    let isJson = false;
+    try { JSON.parse(parsed.body); isJson = true; } catch(e) {}
+    document.getElementById('cgBodyType').value = isJson ? 'json' : 'raw';
+    cgBodyTypeChange();
+    document.getElementById('cgBody').value = isJson ? JSON.stringify(JSON.parse(parsed.body), null, 2) : parsed.body;
+  } else {
+    document.getElementById('cgBodyType').value = 'none';
+    cgBodyTypeChange();
+  }
+  showToast('cURL 命令已解析', 'success');
   cgGenerate();
 }

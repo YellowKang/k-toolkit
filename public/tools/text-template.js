@@ -13,6 +13,16 @@ window.renderTextTemplate = function(el) {
       <div id="ttVars" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px"></div>
     </div>
     <div class="tool-card-panel">
+      <div class="panel-label">批量数据模式</div>
+      <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px">JSON 数组数据 <span style="opacity:.6">（每条记录自动代入模板）</span></label>
+      <textarea class="tool-textarea" id="ttBatchData" rows="4"
+        style="resize:vertical;font-family:monospace;font-size:12px"
+        placeholder='[{"姓名":"张三","订单号":"A001","日期":"3月20日","预计到达":"3月23日","客服电话":"400-123"},{"姓名":"李四","订单号":"A002","日期":"3月21日","预计到达":"3月24日","客服电话":"400-123"}]'></textarea>
+      <div class="tool-actions" style="margin-top:8px">
+        <button class="btn btn-secondary" onclick="_ttBatch()">批量生成</button>
+      </div>
+    </div>
+    <div class="tool-card-panel">
       <div class="panel-label">输出结果</div>
       <div id="ttOutput" style="background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:10px;padding:16px;min-height:60px;white-space:pre-wrap;font-size:14px;line-height:1.7;color:var(--text-primary)"></div>
       <div class="tool-actions" style="margin-top:10px">
@@ -60,6 +70,26 @@ window.renderTextTemplate = function(el) {
   window._ttCopy = function() {
     const text = document.getElementById('ttOutput').textContent;
     navigator.clipboard.writeText(text).catch(() => {});
+  };
+
+  window._ttBatch = function() {
+    const tpl = document.getElementById('ttTpl').value;
+    const batchRaw = document.getElementById('ttBatchData').value.trim();
+    if (!batchRaw) { if (typeof showToast === 'function') showToast('请输入批量 JSON 数据', 'error'); return; }
+    let dataArr;
+    try {
+      dataArr = JSON.parse(batchRaw);
+      if (!Array.isArray(dataArr)) { if (typeof showToast === 'function') showToast('数据必须是 JSON 数组', 'error'); return; }
+    } catch(e) { if (typeof showToast === 'function') showToast('JSON 解析失败: ' + e.message, 'error'); return; }
+    const results = dataArr.map(item => {
+      let result = tpl;
+      for (const [key, val] of Object.entries(item)) {
+        result = result.split('{{' + key + '}}').join(String(val));
+      }
+      return result;
+    });
+    document.getElementById('ttOutput').textContent = results.join('\n---\n');
+    if (typeof showToast === 'function') showToast('已生成 ' + results.length + ' 条结果', 'success');
   };
 
   _ttRender();

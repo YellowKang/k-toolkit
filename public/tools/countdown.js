@@ -125,5 +125,4 @@ function cdDeleteSaved(i) {
   localStorage.setItem('dtb_countdowns', JSON.stringify(list));
   cdRenderSaved();
 }
-
-window._activeCleanup = cdStop;
+// _activeCleanup is set inside cdStart() when the timer begins

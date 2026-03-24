@@ -31,6 +31,12 @@ function renderPomodoro(el) {
       <div id="pomCount" style="margin-top:16px;font-size:13px;color:var(--text-muted)">完成番茄：0 个</div>
     </div>`;
   _updatePomDisplay();
+
+  window._activeCleanup = function() {
+    if (window._pomTimer) { clearInterval(window._pomTimer); window._pomTimer = null; }
+    window._pomRunning = false;
+    document.title = 'DevToolbox';
+  };
 }
 
 function pomSet(w,b) {

@@ -57,6 +57,12 @@ function mdUpdate() {
   document.getElementById('mdPreview').innerHTML = _mdParse(text);
 }
 
+function _mdSafeUrl(url) {
+  var trimmed = url.trim().toLowerCase();
+  if (trimmed.startsWith('javascript:') || trimmed.startsWith('data:') || trimmed.startsWith('vbscript:')) return '';
+  return url.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+}
+
 function _mdParse(text) {
   var html = text;
   var blocks = [];
@@ -80,8 +86,16 @@ function _mdParse(text) {
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
     .replace(/\*(.+?)\*/g,'<em>$1</em>')
     .replace(/~~(.+?)~~/g,'<del>$1</del>')
-    .replace(/!\[(.+?)\]\((.+?)\)/g,'<img src="$2" alt="$1" style="max-width:100%;border-radius:6px">')
-    .replace(/\[(.+?)\]\((.+?)\)/g,'<a href="$2" style="color:var(--accent)" target="_blank">$1</a>')
+    .replace(/!\[(.+?)\]\((.+?)\)/g, function(_,alt,url) {
+      var safe = _mdSafeUrl(url);
+      if (!safe) return alt;
+      return '<img src="'+safe+'" alt="'+alt.replace(/"/g,'&quot;')+'" style="max-width:100%;border-radius:6px">';
+    })
+    .replace(/\[(.+?)\]\((.+?)\)/g, function(_,text,url) {
+      var safe = _mdSafeUrl(url);
+      if (!safe) return text;
+      return '<a href="'+safe+'" style="color:var(--accent)" target="_blank" rel="noopener noreferrer">'+text+'</a>';
+    })
     .replace(/^- (.+)$/gm,'<li style="margin:4px 0;padding-left:4px"><span style="color:var(--accent);margin-right:6px">&bull;</span>$1</li>')
     .replace(/^\d+\. (.+)$/gm,'<li style="margin:4px 0;padding-left:4px">$1</li>')
     .replace(/\n{2,}/g,'<br><br>');

@@ -84,4 +84,9 @@ const toolCount = fs.existsSync(path.join(DIST, 'tools'))
   ? fs.readdirSync(path.join(DIST, 'tools')).length : 0;
 console.log(`  ${toolCount} files`);
 
+// ── Copy agent/ ──
+console.log('\nCopying agent/:');
+copyDir(path.join(PUB, 'agent'), path.join(DIST, 'agent'));
+console.log('  done');
+
 console.log('\nBuild complete → dist/');

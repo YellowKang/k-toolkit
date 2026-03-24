@@ -28,3 +28,4 @@ data/
 
 # Design docs (internal only)
 design/
+.claude/
