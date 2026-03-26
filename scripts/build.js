@@ -164,6 +164,16 @@ for (const name of htmlFiles) {
   console.log(`  ${name}`);
 }
 
+// ── Copy root static files ──
+const staticFiles = ['manifest.json', 'favicon.ico', 'favicon.png', 'robots.txt'];
+console.log('\nCopying static files:');
+for (const name of staticFiles) {
+  const src = path.join(PUB, name);
+  if (!fs.existsSync(src)) continue;
+  copyFile(src, path.join(DIST, name));
+  console.log(`  ${name}`);
+}
+
 // ── Minify tools/ JS ──
 console.log('\nMinifying tools/:');
 const toolCount = processDir(path.join(PUB, 'tools'), path.join(DIST, 'tools'), '.js', (s, d) => {
