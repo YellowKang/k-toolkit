@@ -1,5 +1,7 @@
 // ── 工具列表 ──
 const TOOLS = [
+  // AI 工具（置顶）
+  { id: 'ai-chat',         render: 'renderAiChat',         icon: '💬', color: '#6366f1', name: 'AI 对话',           desc: '直接与 AI 模型对话，支持多轮、发图、Markdown 渲染',        category: '效率工具', file: 'ai-chat.js',         isNew: true, tags: ['ai','chat','gpt','claude','gemini','对话','聊天'] },
   // 文本处理
   { id: 'uuid', render: 'renderUUID',          icon: '🎲', color: '#f59e0b', name: 'UUID 生成器',    desc: '批量生成 UUID v4，一键复制，支持自定义数量', category: '文本处理', file: 'uuid.js', tags: ['uuid','guid','id','唯一标识','随机id','generate'] },
   { id: 'json', render: 'renderJSON',          icon: '📋', color: '#3b82f6', name: 'JSON 格式化',   desc: '格式化、压缩、校验 JSON，语法错误即时提示', category: '文本处理', file: 'json-format.js', tags: ['json','format','prettify','minify','validate','校验','美化','压缩'] },
@@ -98,6 +100,15 @@ const TOOLS = [
   { id: 'typing-speed',    render: 'renderTypingSpeed',    icon: '⌨️', color: '#3b82f6', name: '打字速度测试',     desc: '句子/单词双模式，WPM 实时计算，60秒计时挑战',              category: '效率工具', file: 'typing-speed.js',    isNew: true, tags: ['typing','打字','速度','wpm','keyboard','练习','game','游戏','单词','word'] },
   // 图片工具 - 新增
   { id: 'img-exif',        render: 'renderImgExif',        icon: '📷', color: '#64748b', name: 'EXIF 查看器',      desc: '读取图片拍摄参数、相机型号、ISO、曝光时间等 EXIF 信息',    category: '图片工具', file: 'img-exif.js',        isNew: true, tags: ['exif','photo','照片','拍摄','相机','camera','metadata'] },
+  // 第三轮新增工具
+  { id: 'mock-data',       render: 'renderMockData',       icon: '🎭', color: '#8b5cf6', name: 'Mock 数据生成',    desc: '批量生成模拟数据（姓名/手机/邮箱/地址等），支持 JSON/CSV/SQL',  category: '开发工具', file: 'mock-data.js',       isNew: true, tags: ['mock','fake','数据','生成','模拟','test','faker'] },
+  { id: 'chmod-calc',      render: 'renderChmodCalc',      icon: '🔑', color: '#f59e0b', name: 'Chmod 计算器',     desc: 'Linux 文件权限计算，数字与符号模式双向转换',                  category: '开发工具', file: 'chmod-calc.js',      isNew: true, tags: ['chmod','permission','权限','linux','rwx','755','644'] },
+  { id: 'placeholder-img', render: 'renderPlaceholderImg', icon: '🖼️', color: '#06b6d4', name: '占位图生成',       desc: '自定义尺寸/颜色/文字的占位图，Canvas 绘制+下载',             category: '图片工具', file: 'placeholder-img.js', isNew: true, tags: ['placeholder','占位图','image','尺寸','dummy','thumbnail'] },
+  { id: 'string-inspect',  render: 'renderStringInspect',  icon: '🔬', color: '#ec4899', name: '字符串检查器',     desc: '逐字符检查 Unicode 码点/字节数/不可见字符高亮',              category: '文本处理', file: 'string-inspect.js',  isNew: true, tags: ['string','inspect','unicode','字符','不可见','zero-width','BOM','检查'] },
+  { id: 'json-schema',     render: 'renderJsonSchema',     icon: '📐', color: '#3b82f6', name: 'JSON Schema 生成', desc: '从 JSON 示例自动推断 Schema（Draft-07），支持校验',          category: '开发工具', file: 'json-schema.js',     isNew: true, tags: ['json','schema','类型','type','validate','draft-07','推断'] },
+  { id: 'favicon-gen',     render: 'renderFaviconGen',     icon: '⭐', color: '#f43f5e', name: 'Favicon 生成器',   desc: '文字/Emoji 生成多尺寸 Favicon，导出 ICO/PNG/SVG',            category: '图片工具', file: 'favicon-gen.js',     isNew: true, tags: ['favicon','icon','图标','ico','generate','网站'] },
+  { id: 'llm-token',       render: 'renderLlmToken',       icon: '🤖', color: '#10b981', name: 'LLM Token 计数',   desc: '估算文本 Token 数和 API 调用价格（GPT/Claude）',             category: '开发工具', file: 'llm-token.js',       isNew: true, tags: ['token','llm','gpt','claude','ai','价格','计数','tokenizer'] },
+  { id: 'hmac-gen',        render: 'renderHmacGen',        icon: '🔏', color: '#7c3aed', name: 'HMAC 生成器',      desc: 'HMAC-SHA256/384/512/SHA1 消息认证码生成',                    category: '编码加密', file: 'hmac-gen.js',        isNew: true, tags: ['hmac','sha256','mac','签名','signature','hash','认证'] },
   // 趣味工具 - 新增
   { id: 'emoji-picker',    render: 'renderEmojiPicker',    icon: '😀', color: '#f59e0b', name: 'Emoji 选择器',     desc: '分类浏览 Emoji，点击一键复制，支持搜索',                   category: '趣味工具', file: 'emoji-picker.js',    isNew: true, tags: ['emoji','表情','icon','copy','符号'] },
   { id: 'noise-gen',       render: 'renderNoiseGen',       icon: '🎵', color: '#8b5cf6', name: '白噪音',           desc: '白噪音/粉红噪音/棕色噪音/雨声，可调音量，Web Audio API',  category: '趣味工具', file: 'noise-gen.js',       isNew: true, tags: ['noise','white','pink','rain','噪音','雨声','助眠','专注'] },
@@ -141,6 +152,27 @@ let searchQuery = '';
 let searchHistory = LS.get('dtb_search_history', []); // 最近5条搜索词
 let collapsedCats = LS.get('dtb_collapsed_cats', {});
 let usageCounts = LS.get('dtb_usage', {});
+
+// ── 搜索评分（共用函数）──
+function _scoreToolSearch(tool, tokens) {
+  const name = (tool.name || '').toLowerCase();
+  const desc = (tool.desc || '').toLowerCase();
+  const cat  = (tool.category || '').toLowerCase();
+  const id   = (tool.id || '').toLowerCase();
+  const tags = (tool.tags || []).map(t => t.toLowerCase()).join(' ');
+  let total = 0, matched = 0;
+  for (const tok of tokens) {
+    let s = 0;
+    if (id === tok) s += 10; else if (id.includes(tok)) s += 5;
+    if (name === tok) s += 10; else if (name.startsWith(tok)) s += 8; else if (name.includes(tok)) s += 6;
+    if (tags.includes(tok)) s += 3;
+    if (cat.includes(tok)) s += 2;
+    if (desc.includes(tok)) s += 1;
+    if (s > 0) { total += s; matched++; }
+  }
+  if (matched === tokens.length && tokens.length > 1) total += 5;
+  return matched > 0 ? total : 0;
+}
 
 const _prefetchQueue = new Set();
 function prefetchTool(id) {
@@ -339,8 +371,12 @@ function _trackLoaded(id) {
   _loadOrder.push(id);
   if (_loadOrder.length > _MAX_LOADED) {
     const evict = _loadOrder.shift();
+    const evictTool = TOOLS.find(t => t.id === evict);
     delete loadedTools[evict];
-    const s = document.head.querySelector(`script[src="tools/${TOOLS.find(t=>t.id===evict)?.file}"]`);
+    if (evictTool?.render && typeof window[evictTool.render] === 'function') {
+      delete window[evictTool.render];
+    }
+    const s = document.head.querySelector(`script[src="tools/${evictTool?.file}"]`);
     if (s) s.remove();
   }
 }
@@ -603,28 +639,8 @@ function showSearchDropdown(q) {
   }
   // 拆分多关键词匹配 + 评分排序
   const tokens = q.toLowerCase().split(/[\s,，、]+/).filter(Boolean);
-  const scored = [];
-  for (const t of TOOLS) {
-    const name = (t.name || '').toLowerCase();
-    const desc = (t.desc || '').toLowerCase();
-    const cat  = (t.category || '').toLowerCase();
-    const id   = (t.id || '').toLowerCase();
-    const tags = (t.tags || []).map(tag => tag.toLowerCase()).join(' ');
-    let score = 0, matchedToks = 0;
-    for (const tok of tokens) {
-      let s = 0;
-      if (id === tok) s += 10; else if (id.includes(tok)) s += 5;
-      if (name.includes(tok)) s += 6;
-      if (tags.includes(tok)) s += 3;
-      if (cat.includes(tok)) s += 2;
-      if (desc.includes(tok)) s += 1;
-      if (s > 0) { score += s; matchedToks++; }
-    }
-    if (matchedToks > 0) {
-      if (matchedToks === tokens.length && tokens.length > 1) score += 5;
-      scored.push({ t, score });
-    }
-  }
+  const localTools = getLocalizedTools(TOOLS);
+  const scored = localTools.map(t => ({ t, score: _scoreToolSearch(t, tokens) })).filter(x => x.score > 0);
   scored.sort((a, b) => b.score - a.score);
   const matched = scored.slice(0, 12).map(x => x.t);
   searchDropdownIdx = -1;
@@ -762,32 +778,9 @@ function renderSearchResults(q) {
   // 拆分多关键词（空格/逗号/顿号分隔）
   const tokens = q.toLowerCase().split(/[\s,，、]+/).filter(Boolean);
   if (!tokens.length) return;
-  const score = tool => {
-    const name = (tool.name || '').toLowerCase();
-    const desc = (tool.desc || '').toLowerCase();
-    const cat  = (tool.category || '').toLowerCase();
-    const id   = (tool.id || '').toLowerCase();
-    const tags = (tool.tags || []).map(t => t.toLowerCase()).join(' ');
-    let total = 0, matched = 0;
-    for (const tok of tokens) {
-      let s = 0;
-      if (id === tok) s += 10;
-      else if (id.includes(tok)) s += 5;
-      if (name === tok) s += 10;
-      else if (name.startsWith(tok)) s += 8;
-      else if (name.includes(tok)) s += 6;
-      if (tags.includes(tok)) s += 3;
-      if (cat.includes(tok)) s += 2;
-      if (desc.includes(tok)) s += 1;
-      if (s > 0) { total += s; matched++; }
-    }
-    // 多词全命中加分
-    if (matched === tokens.length && tokens.length > 1) total += 5;
-    return matched > 0 ? total : 0;
-  };
   // 使用频率加权：高频工具在同分段内靠前
   const localizedTools = getLocalizedTools(TOOLS);
-  const matched = localizedTools.map(tool => ({ tool, s: score(tool) })).filter(x => x.s > 0)
+  const matched = localizedTools.map(tool => ({ tool, s: _scoreToolSearch(tool, tokens) })).filter(x => x.s > 0)
     .sort((a, b) => b.s - a.s || (usageCounts[b.tool.id] || 0) - (usageCounts[a.tool.id] || 0))
     .map(x => x.tool);
   const content = document.getElementById('content');
@@ -1023,7 +1016,7 @@ let _cmdLoaded = false;
 function _loadCmd(cb) {
   if (_cmdLoaded) { cb(); return; }
   const s = document.createElement('script');
-  s.src = '/dashboard-cmd.js';
+  s.src = 'dashboard-cmd.js';
   s.onload = () => { _cmdLoaded = true; cb(); };
   document.head.appendChild(s);
 }
@@ -1050,7 +1043,7 @@ function _initGlobalKeySubmit() {
       return;
     }
     // Enter on input（非 textarea）触发
-    if (e.key === 'Enter' && el.tagName === 'INPUT' && (el.classList.contains('tool-input') || el.type === 'text')) {
+    if (e.key === 'Enter' && !e.isComposing && el.tagName === 'INPUT' && (el.classList.contains('tool-input') || el.type === 'text')) {
       if (el.id === 'searchInput' || el.closest('.search-wrap') || el.closest('.cmd-palette')) return;
       e.preventDefault();
       btn.click();

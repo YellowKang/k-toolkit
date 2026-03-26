@@ -310,26 +310,32 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
     overlay.appendChild(box);
     document.body.appendChild(overlay);
 
-    // Welcome chips
-    const welcomeChips = [
-      isEn ? 'Generate UUID' : '生成 UUID',
-      isEn ? 'Format JSON' : '格式化 JSON',
-      isEn ? 'Hash text' : '算哈希',
-      isEn ? 'Convert time' : '时间转换',
-    ];
-    const welcomeEl = document.createElement('div');
-    welcomeEl.className = 'ag-mini-welcome';
-    welcomeEl.innerHTML = `<span class="ag-mini-welcome-text">${isEn ? '👋 Hi! Try a quick command:' : '👋 你好！试试快捷指令：'}</span>
-      <div class="ag-mini-chips">${welcomeChips.map(c => `<span class="ag-mini-chip">${c}</span>`).join('')}</div>`;
-    messages.appendChild(welcomeEl);
+    // Restore previous messages or show welcome chips
+    if (_miniMessagesHtml && _miniSession && _miniSession.messages.length > 0) {
+      messages.innerHTML = _miniMessagesHtml;
+      // Remove any lingering thinking bubbles
+      messages.querySelectorAll('.ag-mini-bubble.thinking').forEach(el => el.remove());
+    } else {
+      const welcomeChips = [
+        isEn ? 'Generate UUID' : '生成 UUID',
+        isEn ? 'Format JSON' : '格式化 JSON',
+        isEn ? 'Hash text' : '算哈希',
+        isEn ? 'Convert time' : '时间转换',
+      ];
+      const welcomeEl = document.createElement('div');
+      welcomeEl.className = 'ag-mini-welcome';
+      welcomeEl.innerHTML = `<span class="ag-mini-welcome-text">${isEn ? '👋 Hi! Try a quick command:' : '👋 你好！试试快捷指令：'}</span>
+        <div class="ag-mini-chips">${welcomeChips.map(c => `<span class="ag-mini-chip">${c}</span>`).join('')}</div>`;
+      messages.appendChild(welcomeEl);
 
-    // Chip click handler
-    welcomeEl.querySelectorAll('.ag-mini-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        input.value = chip.textContent;
-        _miniSend();
+      // Chip click handler
+      welcomeEl.querySelectorAll('.ag-mini-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          input.value = chip.textContent;
+          _miniSend();
+        });
       });
-    });
+    }
 
     // Focus
     setTimeout(() => input.focus(), 50);
@@ -435,15 +441,19 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
     sendBtn.addEventListener('click', _miniSend);
   }
 
+  // Store mini dialog message HTML so we can restore on reopen
+  let _miniMessagesHtml = '';
+
   function closeMini() {
+    // Save messages HTML before removing DOM
+    const msgsEl = document.getElementById('agMiniMessages');
+    if (msgsEl) _miniMessagesHtml = msgsEl.innerHTML;
     const el = document.getElementById('agMiniOverlay');
     if (el) el.remove();
     _miniThinkingEl = null;
-    // Clear session for fresh conversation next time
+    // Detach event handlers but keep session history for continuity
     if (_miniSession) {
       _miniSession._handlers = {};
-      _miniSession.clearHistory();
-      _miniSession._routerInit = false;
     }
   }
 

@@ -59,24 +59,24 @@ const _typingSpeedDict = {
 const _codeSnippets = {
   js: [
     'const sum = arr.reduce((a, b) => a + b, 0);',
-    'const filtered = items.filter(item => item.active);',
-    'async function fetchData(url) { return await fetch(url); }',
-    'const clone = JSON.parse(JSON.stringify(original));',
-    'arr.sort((a, b) => a.name.localeCompare(b.name));',
+    'const filtered = data.filter(item => item.active);',
+    'async function fetchData(url) { return await fetch(url).then(r => r.json()); }',
+    'const [first, ...rest] = items;',
+    'export default function App({ children }) { return <div>{children}</div>; }',
   ],
   python: [
     'result = [x for x in range(10) if x % 2 == 0]',
     'with open("file.txt", "r") as f: data = f.read()',
-    'squares = {x: x**2 for x in range(1, 11)}',
-    'from collections import Counter; cnt = Counter(words)',
-    'print(*sorted(set(nums)), sep=", ")',
+    'def factorial(n): return 1 if n <= 1 else n * factorial(n - 1)',
+    'items = {k: v for k, v in zip(keys, values)}',
+    'class User: def __init__(self, name): self.name = name',
   ],
   go: [
     'func main() { fmt.Println("Hello, World!") }',
-    'if err != nil { log.Fatal(err) }',
-    'for i, v := range slice { fmt.Println(i, v) }',
+    'if err != nil { return fmt.Errorf("failed: %w", err) }',
+    'for i, v := range items { fmt.Printf("%d: %s\\n", i, v) }',
     'ch := make(chan int, 10)',
-    'defer file.Close()',
+    'type Config struct { Host string; Port int }',
   ],
 };
 

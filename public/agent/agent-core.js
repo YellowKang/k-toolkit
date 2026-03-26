@@ -161,12 +161,13 @@ class AgentSession {
     return schemas;
   }
 
-  // 组装本轮有效 tools：core + 已发现的 standard schemas
+  // 组装本轮有效 tools：core + 已发现的 standard schemas（上限 20）
   _getEffectiveTools() {
     const core = window._AGENT_CORE_ACTIONS || [];
     const discovered = this._extractDiscoveredSchemas();
     if (discovered.size === 0) return core;
-    return [...core, ...discovered.values()];
+    const extra = [...discovered.values()].slice(0, 20);
+    return [...core, ...extra];
   }
 
   async _loop() {
@@ -253,7 +254,13 @@ class AgentSession {
       : (window._AGENT_ACTIONS || []).find(a => a.name === name);
     let result;
     try {
-      result = action ? await action.execute(params) : { success: false, error: `未知 action: ${name}` };
+      if (!action) {
+        result = { success: false, error: `未知 action: ${name}` };
+      } else {
+        const timeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Action 执行超时 (15s)')), 15000));
+        result = await Promise.race([action.execute(params), timeout]);
+      }
     } catch (e) {
       result = { success: false, error: e.message };
     }

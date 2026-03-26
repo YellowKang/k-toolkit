@@ -160,7 +160,7 @@ const TOOLS_EN = {
   // Text (文本处理)
   'uuid':             { name:'UUID Generator',     desc:'Batch generate UUID v4, one-click copy, custom count',                        category:'Text' },
   'json':             { name:'JSON Formatter',     desc:'Format, minify and validate JSON with instant syntax highlighting',            category:'Text' },
-  'base64':           { name:'Base64',             desc:'Encode/decode text and Base64, supports URL-safe mode',                       category:'Text' },
+  'base64':           { name:'Base64',             desc:'Encode/decode text and files to Base64, supports URL-safe and Data URL',      category:'Text' },
   'wordcount':        { name:'Word Count',         desc:'Count characters, words, lines, paragraphs and CJK characters',              category:'Text' },
   'regex':            { name:'Regex Tester',       desc:'Real-time highlight matches, capture group details, multiple flags',          category:'Text' },
   'json-csv':         { name:'JSON/CSV Convert',   desc:'Bidirectional conversion between JSON arrays and CSV, download support',      category:'Text' },
@@ -249,6 +249,17 @@ const TOOLS_EN = {
   'emoji-picker':     { name:'Emoji Picker',       desc:'Browse Emoji by category, one-click copy, searchable',                       category:'Fun' },
   'noise-gen':        { name:'White Noise',        desc:'White/pink/brown noise and rain sounds, adjustable volume',                  category:'Fun' },
   'matrix-rain':      { name:'Matrix Rain',        desc:'Matrix digital rain canvas animation, classic green characters',              category:'Fun' },
+  // Round 3 new tools
+  'mock-data':        { name:'Mock Data',          desc:'Batch generate fake data (name/phone/email/address), JSON/CSV/SQL export',    category:'Dev Tools' },
+  'chmod-calc':       { name:'Chmod Calculator',   desc:'Linux file permission calculator, numeric and symbolic mode conversion',      category:'Dev Tools' },
+  'placeholder-img':  { name:'Placeholder Image',  desc:'Generate placeholder images with custom size/color/text, Canvas download',    category:'Image' },
+  'string-inspect':   { name:'String Inspector',   desc:'Inspect each character: Unicode codepoint, byte count, invisible char highlight', category:'Text' },
+  'json-schema':      { name:'JSON Schema',        desc:'Infer JSON Schema (Draft-07) from sample JSON, validate against schema',     category:'Dev Tools' },
+  'favicon-gen':      { name:'Favicon Generator',  desc:'Generate multi-size favicons from text/emoji, export ICO/PNG/SVG',           category:'Image' },
+  'llm-token':        { name:'LLM Token Counter',  desc:'Estimate text token count and API call cost for GPT/Claude models',          category:'Dev Tools' },
+  'hmac-gen':         { name:'HMAC Generator',     desc:'Generate HMAC-SHA256/384/512/SHA1 message authentication codes',             category:'Crypto' },
+  // AI
+  'ai-chat':          { name:'AI Chat',            desc:'Chat with AI models — multi-turn, images, Markdown',                       category:'Productivity' },
 };
 
 // ── 核心 i18n 函数 ──
@@ -266,15 +277,18 @@ function getCurrentLang() { return _currentLang; }
 // 工具级 i18n 辅助函数：工具传入 {zh:{key:val}, en:{key:val}} 字典
 // 返回一个 tl(key) 函数用于取当前语言文案
 function makeToolI18n(dict) {
-  return function(key) {
+  return function(key, ...args) {
     const lang = _currentLang || 'zh';
     const pack = dict[lang] || dict['zh'];
-    return pack[key] ?? key;
+    const val = pack[key] ?? key;
+    if (typeof val === 'function') return val(...args);
+    return val;
   };
 }
 
 function setLang(lang) {
   _currentLang = lang;
+  _ltCache = null; // invalidate localized tools cache
   localStorage.setItem('dtb_lang', lang);
   // 更新语言按钮文字
   const btn = document.getElementById('langBtn');
@@ -298,9 +312,15 @@ function setLang(lang) {
 }
 
 // ── 获取当前语言下的工具数据（覆盖 name/desc/category）──
+// 缓存：同一语言+同一原始数组只计算一次
+let _ltCache = null;
+let _ltCacheLang = '';
+let _ltCacheSrc = null;
+
 function getLocalizedTools(tools) {
   if (_currentLang === 'zh') return tools;
-  return tools.map(t => {
+  if (_ltCache && _ltCacheLang === _currentLang && _ltCacheSrc === tools) return _ltCache;
+  _ltCache = tools.map(t => {
     const en = TOOLS_EN[t.id];
     if (!en) return t;
     return Object.assign({}, t, {
@@ -309,6 +329,9 @@ function getLocalizedTools(tools) {
       category: en.category,
     });
   });
+  _ltCacheLang = _currentLang;
+  _ltCacheSrc = tools;
+  return _ltCache;
 }
 
 // ── 获取当前语言下的分类图标 map（EN 用英文 key）──

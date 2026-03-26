@@ -21,11 +21,38 @@ function minifyCSS(src) {
 }
 
 function minifyJS(src) {
-  return src
-    .replace(/\/\/[^\n]*/g, '')            // strip single-line comments (rough)
-    .replace(/\/\*[\s\S]*?\*\//g, '')      // strip block comments
-    .replace(/\n\s*\n/g, '\n')            // collapse blank lines
-    .replace(/^\s+/gm, '')                // strip leading whitespace per line
+  // Remove block comments, preserve strings
+  let out = '';
+  let i = 0;
+  while (i < src.length) {
+    // String literals: skip to end
+    if (src[i] === '"' || src[i] === "'" || src[i] === '`') {
+      const q = src[i];
+      out += src[i++];
+      while (i < src.length) {
+        if (src[i] === '\\') { out += src[i] + src[i+1]; i += 2; continue; }
+        if (src[i] === q) { out += src[i++]; break; }
+        out += src[i++];
+      }
+      continue;
+    }
+    // Block comment
+    if (src[i] === '/' && src[i+1] === '*') {
+      i += 2;
+      while (i < src.length && !(src[i] === '*' && src[i+1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    // Single-line comment
+    if (src[i] === '/' && src[i+1] === '/') {
+      while (i < src.length && src[i] !== '\n') i++;
+      continue;
+    }
+    out += src[i++];
+  }
+  return out
+    .replace(/\n\s*\n/g, '\n')
+    .replace(/^\s+/gm, '')
     .trim();
 }
 
