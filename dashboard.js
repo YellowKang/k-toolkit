@@ -91,8 +91,8 @@ const TOOLS = [
 { id: 'emoji-picker',    render: 'renderEmojiPicker',    icon: '😀', color: '#f59e0b', name: 'Emoji 选择器',     desc: '分类浏览 Emoji，点击一键复制，支持搜索',                   category: '趣味工具', file: 'emoji-picker.js',    isNew: true, tags: ['emoji','表情','icon','copy','符号'] },
 { id: 'noise-gen',       render: 'renderNoiseGen',       icon: '🎵', color: '#8b5cf6', name: '白噪音',           desc: '白噪音/粉红噪音/棕色噪音/雨声，可调音量，Web Audio API',  category: '趣味工具', file: 'noise-gen.js',       isNew: true, tags: ['noise','white','pink','rain','噪音','雨声','助眠','专注'] },
 ];
-const CATEGORIES = [...new Set(TOOLS.map(t => t.category))];
-const CAT_COUNTS = Object.fromEntries(CATEGORIES.map(c => [c, TOOLS.filter(t => t.category === c).length]));
+const CATEGORIES = [...new Set(TOOLS.filter(t => t.id !== 'ai-chat').map(t => t.category))];
+const CAT_COUNTS = Object.fromEntries(CATEGORIES.map(c => [c, TOOLS.filter(t => t.category === c && t.id !== 'ai-chat').length]));
 const CAT_ICONS = {
 '文本处理': '🔤',
 '开发工具': '🛠️',
@@ -257,7 +257,7 @@ if (!entry.isIntersecting) return;
 const cat = entry.target.dataset.lazyCat;
 const grid = entry.target.querySelector('.tools-grid');
 if (!grid || grid.children.length) return;
-grid.innerHTML = getLocalizedTools(TOOLS).filter(tool => TOOLS.find(x => x.id === tool.id && x.category === cat)).map(renderToolCard).join('');
+grid.innerHTML = getLocalizedTools(TOOLS).filter(tool => tool.id !== 'ai-chat' && TOOLS.find(x => x.id === tool.id && x.category === cat)).map(renderToolCard).join('');
 _lazyCatObserver.unobserve(entry.target);
 });
 }, { rootMargin: '200px' });
