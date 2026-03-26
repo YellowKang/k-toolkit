@@ -243,8 +243,9 @@ function renderHomePage(mode) {
     </div>
     <div class="home-hero-stats">
       <div class="home-hero-stat"><strong>${tools.length}</strong>${t('stat_tools')}</div>
-      <div class="home-hero-stat"><strong>${favorites.length || 0}</strong>${t('stat_favs')}</div>
-      <div class="home-hero-stat"><strong>${recent.length || 0}</strong>${t('stat_recent')}</div>
+      <div class="home-hero-stat" onclick="navigateTo('favorites')" style="cursor:pointer"><strong>${favorites.length || 0}</strong>${t('stat_favs')}</div>
+      <div class="home-hero-stat" onclick="navigateTo('recent')" style="cursor:pointer"><strong>${recent.length || 0}</strong>${t('stat_recent')}</div>
+      <div class="home-hero-stat home-hero-stat-ai" onclick="navigateTo('ai-chat')" style="cursor:pointer;border-color:var(--accent)">🤖 AI ${t('stat_ai_chat') || '对话'}</div>
     </div>
     ${topHtml}
   </div>`;
