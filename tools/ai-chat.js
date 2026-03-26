@@ -170,6 +170,9 @@ msgList.appendChild(thinkEl);
 _chatScrollBottom();
 try {
 _chatAbort = new AbortController();
+if (!window.AgentAdapters) {
+if (window._agEnsureLoaded) await window._agEnsureLoaded();
+}
 const adapter = window.AgentAdapters?.getAdapter(_chatAdapterId);
 if (!adapter) throw new Error(_chatTl('no_adapter'));
 const messages = _chatBuildMessages();
@@ -397,6 +400,7 @@ try { _chatSystemPrompt = localStorage.getItem(_CHAT_SYS_KEY) || ''; } catch {}
 _chatMessages = _chatLoadHistory();
 _chatImages = [];
 _chatBusy = false;
+if (!window.AgentAdapters && window._agEnsureLoaded) window._agEnsureLoaded().catch(() => {});
 const adapters = window.AgentAdapters?.listAdapters?.() || [];
 const adapterList = adapters.length > 0 ? adapters : [
 { id: 'claude', name: 'Claude' },

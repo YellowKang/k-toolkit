@@ -379,4 +379,5 @@ return;
 });
 window._agOpenMini = openMini;
 window._agCloseMini = closeMini;
+window._agEnsureLoaded = ensureLoaded;
 })();
