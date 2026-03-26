@@ -159,11 +159,16 @@ usageCounts[id] = (usageCounts[id] || 0) + 1;
 clearTimeout(addUsage._timer);
 addUsage._timer = setTimeout(() => { LS.set('dtb_usage', usageCounts); }, 2000);
 }
-function renderHomePage(mode) {
+async function renderHomePage(mode) {
 const content = document.getElementById('content');
 if (!content) return;
 const tools = getLocalizedTools(TOOLS);
 let html = '';
+if (mode === 'ai-chat') {
+const aiTool = getLocalizedTools(TOOLS).find(t => t.id === 'ai-chat');
+if (aiTool) { await renderToolPageFull(aiTool); return; }
+return;
+}
 if (mode === 'favorites') {
 const favTools = favorites.map(id => tools.find(t => t.id === id)).filter(Boolean);
 if (!favTools.length) {
@@ -336,6 +341,7 @@ const fixed = [
 { page: 'home', icon: '🏠', label: t('nav_home') },
 { page: 'favorites', icon: '⭐', label: t('nav_favs') },
 { page: 'recent', icon: '🕐', label: t('nav_recent') },
+{ page: 'ai-chat', icon: '🤖', label: t('stat_ai_chat') || 'AI 对话' },
 ];
 let html = '<div class="nav-section nav-section-fixed">';
 fixed.forEach(i => {
@@ -432,27 +438,28 @@ return;
 }
 if (window._activeCleanup) { window._activeCleanup(); window._activeCleanup = null; }
 const prevPage = currentPage;
-const prevIsSpecial = ['home','favorites','recent'].includes(prevPage);
+const prevIsSpecial = ['home','favorites','recent','ai-chat'].includes(prevPage);
 const content = document.getElementById('content');
 if (prevIsSpecial && content) _homeScrollTop = content.scrollTop;
 currentPage = page;
 updateNavActive(page);
-const isSpecial = ['home','favorites','recent'].includes(page);
+const isSpecial = ['home','favorites','recent','ai-chat'].includes(page);
 if (isSpecial) {
-renderHomePage(page);
+await renderHomePage(page);
 } else {
 const tool = TOOLS.find(t => t.id === page);
 if (tool) { addUsage(page); await renderToolPageFull(tool); }
 else renderHomePage('home');
 }
 if (!isSpecial && TOOLS.find(t => t.id === page)) addRecent(page);
-if (isSpecial) {
+const isHomeGroup = ['home','favorites','recent'].includes(page);
+if (isHomeGroup) {
 content.scrollTop = _homeScrollTop;
 } else {
 content.scrollTop = 0;
 }
 const fab = document.getElementById('scrollTopBtn');
-if (fab) fab.style.display = isSpecial ? '' : 'none';
+if (fab) fab.style.display = isHomeGroup ? '' : 'none';
 content.classList.remove('content-fade-in');
 void content.offsetWidth;
 content.classList.add('content-fade-in');
