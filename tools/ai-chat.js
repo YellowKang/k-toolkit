@@ -141,7 +141,8 @@ const text = (input?.value || '').trim();
 if (!text && _chatImages.length === 0) return;
 if (_chatBusy) return;
 const AG = window.AgentConfig?.AG;
-const apiKey = AG?.getKey?.(_chatAdapterId) || '';
+const apiKey = AG?.getKey?.(_chatAdapterId) ||
+(() => { try { return JSON.parse(localStorage.getItem('ag_key_' + _chatAdapterId)) || ''; } catch { return ''; } })();
 if (!apiKey) {
 _chatShowNoKey();
 return;
@@ -385,10 +386,11 @@ document.addEventListener('click', handler);
 }
 function renderAiChat(container) {
 const AG = window.AgentConfig?.AG;
+function _lsGet(key, def) { try { const v = localStorage.getItem('ag_' + key); return v === null ? def : JSON.parse(v); } catch { return def; } }
 const savedCfg = _chatLoadConfig();
-_chatAdapterId = savedCfg.adapterId || AG?.get?.('adapter', 'claude') || 'claude';
-_chatModel = savedCfg.model || AG?.get?.('model', '') || '';
-_chatTemp = savedCfg.temp ?? AG?.get?.('temperature', 0.7) ?? 0.7;
+_chatAdapterId = savedCfg.adapterId || AG?.get?.('adapter', 'claude') || _lsGet('adapter', 'claude');
+_chatModel = savedCfg.model || AG?.get?.('model', '') || _lsGet('model', '');
+_chatTemp = savedCfg.temp ?? AG?.get?.('temperature', 0.7) ?? _lsGet('temperature', 0.7);
 _chatMaxCtx = savedCfg.maxCtx ?? 20;
 _chatSystemPrompt = '';
 try { _chatSystemPrompt = localStorage.getItem(_CHAT_SYS_KEY) || ''; } catch {}
