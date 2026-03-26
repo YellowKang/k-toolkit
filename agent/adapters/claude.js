@@ -5,7 +5,7 @@ name: 'Claude',
 defaultModel: 'claude-sonnet-4-6',
 models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5', 'claude-opus-4-5', 'claude-sonnet-4-5', 'claude-3-5-haiku-20241022'],
 async chat({ messages, tools, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
-const base = baseUrl || 'https:
+const base = baseUrl || 'https://api.anthropic.com';
 const url = `${base}/v1/messages`;
 const sysMsg = messages.find(m => m.role === 'system');
 const chatMsgs = messages.filter(m => m.role !== 'system');

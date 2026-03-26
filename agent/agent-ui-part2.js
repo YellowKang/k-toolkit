@@ -136,6 +136,7 @@ scrollBottom();
 function escAttr(str) {
 return JSON.stringify(str).replace(/'/g, "\\'");
 }
+// ── Send logic ──────────────────────────────────────────────────
 function doSend() {
 if (_busy) return;
 const input = document.getElementById('agInput');
@@ -144,6 +145,7 @@ const text = input.value.trim();
 if (!text) return;
 input.value = '';
 input.style.height = 'auto';
+// Ensure session exists
 if (!_session) {
 const { AG } = window.AgentConfig;
 const cfg = AG.load();
@@ -152,6 +154,7 @@ _session = new window.AgentSession({ adapter, config: { ...cfg, apiKey: AG.getKe
 window.initAgentRouter(_session);
 wireSession(_session);
 }
+// 斜杠命令 / @mention 处理
 if (window.CmdParser) {
 const parsed = window.CmdParser.parse(text);
 if (parsed) {
@@ -164,6 +167,7 @@ appendBubble('assistant', '未知命令 `/' + parsed.cmd + '`，输入 `/help` �
 return;
 }
 if (parsed.type === 'action') {
+// 直接执行，不走 LLM
 appendBubble('user', text);
 const action = window._AGENT_ALL_ACTIONS
 ? window._AGENT_ALL_ACTIONS.get(parsed.action)
@@ -182,6 +186,7 @@ appendBubble('assistant', '命令对应的 action 未找到：' + parsed.action)
 }
 return;
 }
+// mention：走 LLM 但原始文本已含 @
 }
 }
 appendBubble('user', text);

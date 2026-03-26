@@ -1,37 +1,96 @@
+var _qrTl = null;
+function _qrInitI18n() {
+_qrTl = makeToolI18n({
+zh: {
+title:         '二维码生成',
+placeholder:   '输入文本、URL、联系方式...',
+size:          '尺寸',
+ecc:           '纠错',
+ecc_l:         'L (低)',
+ecc_m:         'M (中)',
+ecc_q:         'Q (较高)',
+ecc_h:         'H (高)',
+style:         '样式',
+style_square:  '方块',
+style_rounded: '圆角',
+style_dots:    '圆点',
+fg_color:      '前景色',
+bg_color:      '背景色',
+logo:          'Logo',
+clear_logo:    '清除 Logo',
+generate:      '生成',
+result_title:  '二维码',
+download_png:  '下载 PNG',
+download_svg:  '下载 SVG',
+loading_lib:   '正在加载 QR 库，请稍后重试...',
+gen_fail:      '生成失败：',
+},
+en: {
+title:         'QR Code Generator',
+placeholder:   'Enter text, URL, contact info...',
+size:          'Size',
+ecc:           'ECC',
+ecc_l:         'L (Low)',
+ecc_m:         'M (Medium)',
+ecc_q:         'Q (Quartile)',
+ecc_h:         'H (High)',
+style:         'Style',
+style_square:  'Square',
+style_rounded: 'Rounded',
+style_dots:    'Dots',
+fg_color:      'Foreground',
+bg_color:      'Background',
+logo:          'Logo',
+clear_logo:    'Clear Logo',
+generate:      'Generate',
+result_title:  'QR Code',
+download_png:  'Download PNG',
+download_svg:  'Download SVG',
+loading_lib:   'Loading QR library, please retry...',
+gen_fail:      'Generation failed: ',
+}
+});
+}
 function renderQrCode(el) {
+_qrInitI18n();
+var tl = _qrTl;
 el.innerHTML =
 '<div class="tool-card-panel">' +
-'<div class="panel-label">二维码生成</div>' +
+'<div class="panel-label">' + tl('title') + '</div>' +
 '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
-'<input class="tool-input" id="qrInput" placeholder="输入文本、URL、联系方式..." style="flex:1" oninput="qrAutoGen()">' +
+'<input class="tool-input" id="qrInput" placeholder="' + tl('placeholder') + '" style="flex:1" oninput="qrAutoGen()">' +
 '</div>' +
 '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;align-items:center">' +
-'<label style="font-size:13px;color:var(--text-muted)">尺寸</label>' +
+'<label style="font-size:13px;color:var(--text-muted)">' + tl('size') + '</label>' +
 '<select id="qrSize" class="tool-input" style="width:auto">' +
 '<option value="200">200px</option><option value="256" selected>256px</option><option value="400">400px</option><option value="512">512px</option>' +
 '</select>' +
-'<label style="font-size:13px;color:var(--text-muted)">纠错</label>' +
+'<label style="font-size:13px;color:var(--text-muted)">' + tl('ecc') + '</label>' +
 '<select id="qrEcc" class="tool-input" style="width:auto">' +
-'<option value="L">L (低)</option><option value="M" selected>M (中)</option><option value="Q">Q (较高)</option><option value="H">H (高)</option>' +
+'<option value="L">' + tl('ecc_l') + '</option><option value="M" selected>' + tl('ecc_m') + '</option><option value="Q">' + tl('ecc_q') + '</option><option value="H">' + tl('ecc_h') + '</option>' +
 '</select>' +
-'<label style="font-size:13px;color:var(--text-muted)">样式</label>' +
+'<label style="font-size:13px;color:var(--text-muted)">' + tl('style') + '</label>' +
 '<select id="qrStyle" class="tool-input" style="width:auto" onchange="qrAutoGen()">' +
-'<option value="square">方块</option><option value="rounded">圆角</option><option value="dots">圆点</option>' +
+'<option value="square">' + tl('style_square') + '</option><option value="rounded">' + tl('style_rounded') + '</option><option value="dots">' + tl('style_dots') + '</option>' +
 '</select>' +
-'<label style="font-size:13px;color:var(--text-muted)">前景色</label>' +
+'<label style="font-size:13px;color:var(--text-muted)">' + tl('fg_color') + '</label>' +
 '<input type="color" id="qrFg" value="#000000" style="width:36px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px" onchange="qrAutoGen()">' +
-'<label style="font-size:13px;color:var(--text-muted)">背景色</label>' +
+'<label style="font-size:13px;color:var(--text-muted)">' + tl('bg_color') + '</label>' +
 '<input type="color" id="qrBg" value="#ffffff" style="width:36px;height:32px;border:none;background:none;cursor:pointer;border-radius:6px" onchange="qrAutoGen()">' +
 '</div>' +
 '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;align-items:center">' +
-'<label style="font-size:13px;color:var(--text-muted)">Logo</label>' +
+'<label style="font-size:13px;color:var(--text-muted)">' + tl('logo') + '</label>' +
 '<input type="file" id="qrLogo" accept="image/*" style="font-size:12px;color:var(--text-muted)">' +
-'<button class="btn btn-secondary" onclick="_qrLogoImg=null;document.getElementById(\'qrLogo\').value=\'\';qrAutoGen()" style="font-size:12px">清除 Logo</button>' +
-'<button class="btn btn-primary" onclick="generateQr()">生成</button>' +
+'<button class="btn btn-secondary" onclick="_qrLogoImg=null;document.getElementById(\'qrLogo\').value=\'\';qrAutoGen()" style="font-size:12px">' + tl('clear_logo') + '</button>' +
+'<button class="btn btn-primary" onclick="generateQr()">' + tl('generate') + '</button>' +
 '</div>' +
 '</div>' +
 '<div class="tool-card-panel" id="qrResult" style="display:none"></div>';
 loadQrLib();
+window._activeCleanup = function() {
+clearTimeout(_qrAutoTimer);
+_qrAutoTimer = null;
+};
 document.getElementById('qrLogo').addEventListener('change', function(e) {
 var file = e.target.files[0];
 if (!file) { _qrLogoImg = null; return; }
@@ -52,7 +111,7 @@ function loadQrLib() {
 if (_qrLibLoaded || _qrLibLoading) return;
 _qrLibLoading = true;
 var s = document.createElement('script');
-s.src = 'https:
+s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
 s.onload = function() { _qrLibLoaded = true; _qrLibLoading = false; };
 document.head.appendChild(s);
 }
@@ -61,12 +120,14 @@ if (_qrAutoTimer) clearTimeout(_qrAutoTimer);
 _qrAutoTimer = setTimeout(generateQr, 600);
 }
 function generateQr() {
+if (!_qrTl) _qrInitI18n();
+var tl = _qrTl;
 var text = document.getElementById('qrInput').value.trim();
 var panel = document.getElementById('qrResult');
 if (!text) { panel.style.display = 'none'; return; }
 if (!_qrLibLoaded) {
 panel.style.display = '';
-panel.innerHTML = '<div style="color:var(--text-muted);font-size:13px">正在加载 QR 库，请稍后重试...</div>';
+panel.innerHTML = '<div style="color:var(--text-muted);font-size:13px">' + tl('loading_lib') + '</div>';
 loadQrLib();
 return;
 }
@@ -76,12 +137,12 @@ var fg = document.getElementById('qrFg').value;
 var bg = document.getElementById('qrBg').value;
 if (_qrLogoImg) ecc = 'H';
 panel.style.display = '';
-panel.innerHTML = '<div class="panel-label">二维码</div>' +
+panel.innerHTML = '<div class="panel-label">' + tl('result_title') + '</div>' +
 '<div style="display:flex;flex-direction:column;align-items:center;gap:14px">' +
 '<div id="qrCanvas" style="background:' + bg + ';padding:12px;border-radius:12px;display:inline-block"></div>' +
 '<div style="display:flex;gap:8px">' +
-'<button class="btn btn-secondary" onclick="downloadQr()">⬇ 下载 PNG</button>' +
-'<button class="btn btn-secondary" onclick="downloadQrSvg()">⬇ 下载 SVG</button>' +
+'<button class="btn btn-secondary" onclick="downloadQr()">\u2B07 ' + tl('download_png') + '</button>' +
+'<button class="btn btn-secondary" onclick="downloadQrSvg()">\u2B07 ' + tl('download_svg') + '</button>' +
 '</div></div>';
 document.getElementById('qrCanvas').innerHTML = '';
 try {
@@ -100,7 +161,7 @@ var style = document.getElementById('qrStyle').value;
 applyQrStyle(canvas, style, _qrLogoImg);
 }, 100);
 } catch(e) {
-panel.innerHTML = '<div style="color:#ef4444">生成失败：' + escHtml(e.message) + '</div>';
+panel.innerHTML = '<div style="color:#ef4444">' + tl('gen_fail') + escHtml(e.message) + '</div>';
 }
 }
 function applyQrStyle(canvas, style, logoImg) {
@@ -182,7 +243,7 @@ var i = (y * size + x) * 4;
 if (data[i] < 128) rects += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + fg + '"/>';
 }
 }
-var svg = '<svg xmlns="http:
+var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '">' +
 '<rect width="' + size + '" height="' + size + '" fill="' + bg + '"/>' + rects + '</svg>';
 var blob = new Blob([svg], { type: 'image/svg+xml' });
 var a = document.createElement('a');

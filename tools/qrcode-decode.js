@@ -60,7 +60,7 @@ if (typeof jsQR !== 'undefined') {
 qrdRunDecode(imageData, canvas);
 } else {
 const s = document.createElement('script');
-s.src = 'https:
+s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
 s.onload = () => qrdRunDecode(imageData, canvas);
 s.onerror = () => {
 document.getElementById('qrdStatus').textContent = '✗ jsQR 库加载失败，请检查网络';

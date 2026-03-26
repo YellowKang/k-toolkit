@@ -7,7 +7,7 @@ el.innerHTML = `
 <option>GET</option><option>POST</option><option>PUT</option>
 <option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
 </select>
-<input class="tool-input" id="cgUrl" placeholder="https:
+<input class="tool-input" id="cgUrl" placeholder="https://api.example.com/users">
 </div>
 <div class="panel-label" style="margin-bottom:8px">请求头</div>
 <div id="cgHeaders">
@@ -38,7 +38,7 @@ el.innerHTML = `
 </div>
 <div class="tool-card-panel">
 <div class="panel-label" style="margin-bottom:8px">导入 cURL 命令</div>
-<textarea class="tool-textarea" id="cgImportInput" rows="4" placeholder="粘贴 cURL 命令，如：curl -X POST -H 'Content-Type: application/json' -d '{&quot;key&quot;:&quot;value&quot;}' https:
+<textarea class="tool-textarea" id="cgImportInput" rows="4" placeholder="粘贴 cURL 命令，如：curl -X POST -H 'Content-Type: application/json' -d '{&quot;key&quot;:&quot;value&quot;}' https://api.example.com/data"></textarea>
 <div class="tool-actions" style="margin-top:8px">
 <button class="btn btn-secondary" onclick="cgImportParse()">解析导入</button>
 </div>
@@ -148,7 +148,7 @@ document.getElementById('cgResultPanel').style.display='none';
 }
 function cgLoadSample() {
 document.getElementById('cgMethod').value='POST';
-document.getElementById('cgUrl').value='https:
+document.getElementById('cgUrl').value='https://api.example.com/users';
 document.getElementById('cgBodyType').value='json';
 cgBodyTypeChange();
 document.getElementById('cgBody').value=JSON.stringify({name:'张三',email:'zhangsan@example.com'},null,2);
@@ -167,6 +167,7 @@ if (methodMatch) result.method = methodMatch[1].toUpperCase();
 const urlMatch = normalized.match(/(?:curl\s+)?(?:.*?\s+)?((?:https?|ftp):\/\/[^\s'"]+)/i)
 || normalized.match(/['"]?(https?:\/\/[^\s'"]+)['"]?/i);
 if (urlMatch) result.url = urlMatch[1].replace(/['"]$/,'');
+// Extract headers -H 'Key: Value' or -H "Key: Value"
 const headerRe = /-H\s+['"]([^'"]+)['"]/gi;
 let hm;
 while ((hm = headerRe.exec(normalized)) !== null) {
@@ -175,6 +176,7 @@ if (colonIdx > 0) {
 result.headers[hm[1].slice(0,colonIdx).trim()] = hm[1].slice(colonIdx+1).trim();
 }
 }
+// Extract body -d or --data or --data-raw
 const bodyMatch = normalized.match(/(?:-d|--data(?:-raw)?)\s+['"](.+?)['"]\s*(?:-|$)/i)
 || normalized.match(/(?:-d|--data(?:-raw)?)\s+['"](.+?)['"]$/i)
 || normalized.match(/(?:-d|--data(?:-raw)?)\s+(\S+)/i);

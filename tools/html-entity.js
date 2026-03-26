@@ -145,7 +145,7 @@ const out = v
 .replace(/>/g, '&gt;')
 .replace(/"/g, '&quot;')
 .replace(/'/g, '&#x27;')
-.replace(/\
+.replace(/\//g, '&#x2F;');
 _heShowResult(out, tl('encode_done'));
 }
 function heEncodeAll() {
@@ -158,7 +158,7 @@ let out = v
 .replace(/>/g, '&gt;')
 .replace(/"/g, '&quot;')
 .replace(/'/g, '&#x27;')
-.replace(/\
+.replace(/\//g, '&#x2F;');
 out = out.replace(/[^\x00-\x7E]/g, ch => `&#x${ch.codePointAt(0).toString(16).toUpperCase()};`);
 _heShowResult(out, tl('encode_done'));
 }

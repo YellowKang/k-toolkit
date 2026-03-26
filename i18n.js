@@ -151,7 +151,7 @@ const CAT_NAME_EN = {
 const TOOLS_EN = {
 'uuid':             { name:'UUID Generator',     desc:'Batch generate UUID v4, one-click copy, custom count',                        category:'Text' },
 'json':             { name:'JSON Formatter',     desc:'Format, minify and validate JSON with instant syntax highlighting',            category:'Text' },
-'base64':           { name:'Base64',             desc:'Encode/decode text and Base64, supports URL-safe mode',                       category:'Text' },
+'base64':           { name:'Base64',             desc:'Encode/decode text and files to Base64, supports URL-safe and Data URL',      category:'Text' },
 'wordcount':        { name:'Word Count',         desc:'Count characters, words, lines, paragraphs and CJK characters',              category:'Text' },
 'regex':            { name:'Regex Tester',       desc:'Real-time highlight matches, capture group details, multiple flags',          category:'Text' },
 'json-csv':         { name:'JSON/CSV Convert',   desc:'Bidirectional conversion between JSON arrays and CSV, download support',      category:'Text' },
@@ -231,6 +231,15 @@ const TOOLS_EN = {
 'emoji-picker':     { name:'Emoji Picker',       desc:'Browse Emoji by category, one-click copy, searchable',                       category:'Fun' },
 'noise-gen':        { name:'White Noise',        desc:'White/pink/brown noise and rain sounds, adjustable volume',                  category:'Fun' },
 'matrix-rain':      { name:'Matrix Rain',        desc:'Matrix digital rain canvas animation, classic green characters',              category:'Fun' },
+'mock-data':        { name:'Mock Data',          desc:'Batch generate fake data (name/phone/email/address), JSON/CSV/SQL export',    category:'Dev Tools' },
+'chmod-calc':       { name:'Chmod Calculator',   desc:'Linux file permission calculator, numeric and symbolic mode conversion',      category:'Dev Tools' },
+'placeholder-img':  { name:'Placeholder Image',  desc:'Generate placeholder images with custom size/color/text, Canvas download',    category:'Image' },
+'string-inspect':   { name:'String Inspector',   desc:'Inspect each character: Unicode codepoint, byte count, invisible char highlight', category:'Text' },
+'json-schema':      { name:'JSON Schema',        desc:'Infer JSON Schema (Draft-07) from sample JSON, validate against schema',     category:'Dev Tools' },
+'favicon-gen':      { name:'Favicon Generator',  desc:'Generate multi-size favicons from text/emoji, export ICO/PNG/SVG',           category:'Image' },
+'llm-token':        { name:'LLM Token Counter',  desc:'Estimate text token count and API call cost for GPT/Claude models',          category:'Dev Tools' },
+'hmac-gen':         { name:'HMAC Generator',     desc:'Generate HMAC-SHA256/384/512/SHA1 message authentication codes',             category:'Crypto' },
+'ai-chat':          { name:'AI Chat',            desc:'Chat with AI models — multi-turn, images, Markdown',                       category:'Productivity' },
 };
 let _currentLang = localStorage.getItem('dtb_lang') || 'zh';
 function t(key, ...args) {
@@ -241,14 +250,17 @@ return val ?? key;
 }
 function getCurrentLang() { return _currentLang; }
 function makeToolI18n(dict) {
-return function(key) {
+return function(key, ...args) {
 const lang = _currentLang || 'zh';
 const pack = dict[lang] || dict['zh'];
-return pack[key] ?? key;
+const val = pack[key] ?? key;
+if (typeof val === 'function') return val(...args);
+return val;
 };
 }
 function setLang(lang) {
 _currentLang = lang;
+_ltCache = null; 
 localStorage.setItem('dtb_lang', lang);
 const btn = document.getElementById('langBtn');
 if (btn) btn.textContent = t('lang_btn');
@@ -264,9 +276,13 @@ if (tool) renderToolPageFull(tool);
 }
 }
 }
+let _ltCache = null;
+let _ltCacheLang = '';
+let _ltCacheSrc = null;
 function getLocalizedTools(tools) {
 if (_currentLang === 'zh') return tools;
-return tools.map(t => {
+if (_ltCache && _ltCacheLang === _currentLang && _ltCacheSrc === tools) return _ltCache;
+_ltCache = tools.map(t => {
 const en = TOOLS_EN[t.id];
 if (!en) return t;
 return Object.assign({}, t, {
@@ -275,6 +291,9 @@ desc: en.desc,
 category: en.category,
 });
 });
+_ltCacheLang = _currentLang;
+_ltCacheSrc = tools;
+return _ltCache;
 }
 function getLocalizedCatIcons(catIcons) {
 if (_currentLang === 'zh') return catIcons;

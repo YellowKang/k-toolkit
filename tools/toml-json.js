@@ -145,6 +145,7 @@ current[key] = parseVal(val);
 }
 return root;
 }
+// ---- TOML serializer ----
 function tjObjToToml(obj, prefix) {
 var scalars = [];
 var tables = [];

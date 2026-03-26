@@ -5,7 +5,7 @@ name: 'Gemini',
 defaultModel: 'gemini-2.5-flash',
 models: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview'],
 async chat({ messages, tools, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
-const base = baseUrl || 'https:
+const base = baseUrl || 'https://generativelanguage.googleapis.com/v1beta/openai';
 const url = `${base}/chat/completions`;
 const oaiMsgs = messages.map(m => {
 if (m.role === 'tool') return { role: 'tool', tool_call_id: m.tool_call_id, content: m.content };

@@ -16,7 +16,7 @@ border-radius:10px;gap:12px">
 </div>`;
 }
 try {
-const res = await fetch('https:
+const res = await fetch('https://ipapi.co/json/');
 if (!res.ok) throw new Error('fetch failed');
 const d = await res.json();
 if (d.error) throw new Error(d.reason || 'api error');
@@ -34,7 +34,7 @@ row('语言', d.languages ? d.languages.split(',')[0] : '-'),
 ].join('');
 } catch(e) {
 try {
-const r2 = await fetch('https:
+const r2 = await fetch('https://api.ipify.org?format=json');
 const d2 = await r2.json();
 box.innerHTML = row('IP 地址', d2.ip || '-') +
 '<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:13px">无法获取详细地理信息（网络限制或需要代理）</div>';

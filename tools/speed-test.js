@@ -112,8 +112,8 @@ _stRunning = false;
 }
 async function _stMeasurePing() {
 const endpoints = [
-'https:
-'https:
+'https://www.cloudflare.com/cdn-cgi/trace',
+'https://1.1.1.1/cdn-cgi/trace',
 ];
 const samples = [];
 for (let i = 0; i < 4; i++) {
@@ -137,7 +137,7 @@ let totalBits = 0, totalMs = 0;
 for (const size of sizes) {
 if (!_stRunning) break;
 _stAbort = new AbortController();
-const url = `https:
+const url = `https://speed.cloudflare.com/__down?bytes=${size}&t=${Date.now()}`;
 const timer = setTimeout(() => _stAbort && _stAbort.abort(), 5000);
 try {
 const t = Date.now();
@@ -164,7 +164,7 @@ let totalBits = 0, totalMs = 0;
 for (const size of sizes) {
 if (!_stRunning) break;
 _stAbort = new AbortController();
-const url = `https:
+const url = `https://speed.cloudflare.com/__up?t=${Date.now()}`;
 const body = new Uint8Array(size);
 const timer = setTimeout(() => _stAbort && _stAbort.abort(), 5000);
 try {

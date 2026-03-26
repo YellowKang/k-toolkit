@@ -10,7 +10,7 @@ models: [
 'gpt-4.1', 'gpt-4o', 'o3', 'o4-mini',
 ],
 async chat({ messages, tools, model, max_tokens, temperature, baseUrl, apiKey, signal, _responseId }) {
-const base = baseUrl || 'https:
+const base = baseUrl || 'https://api.openai.com';
 const url = `${base}/v1/responses`;
 const sysMsg = messages.find(m => m.role === 'system');
 const inputMsgs = messages.filter(m => m.role !== 'system').map(m => {

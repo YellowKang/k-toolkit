@@ -11,7 +11,7 @@ models: [
 'o3', 'o4-mini',
 ],
 async chat({ messages, tools, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
-const base = baseUrl || 'https:
+const base = baseUrl || 'https://api.openai.com';
 const url = `${base}/v1/chat/completions`;
 const oaiMsgs = messages.map(m => {
 if (m.role === 'tool') {

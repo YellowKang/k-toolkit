@@ -111,7 +111,7 @@ el.innerHTML = `
 <div class="tool-card-panel">
 <div class="panel-label">${tl('input_url')}</div>
 <div style="display:flex;gap:10px;flex-wrap:wrap">
-<input class="tool-input" id="urlInput" placeholder="https:
+<input class="tool-input" id="urlInput" placeholder="https://example.com/path?foo=bar&baz=qux#section" style="flex:1">
 <button class="btn btn-primary" onclick="parseUrl()">${tl('btn_parse')}</button>
 <button class="btn btn-secondary" onclick="urlUseCurrent()">${tl('btn_current')}</button>
 </div>
@@ -155,7 +155,7 @@ el.innerHTML = `
 <div id="urlTabContentBuild" style="display:none">
 <div class="tool-card-panel">
 <div class="panel-label">${tl('base_url')}</div>
-<input class="tool-input" id="urlBuildBase" placeholder="https:
+<input class="tool-input" id="urlBuildBase" placeholder="https://example.com/api/endpoint" style="width:100%;margin-bottom:14px" oninput="urlBuildAutoPreview()">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
 <div class="panel-label" style="margin:0">${tl('query_params')}</div>
 <button class="btn btn-secondary" onclick="urlBuildAddRow()">${tl('btn_add_param')}</button>
@@ -205,7 +205,7 @@ const raw = document.getElementById('urlInput').value.trim();
 if (!raw) return;
 let url;
 try { url = new URL(raw); }
-catch { try { url = new URL('https:
+catch { try { url = new URL('https://' + raw); } catch {
 document.getElementById('urlResultPanel').style.display = '';
 document.getElementById('urlFields').innerHTML = `<span style="color:#ef4444">${tl('invalid_url')}</span>`;
 return;
@@ -297,7 +297,7 @@ status.textContent=tl('error'); status.style.color='#ef4444';
 }
 } else {
 try {
-const url = new URL(v.includes(':
+const url = new URL(v.includes('://')?v:'https://'+v);
 const params = [...url.searchParams.entries()];
 let html = `<div style="margin-bottom:10px"><span style="color:var(--text-muted);font-size:12px">${tl('domain')}</span><code style="color:var(--neon)">${url.hostname}</code>`;
 if (url.pathname !== '/') html += `<span style="color:var(--text-muted)"> ${url.pathname}</span>`;
@@ -366,7 +366,7 @@ const qs = params.map(([k, v]) => encodeURIComponent(k) + '=' + encodeURICompone
 let result;
 if (base) {
 try {
-const url = new URL(base.includes(':
+const url = new URL(base.includes('://') ? base : 'https://' + base);
 params.forEach(([k, v]) => url.searchParams.append(k, v));
 result = url.toString();
 } catch {

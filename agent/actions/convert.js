@@ -71,6 +71,7 @@ if (v === null) return 'null';
 if (typeof v === 'string') return /[:#\[\]{}&*!|>'",%@`]/.test(v) ? JSON.stringify(v) : v;
 return String(v);
 }
+// ─── 简易 TOML ↔ JSON ──────────────────────────────────────────
 function _tomlToJson(toml) {
 const result = {}; let current = result;
 for (const line of toml.split('\n')) {
@@ -128,11 +129,13 @@ if (typeof v === 'number') return String(v);
 if (Array.isArray(v)) return '[' + v.map(_tomlStringify).join(', ') + ']';
 return JSON.stringify(String(v));
 }
+// ─── XML 格式化 ─────────────────────────────────────────────────
 function _xmlFormat(xml, minify) {
 const parser = new DOMParser();
 const doc = parser.parseFromString(xml, 'text/xml');
 if (doc.querySelector('parsererror')) throw new Error('XML 解析失败');
 if (minify) return new XMLSerializer().serializeToString(doc).replace(/>\s+</g, '><');
+// Pretty print
 const serialized = new XMLSerializer().serializeToString(doc);
 let formatted = '', indent = 0;
 for (const node of serialized.replace(/>\s*</g, '><').split(/(<[^>]+>)/)) {
@@ -166,6 +169,7 @@ return obj;
 }
 return nodeToObj(doc.documentElement);
 }
+// ─── SQL 格式化 ──────────────────────────────────────────────────
 const _SQL_KW = ['SELECT','FROM','WHERE','JOIN','LEFT JOIN','RIGHT JOIN','INNER JOIN','ON','AND','OR','ORDER BY','GROUP BY','HAVING','LIMIT','OFFSET','INSERT INTO','VALUES','UPDATE','SET','DELETE FROM','CREATE TABLE','DISTINCT','AS','UNION','UNION ALL','WITH','CASE','WHEN','THEN','ELSE','END'];
 function _sqlFormat(sql, minify) {
 if (minify) return sql.replace(/\s+/g, ' ').trim();
@@ -180,6 +184,7 @@ out = out.replace(/\n(AND|OR)\b/g, '\n  $1');
 out = out.replace(/,\s*/g, ',\n  ');
 return out.replace(/^\s*\n/, '').trim();
 }
+// ─── JSON Diff ──────────────────────────────────────────────────
 function _jsonDiff(a, b, path) {
 path = path || '';
 const diffs = [];
@@ -197,8 +202,10 @@ diffs.push({ path: p, type: 'changed', from: a[k], to: b[k] });
 }
 return diffs;
 }
+// ─── Morse 编解码 ───────────────────────────────────────────────
 const _MORSE_MAP = {A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..',0:'-----',1:'.----',2:'..---',3:'...--',4:'....-',5:'.....',6:'-....',7:'--...',8:'---..',9:'----.','.':'.-.-.-',',':'--..--','?':'..--..','/':'-..-.','-':'-....-','(':'-.--.',')':'-.--.-'};
 const _MORSE_REV = Object.fromEntries(Object.entries(_MORSE_MAP).map(([k,v])=>[v,k]));
+// ─── AES 加解密 ─────────────────────────────────────────────────
 async function _aesEncrypt(text, password) {
 const enc = new TextEncoder();
 const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
@@ -219,6 +226,7 @@ const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 10
 const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
 return new TextDecoder().decode(decrypted);
 }
+// ─── Actions 注册 ────────────────────────────────────────────────
 const ConvertActions = [
 {
 name: 'yaml_to_json',

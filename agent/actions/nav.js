@@ -1,9 +1,9 @@
 'use strict';
 const TOOL_CAPS = {
 'uuid':         { autoRun: true,  inputs: ['count','format'],              actions: ['generate'],                    desc: '生成 UUID v4，可指定数量和格式(standard/no-dash/upper/braces)' },
-'json':         { autoRun: true,  inputs: ['text'],                         actions: ['format','compress','sort','toYaml','toToml','toCsv','diff','escape'], desc: '格式化/压缩/排序/转换 JSON，支持转 YAML/TOML/CSV、对比、转义' },
-'base64':       { autoRun: true,  inputs: ['text'],                         actions: ['encode','decode'],              desc: 'Base64 编解码，支持 URL 安全模式' },
-'hash':         { autoRun: true,  inputs: ['text'],                         actions: ['calc'],                         desc: '计算 MD5/SHA-1/SHA-256/SHA-512 哈希' },
+'json':         { autoRun: true,  inputs: ['text'],                         actions: ['format','compress','sort','toYaml','toToml','toCsv','diff','escape','tsInterface'], desc: '格式化/压缩/排序/转换 JSON，支持转 YAML/TOML/CSV、对比、转义、生成 TS Interface' },
+'base64':       { autoRun: true,  inputs: ['text'],                         actions: ['encode','decode'],              desc: 'Base64 编解码，支持 URL 安全模式和文件 Base64 编解码' },
+'hash':         { autoRun: true,  inputs: ['text','key','algo'],             actions: ['calc','hmac'],                   desc: '计算 SHA-1/SHA-256/SHA-384/SHA-512 哈希，或 HMAC（action=hmac 时需 key 和 algo）' },
 'case-convert': { autoRun: true,  inputs: ['text'],                         actions: ['camel','snake','kebab','pascal','upper','lower','title'], desc: '文本大小写/命名风格转换' },
 'yaml-json':    { autoRun: true,  inputs: ['text'],                         actions: ['toJSON','toYAML'],              desc: 'YAML 与 JSON 互转' },
 'regex':        { autoRun: true,  inputs: ['pattern','text','flags'],       actions: ['test'],                         desc: '正则表达式测试，支持 flags(gimsuy)' },
@@ -26,12 +26,12 @@ const TOOL_CAPS = {
 'dns-lookup':   { autoRun: true,  inputs: ['text'], actions: ['lookup'], desc: 'DNS 查询' },
 'env-parse':    { autoRun: true,  inputs: ['text'], actions: ['parse'], desc: '解析 .env 文件内容' },
 'git-commit':   { autoRun: true,  inputs: ['text'], actions: ['generate'], desc: '生成 Git commit message' },
-'http-tester':  { autoRun: true,  inputs: ['url','text'], actions: ['send'], desc: 'HTTP 请求测试' },
+'http-tester':  { autoRun: true,  inputs: ['url','text'], actions: ['send','exportCurl'], desc: 'HTTP 请求测试，支持请求历史和 cURL 导出' },
 'ip-calc':      { autoRun: true,  inputs: ['ip','cidr'], actions: ['calc'], desc: 'IP/CIDR 子网计算，ip 为 IP 地址如 192.168.1.1，cidr 为前缀长度如 24' },
 'line-sort':    { autoRun: true,  inputs: ['text'], actions: ['asc','desc','shuffle','dedup','reverse'], desc: '行排序/去重，action 指定操作类型' },
-'markdown':     { autoRun: true,  inputs: ['text'], actions: ['render'], desc: 'Markdown 预览' },
+'markdown':     { autoRun: true,  inputs: ['text'], actions: ['render','toc'], desc: 'Markdown 预览，支持 TOC 生成和快捷键' },
 'morse':        { autoRun: true,  inputs: ['text'], actions: ['encode','decode'], desc: '摩斯电码编解码' },
-'nginx-gen':    { autoRun: true,  inputs: ['domain','scene','root','upstream','port','ssl','gzip','cache','accessLog'], actions: ['static','spa','proxy','https','loadbalance'], desc: 'Nginx 配置生成。scene: static/spa/proxy/https/loadbalance；upstream 为代理后端地址如 http:
+'nginx-gen':    { autoRun: true,  inputs: ['domain','scene','root','upstream','port','ssl','gzip','cache','accessLog'], actions: ['static','spa','proxy','https','loadbalance'], desc: 'Nginx 配置生成。scene: static/spa/proxy/https/loadbalance；upstream 为代理后端地址如 http://127.0.0.1:3000；ssl/gzip/cache 为 boolean' },
 'number-base':  { autoRun: true,  inputs: ['text'], actions: ['convert'], desc: '进制转换 2/8/10/16' },
 'number-chinese':{ autoRun: true, inputs: ['text'], actions: ['convert'], desc: '数字与中文大写互转' },
 'qrcode':       { autoRun: true,  inputs: ['text'], actions: ['generate'], desc: '生成二维码' },
@@ -47,7 +47,7 @@ const TOOL_CAPS = {
 'date-diff':    { autoRun: true,  inputs: ['from','to'], actions: ['calc'], desc: '计算两个日期之间的天数/周数/月数，from/to 为日期字符串如 2024-01-01' },
 'byte-convert': { autoRun: true,  inputs: ['value','unit'], actions: ['convert'], desc: '字节单位换算，value 为数值，unit 为 B/KB/MB/GB/TB' },
 'loan-calc':    { autoRun: true,  inputs: ['amount','rate','months'], actions: ['calc'], desc: '贷款计算，amount 本金，rate 年利率(%)，months 期数' },
-'calculator':   { autoRun: false, note: '计算器为按键交互，AI 无法自动操作，请使用 calculate action 直接计算' },
+'calculator':   { autoRun: true,  inputs: ['expr'], actions: ['calc'], desc: '科学计算器，支持 sin/cos/tan/log/ln/sqrt/pow/π/e 等科学函数和括号' },
 'wordcount':    { autoRun: true,  inputs: ['text'], actions: ['count'], desc: '统计字符数、单词数、行数、段落数' },
 'lorem':        { autoRun: true,  inputs: ['count','lang'], actions: ['generate'], desc: '生成占位文本，count 段落数，lang 为 zh/en' },
 'curl-gen':     { autoRun: true,  inputs: ['url','method','headers','body','curl'], actions: ['generate','import'], desc: '生成 curl/fetch/axios 代码 或 导入 cURL 命令反解析' },
@@ -82,6 +82,15 @@ const TOOL_CAPS = {
 'note':         { autoRun: false, note: '便签需要用户自行编辑' },
 'world-clock':  { autoRun: false, note: '世界时钟为实时展示，无需输入' },
 'ip-info':      { autoRun: false, note: 'IP 信息自动查询，无需输入' },
+'mock-data':    { autoRun: true,  inputs: ['count','fields'], actions: ['generate'], desc: '批量生成模拟数据（姓名/手机/邮箱/地址等），count 为条数，fields 为字段配置' },
+'chmod-calc':   { autoRun: true,  inputs: ['text'], actions: ['calc'], desc: 'Linux chmod 权限计算，输入数字如 755 或 644 自动解析' },
+'placeholder-img':{ autoRun: true, inputs: ['width','height','bg','color','text'], actions: ['generate'], desc: '生成占位图，width/height 为尺寸' },
+'string-inspect':{ autoRun: true, inputs: ['text'], actions: ['inspect'], desc: '检查字符串每个字符的 Unicode 码点、字节数、不可见字符高亮' },
+'json-schema':  { autoRun: true,  inputs: ['text'], actions: ['generate','validate'], desc: '从 JSON 示例推断 Schema（Draft-07），或校验 JSON 是否符合 Schema' },
+'favicon-gen':  { autoRun: true,  inputs: ['text','bg','color'], actions: ['generate'], desc: '从文字/Emoji 生成多尺寸 Favicon' },
+'llm-token':    { autoRun: true,  inputs: ['text'], actions: ['count'], desc: '估算文本 LLM Token 数和 API 价格' },
+'hmac-gen':     { autoRun: true,  inputs: ['text','key','algo'], actions: ['generate'], desc: 'HMAC 消息认证码生成，algo: SHA-256/SHA-384/SHA-512/SHA-1' },
+'ai-chat':      { autoRun: false, desc: 'AI Chat', note: 'Direct chat with AI models' },
 };
 const TOOL_RUNNERS = {
 'hash': {
@@ -516,7 +525,7 @@ waitMs: 200,
 },
 'spinner': {
 mainInput: '#spinOptions',
-trigger: 'doSpin',
+trigger: '_spinDoSpin',
 outputSelector: '#spinResult',
 waitMs: 1500,
 },
@@ -565,6 +574,56 @@ extraInputs: { name: '#cdName' },
 trigger: 'cdStart',
 outputSelector: '#cdDisplay',
 waitMs: 500,
+},
+'mock-data': {
+mainInput: '#mockCount',
+trigger: '_mockGenerate',
+outputSelector: '#mockResultPanel',
+waitMs: 500,
+},
+'chmod-calc': {
+mainInput: '#chmodNumIn',
+trigger: '_chmodFromNum',
+outputSelector: '#chmodResults',
+waitMs: 200,
+},
+'placeholder-img': {
+mainInput: '#phW',
+extraInputs: { height: '#phH' },
+trigger: 'phGenerate',
+outputSelector: '#phResult',
+waitMs: 500,
+},
+'string-inspect': {
+mainInput: '#siInput',
+trigger: '_siAnalyze',
+outputSelector: '#siStats',
+waitMs: 300,
+},
+'json-schema': {
+mainInput: '#jsInput',
+trigger: '_jsGenerate',
+outputSelector: '#jsOutput',
+waitMs: 300,
+},
+'favicon-gen': {
+mainInput: '#favText',
+trigger: '_favGenAll',
+outputSelector: '#favSizesPanel',
+waitMs: 500,
+},
+'llm-token': {
+mainInput: '#ltInput',
+trigger: 'ltUpdate',
+outputSelector: '#ltStats',
+waitMs: 200,
+},
+'hmac-gen': {
+mainInput: '#hmacMsg',
+extraInputs: { key: '#hmacKey' },
+trigger: '_hmacAutoCalc',
+outputSelector: '#hmacResultPanel',
+waitMs: 400,
 },
 };
 const SPECIAL_RUNNERS = {
@@ -1208,10 +1267,12 @@ return _rpEsc(code)
 .replace(/\b(\d+\.?\d*)\b/g, '<span class="num">$&</span>')
 .replace(/(\/\/.*$|#.*$|--.*$)/gm, '<span class="cmt">$&</span>');
 }
+// Render a table from JSON array
 function _rpRenderTable(jsonStr) {
 try {
 const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
 if (!Array.isArray(data) || data.length === 0) return `<div class="ag-rp-value">${_rpEsc(String(jsonStr))}</div>`;
+// If array of objects, extract headers from keys
 if (typeof data[0] === 'object' && !Array.isArray(data[0])) {
 const headers = Object.keys(data[0]);
 let html = '<table class="ag-rp-table"><thead><tr>';
@@ -1225,6 +1286,7 @@ html += '</tr>';
 html += '</tbody></table>';
 return html;
 }
+// Array of arrays
 if (Array.isArray(data[0])) {
 let html = '<table class="ag-rp-table"><thead><tr>';
 data[0].forEach(h => { html += `<th>${_rpEsc(String(h))}</th>`; });

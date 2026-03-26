@@ -42,6 +42,7 @@ for (const m of matches) {
 const name = m[1].trim();
 if (!seen.has(name)) { seen.add(name); names.push(name); }
 }
+// preserve existing values
 const oldVals = {};
 varsEl.querySelectorAll('input[data-var]').forEach(inp => {
 oldVals[inp.dataset.var] = inp.value;

@@ -1,42 +1,77 @@
 const GRAD_PRESETS = [
-{ name:'日落',   colors:['#ff512f','#f09819'], angle:135 },
-{ name:'极光',   colors:['#00c6ff','#0072ff','#1a1a8c'], angle:135 },
-{ name:'樱花',   colors:['#fbc2eb','#a6c1ee'], angle:120 },
-{ name:'海洋',   colors:['#2193b0','#6dd5ed'], angle:90 },
-{ name:'火焰',   colors:['#f12711','#f5af19'], angle:45 },
-{ name:'薰衣草', colors:['#e8cbc0','#636fa4'], angle:135 },
-{ name:'糖果',   colors:['#ff9a9e','#fecfef','#fdfbfb'], angle:135 },
-{ name:'森林',   colors:['#11998e','#38ef7d'], angle:120 },
-{ name:'星空',   colors:['#0f0c29','#302b63','#24243e'], angle:180 },
-{ name:'柠檬',   colors:['#f7ff00','#db36a4'], angle:90 },
-{ name:'深海',   colors:['#1a2980','#26d0ce'], angle:135 },
-{ name:'蜜桃',   colors:['#ed6ea0','#ec8c69'], angle:120 },
-{ name:'极夜',   colors:['#232526','#414345'], angle:180 },
-{ name:'彩虹',   colors:['#ff0000','#ff7700','#ffff00','#00ff00','#0000ff','#8b00ff'], angle:90 },
-{ name:'薄荷',   colors:['#00b09b','#96c93d'], angle:135 },
-{ name:'玫瑰',   colors:['#ee9ca7','#ffdde1'], angle:135 },
-{ name:'午夜',   colors:['#0f2027','#203a43','#2c5364'], angle:135 },
-{ name:'阳光',   colors:['#f6d365','#fda085'], angle:120 },
-{ name:'冰川',   colors:['#e6dada','#274046'], angle:135 },
-{ name:'霓虹',   colors:['#12c2e9','#c471ed','#f64f59'], angle:135 },
+{ zh:'日落',     en:'Sunset',     colors:['#ff512f','#f09819'], angle:135 },
+{ zh:'极光',     en:'Aurora',     colors:['#00c6ff','#0072ff','#1a1a8c'], angle:135 },
+{ zh:'樱花',     en:'Sakura',     colors:['#fbc2eb','#a6c1ee'], angle:120 },
+{ zh:'海洋',     en:'Ocean',      colors:['#2193b0','#6dd5ed'], angle:90 },
+{ zh:'火焰',     en:'Fire',       colors:['#f12711','#f5af19'], angle:45 },
+{ zh:'薰衣草',   en:'Lavender',   colors:['#e8cbc0','#636fa4'], angle:135 },
+{ zh:'糖果',     en:'Candy',      colors:['#ff9a9e','#fecfef','#fdfbfb'], angle:135 },
+{ zh:'森林',     en:'Forest',     colors:['#11998e','#38ef7d'], angle:120 },
+{ zh:'星空',     en:'Starry',     colors:['#0f0c29','#302b63','#24243e'], angle:180 },
+{ zh:'柠檬',     en:'Lemon',      colors:['#f7ff00','#db36a4'], angle:90 },
+{ zh:'午夜',     en:'Midnight',   colors:['#232526','#414345'], angle:180 },
+{ zh:'热带',     en:'Tropical',   colors:['#f83600','#f9d423'], angle:120 },
+{ zh:'薄荷',     en:'Mint',       colors:['#00b09b','#96c93d'], angle:135 },
+{ zh:'玫瑰',     en:'Rose',       colors:['#ee9ca7','#ffdde1'], angle:135 },
+{ zh:'夕阳',     en:'Dusk',       colors:['#2c3e50','#fd746c'], angle:135 },
+{ zh:'霓虹',     en:'Neon',       colors:['#12c2e9','#c471ed','#f64f59'], angle:90 },
+{ zh:'紫罗兰',   en:'Violet',     colors:['#7f00ff','#e100ff'], angle:135 },
+{ zh:'冰川',     en:'Glacier',    colors:['#e6dada','#274046'], angle:180 },
+{ zh:'彩虹',     en:'Rainbow',    colors:['#ff0000','#ff8800','#ffff00','#00ff00','#0000ff','#8800ff'], angle:90 },
+{ zh:'黑金',     en:'Black Gold', colors:['#1a1a2e','#e2b714'], angle:135 },
 ];
 let _gradStops = [];
 function renderGradient(el) {
+const tl = makeToolI18n({
+zh: {
+settings:       '渐变设置',
+random:         '随机',
+presets:        '预设模板',
+type_label:     '类型',
+angle_label:    '角度',
+add_stop:       '+ 添加色标',
+anim_play:      '▶ 动画',
+anim_pause:     '⏸ 停止',
+css_code:       'CSS 代码',
+copy:           '复制',
+tailwind_label: 'Tailwind CSS',
+tw_unsupported: '// Tailwind 仅支持 linear-gradient 的 2-3 色标',
+},
+en: {
+settings:       'Gradient Settings',
+random:         'Random',
+presets:        'Presets',
+type_label:     'Type',
+angle_label:    'Angle',
+add_stop:       '+ Add Color Stop',
+anim_play:      '▶ Animation',
+anim_pause:     '⏸ Stop',
+css_code:       'CSS Code',
+copy:           'Copy',
+tailwind_label: 'Tailwind CSS',
+tw_unsupported: '// Tailwind only supports linear-gradient with 2-3 stops',
+},
+});
+window._gradTl = tl;
+const lang = getCurrentLang();
 el.innerHTML = `
 <div class="tool-card-panel">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-<div class="panel-label" style="margin:0">渐变设置</div>
-<button class="btn btn-secondary" onclick="gradRandom()">随机</button>
+<div class="panel-label" style="margin:0">${tl('settings')}</div>
+<button class="btn btn-secondary" onclick="gradRandom()">${tl('random')}</button>
 </div>
 <div style="margin-bottom:14px">
-<div style="font-size:11px;color:var(--text-muted);margin-bottom:7px">预设模板</div>
-<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px">
-${GRAD_PRESETS.map((p,i) => `<button onclick="gradApplyPreset(${i})" style="flex-shrink:0;width:48px;height:28px;border-radius:8px;border:1px solid var(--glass-border);cursor:pointer;background:linear-gradient(135deg, ${p.colors.join(',')})" title="${p.name}"></button>`).join('')}
+<div style="font-size:11px;color:var(--text-muted);margin-bottom:7px">${tl('presets')}</div>
+<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px" id="gradPresetRow">
+${GRAD_PRESETS.map((p,i) => `<button onclick="gradApplyPreset(${i})" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:2px" title="${lang==='en'?p.en:p.zh}">
+<span style="display:block;width:48px;height:28px;border-radius:8px;border:1px solid var(--glass-border);background:linear-gradient(${p.angle}deg, ${p.colors.join(',')})"></span>
+<span style="font-size:9px;color:var(--text-muted);white-space:nowrap">${lang==='en'?p.en:p.zh}</span>
+</button>`).join('')}
 </div>
 </div>
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:14px">
 <div>
-<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">类型</div>
+<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">${tl('type_label')}</div>
 <select class="tool-input" id="gradType" onchange="gradUpdate()">
 <option value="linear">linear-gradient</option>
 <option value="radial">radial-gradient</option>
@@ -44,27 +79,27 @@ ${GRAD_PRESETS.map((p,i) => `<button onclick="gradApplyPreset(${i})" style="flex
 </select>
 </div>
 <div id="gradAngleWrap">
-<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">角度 <span id="gradAngleVal">135</span>°</div>
+<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">${tl('angle_label')} <span id="gradAngleVal">135</span>°</div>
 <input type="range" id="gradAngle" min="0" max="360" value="135" oninput="document.getElementById('gradAngleVal').textContent=this.value;gradUpdate()">
 </div>
 </div>
 <div id="gradStops" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
-<button class="btn btn-secondary" onclick="gradAddStop()" style="font-size:12px">+ 添加色标</button>
+<button class="btn btn-secondary" onclick="gradAddStop()" style="font-size:12px">${tl('add_stop')}</button>
 </div>
 <div class="tool-card-panel">
 <div style="height:120px;border-radius:12px;margin-bottom:14px;border:1px solid var(--glass-border);transition:all 0.3s" id="gradPreview"></div>
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-<button class="btn btn-secondary" id="gradAnimToggle" onclick="gradToggleAnim()" style="font-size:12px">▶ 动画</button>
+<button class="btn btn-secondary" id="gradAnimToggle" onclick="gradToggleAnim()" style="font-size:12px">${tl('anim_play')}</button>
 </div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-<div class="panel-label" style="margin:0">CSS 代码</div>
-<button class="btn btn-secondary" onclick="copyText(document.getElementById('gradCode').textContent,this)">复制</button>
+<div class="panel-label" style="margin:0">${tl('css_code')}</div>
+<button class="btn btn-secondary" onclick="copyText(document.getElementById('gradCode').textContent,this)">${tl('copy')}</button>
 </div>
 <pre class="result-box" id="gradCode" style="white-space:pre-wrap"></pre>
 <div style="margin-top:10px">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-<div style="font-size:11px;color:var(--text-muted)">Tailwind CSS</div>
-<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="copyText(document.getElementById('gradTailwind').textContent,this)">复制</button>
+<div style="font-size:11px;color:var(--text-muted)">${tl('tailwind_label')}</div>
+<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="copyText(document.getElementById('gradTailwind').textContent,this)">${tl('copy')}</button>
 </div>
 <pre class="result-box" id="gradTailwind" style="white-space:pre-wrap;font-size:12px"></pre>
 </div>
@@ -75,6 +110,12 @@ _gradStops = [
 ];
 gradRenderStops();
 gradUpdate();
+window._activeCleanup = function() {
+var preview = document.getElementById('gradPreview');
+if (preview) preview.style.animation = '';
+var styleEl = document.getElementById('gradAnimStyle');
+if (styleEl) styleEl.remove();
+};
 }
 function gradRenderStops() {
 const container = document.getElementById('gradStops');
@@ -108,17 +149,21 @@ _gradStops.forEach((s,i) => {
 const el = document.getElementById('gsc'+i);
 if (el) el.textContent = s.color.toUpperCase();
 });
+const tl = window._gradTl || function(k){ return k; };
 const twEl = document.getElementById('gradTailwind');
 if (twEl) {
 if (type === 'linear' && sorted.length >= 2) {
-const angleMap = {0:'to-t',45:'to-tr',90:'to-r',135:'to-br',180:'to-b',225:'to-bl',270:'to-l',315:'to-tl'};
+const angleMap = {
+0:'to-t', 45:'to-tr', 90:'to-r', 135:'to-br',
+180:'to-b', 225:'to-bl', 270:'to-l', 315:'to-tl'
+};
 const dir = angleMap[+angle] || 'to-r';
 let tw = `bg-gradient-${dir} from-[${sorted[0].color}]`;
 if (sorted.length === 3) tw += ` via-[${sorted[1].color}]`;
 if (sorted.length >= 2) tw += ` to-[${sorted[sorted.length-1].color}]`;
 twEl.textContent = tw;
 } else {
-twEl.textContent = '
+twEl.textContent = tl('tw_unsupported');
 }
 }
 }
@@ -133,10 +178,11 @@ function gradToggleAnim() {
 const preview = document.getElementById('gradPreview');
 const btn = document.getElementById('gradAnimToggle');
 if (!preview) return;
+const tl = window._gradTl || function(k){ return k; };
 const isAnimating = preview.style.animation;
 if (isAnimating) {
 preview.style.animation = '';
-btn.textContent = '▶ 动画';
+btn.textContent = tl('anim_play');
 } else {
 if (!document.getElementById('gradAnimStyle')) {
 const s = document.createElement('style');
@@ -145,7 +191,7 @@ s.textContent = '@keyframes gradSpin{to{filter:hue-rotate(360deg)}}';
 document.head.appendChild(s);
 }
 preview.style.animation = 'gradSpin 3s linear infinite';
-btn.textContent = '⏸ 停止';
+btn.textContent = tl('anim_pause');
 }
 }
 function gradAddStop() {

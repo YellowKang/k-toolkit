@@ -26,7 +26,7 @@ title.textContent = `查询中...`;
 data.innerHTML = '<span style="color:var(--text-muted)">请稍候...</span>';
 res.style.display = '';
 try {
-const r = await fetch(`https:
+const r = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=${type}`, {
 headers: {Accept:'application/dns-json'},
 signal: AbortSignal.timeout(8000)
 });

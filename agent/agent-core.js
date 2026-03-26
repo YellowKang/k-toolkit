@@ -147,7 +147,8 @@ _getEffectiveTools() {
 const core = window._AGENT_CORE_ACTIONS || [];
 const discovered = this._extractDiscoveredSchemas();
 if (discovered.size === 0) return core;
-return [...core, ...discovered.values()];
+const extra = [...discovered.values()].slice(0, 20);
+return [...core, ...extra];
 }
 async _loop() {
 if (this.iterations >= this.MAX_ITER) {
@@ -160,7 +161,7 @@ this.emit('thinking', {});
 let resp;
 try {
 let safeBaseUrl = this.config.baseUrl || '';
-if (safeBaseUrl && location.protocol === 'https:' && safeBaseUrl.startsWith('http:
+if (safeBaseUrl && location.protocol === 'https:' && safeBaseUrl.startsWith('http://')) {
 safeBaseUrl = safeBaseUrl.replace(/^http:\/\
 if (!this._mixedContentWarned) {
 this._mixedContentWarned = true;
@@ -224,7 +225,13 @@ const action = window._AGENT_ALL_ACTIONS
 : (window._AGENT_ACTIONS || []).find(a => a.name === name);
 let result;
 try {
-result = action ? await action.execute(params) : { success: false, error: `未知 action: ${name}` };
+if (!action) {
+result = { success: false, error: `未知 action: ${name}` };
+} else {
+const timeout = new Promise((_, reject) =>
+setTimeout(() => reject(new Error('Action 执行超时 (15s)')), 15000));
+result = await Promise.race([action.execute(params), timeout]);
+}
 } catch (e) {
 result = { success: false, error: e.message };
 }

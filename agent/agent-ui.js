@@ -1,5 +1,6 @@
 'use strict';
 const AG_CSS = `
+/* FAB styles are in agent-loader.js (injected early) */
 #agentPanel {
 position: fixed;
 z-index: 9999;
@@ -232,6 +233,7 @@ transition: background 0.1s;
 .ag-sug-desc { font-size: 12px; color: var(--ag-text2,#94a3b8); }
 #agSendBtn:hover { background: #7c3aed; transform: scale(1.05); }
 #agSendBtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+/* Config modal */
 #agConfigModal {
 position: fixed;
 inset: 0;
@@ -309,6 +311,7 @@ transition: all 0.15s;
 }
 .ag-opt-btn:hover { background: rgba(255,255,255,0.08); }
 .ag-opt-btn.active { background: var(--ag-accent,#6366f1); color: var(--ag-accent-text,#fff); border-color: var(--ag-accent,#6366f1); }
+/* Skin buttons with color dot preview */
 .ag-skin-btns { display: flex; flex-wrap: wrap; gap: 8px; }
 .ag-skin-btn {
 display: flex; align-items: center; gap: 6px;
@@ -336,11 +339,14 @@ position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
 background: none; border: none; color: var(--ag-text2,#94a3b8); cursor: pointer; font-size: 14px;
 }
 .ag-hint { font-size: 11px; color: var(--ag-text2,#94a3b8); margin-top: 4px; }
+/* Color picker row */
 .ag-color-row { display: flex; gap: 8px; align-items: center; }
 .ag-color-row input[type="color"] { width: 40px; height: 32px; border: none; background: none; cursor: pointer; padding: 0; border-radius: 6px; }
+/* Shortcut display in config */
 .ag-shortcuts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .ag-shortcut-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 12px; }
 .ag-shortcut-key { font-family: 'SF Mono', monospace; font-size: 11px; color: var(--ag-accent,#6366f1); background: rgba(99,102,241,0.12); padding: 2px 6px; border-radius: 4px; }
+/* Markdown basics in assistant bubble */
 .ag-bubble.assistant code {
 background: rgba(0,0,0,0.3);
 padding: 1px 4px;
@@ -349,6 +355,7 @@ font-family: monospace;
 font-size: 12px;
 }
 .ag-bubble.assistant strong { color: #fff; }
+/* Enhanced tool cards with status colors */
 .ag-card.success { border-color: rgba(34,197,94,0.3); }
 .ag-card.success .ag-card-header { background: rgba(34,197,94,0.08); }
 .ag-card.error { border-color: rgba(239,68,68,0.3); }
@@ -356,11 +363,14 @@ font-size: 12px;
 .ag-card-status { font-size: 11px; color: var(--ag-text2,#94a3b8); margin-left: auto; white-space: nowrap; }
 .ag-card-status.ok { color: #22c55e; }
 .ag-card-status.fail { color: #ef4444; }
+/* Thinking animation with action name */
 .ag-thinking-label { font-size: 12px; }
 .ag-thinking-timer { font-size: 11px; color: var(--ag-accent,#6366f1); font-variant-numeric: tabular-nums; margin-left: 4px; }
+/* Message timestamps */
 .ag-bubble-time { font-size: 10px; opacity: 0.5; margin-top: 4px; display: block; text-align: right; }
 .ag-bubble.user .ag-bubble-time { text-align: right; }
 .ag-bubble.assistant .ag-bubble-time { text-align: left; }
+/* Stop button */
 #agStopBtn {
 display: none;
 width: 36px; height: 36px;
@@ -375,6 +385,7 @@ transition: background 0.15s;
 }
 #agStopBtn:hover { background: rgba(239,68,68,0.3); }
 #agStopBtn.visible { display: flex; align-items: center; justify-content: center; }
+/* Enhanced markdown in assistant bubbles */
 .ag-bubble.assistant pre {
 background: rgba(0,0,0,0.35);
 border: 1px solid rgba(255,255,255,0.08);
@@ -428,6 +439,7 @@ text-align: left;
 background: rgba(255,255,255,0.06);
 font-weight: 600;
 }
+/* Inline copy button for bubbles */
 .ag-bubble-copy {
 position: absolute;
 top: 6px;
@@ -444,8 +456,10 @@ transition: opacity 0.15s;
 }
 .ag-bubble:hover .ag-bubble-copy { opacity: 1; }
 .ag-bubble { position: relative; }
+/* Card animation */
 .ag-card { animation: agSlideIn 0.2s ease-out; }
 @keyframes agSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+/* Welcome enhancement */
 .ag-welcome-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .ag-welcome-chip {
 background: rgba(99,102,241,0.1);
@@ -458,6 +472,7 @@ cursor: pointer;
 transition: all 0.15s;
 }
 .ag-welcome-chip:hover { background: var(--ag-accent,#6366f1); color: #fff; }
+/* ── Mini dialog (chat style) ─────────────────────────────────── */
 #agMiniOverlay {
 position: fixed;
 inset: 0;
@@ -483,6 +498,7 @@ display: flex;
 flex-direction: column;
 max-height: min(520px, 70vh);
 }
+/* Mini header */
 .ag-mini-header {
 display: flex;
 align-items: center;
@@ -511,6 +527,7 @@ justify-content: center;
 transition: background 0.15s, color 0.15s;
 }
 .ag-mini-hdr-btn:hover { background: rgba(255,255,255,0.12); color: #f1f5f9; }
+/* Mini messages area */
 #agMiniMessages {
 flex: 1;
 overflow-y: auto;
@@ -523,6 +540,7 @@ min-height: 60px;
 }
 #agMiniMessages::-webkit-scrollbar { width: 3px; }
 #agMiniMessages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+/* Mini bubbles — compact version of full-panel bubbles */
 .ag-mini-bubble {
 max-width: 88%;
 padding: 7px 11px;
@@ -581,6 +599,7 @@ border: 1px solid var(--ag-border,rgba(255,255,255,0.08));
 color: var(--ag-text2,#94a3b8);
 font-size: 12px;
 }
+/* Mini welcome */
 .ag-mini-welcome {
 text-align: center;
 padding: 8px 0 4px;
@@ -600,6 +619,7 @@ cursor: pointer;
 transition: all 0.15s;
 }
 .ag-mini-chip:hover { background: var(--ag-accent,#6366f1); color: #fff; }
+/* Mini input row */
 .ag-mini-input-row {
 display: flex;
 align-items: center;
@@ -638,6 +658,7 @@ transition: background 0.15s, transform 0.1s;
 }
 #agMiniSendBtn:hover { background: #7c3aed; transform: scale(1.05); }
 #agMiniSendBtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+/* Mini footer */
 .ag-mini-footer {
 padding: 6px 14px;
 border-top: 1px solid rgba(255,255,255,0.06);
@@ -681,27 +702,36 @@ html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
 return '<pre><code class="lang-' + (lang||'text') + '">' + code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code></pre>';
 });
 html = html.replace(/`([^`]+)`/g, (_, code) => '<code>' + code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code>');
+// Escape remaining HTML (but not our tags)
 const parts = html.split(/(<\/?(?:pre|code|strong|em|a|ul|ol|li|h[1-3]|blockquote|table|thead|tbody|tr|th|td|br)[^>]*>)/);
 html = parts.map((p, i) => i % 2 === 0 ? p.replace(/&(?!amp;|lt;|gt;)/g, '&amp;').replace(/<(?!\/?(?:pre|code|strong|em|a|ul|ol|li|h[1-3]|blockquote|table|thead|tbody|tr|th|td|br))/g, '&lt;') : p).join('');
+// Headers (### > ## > #)
 html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
 html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
 html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+// Bold & italic
 html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+// Links (reject javascript: and data: schemes to prevent XSS)
 html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
 if (/^\s*(?:javascript|data|vbscript):/i.test(url)) return text;
 return '<a href="' + url + '" target="_blank" rel="noopener">' + text + '</a>';
 });
+// Blockquotes
 html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+// Unordered lists
 html = html.replace(/(?:^|\n)((?:- .+\n?)+)/g, (_, list) => {
 const items = list.trim().split('\n').map(l => '<li>' + l.replace(/^- /, '') + '</li>').join('');
 return '<ul>' + items + '</ul>';
 });
+// Ordered lists
 html = html.replace(/(?:^|\n)((?:\d+\. .+\n?)+)/g, (_, list) => {
 const items = list.trim().split('\n').map(l => '<li>' + l.replace(/^\d+\. /, '') + '</li>').join('');
 return '<ol>' + items + '</ol>';
 });
+// Line breaks (but not inside pre/code)
 html = html.replace(/\n/g, '<br>');
+// Clean up br inside block elements
 html = html.replace(/<br>(<\/?(?:pre|ul|ol|li|h[1-3]|blockquote|table))/g, '$1');
 html = html.replace(/(<\/(?:pre|ul|ol|li|h[1-3]|blockquote|table)>)<br>/g, '$1');
 return html;
@@ -710,10 +740,14 @@ function scrollBottom() {
 const el = document.getElementById('agMessages');
 if (el) el.scrollTop = el.scrollHeight;
 }
+// ── State (shared with agent-ui-part2.js via window) ────────────
+// Using var instead of let so they are accessible across script files
+// (let/const at top-level in 'use strict' non-module scripts are script-scoped, not global)
 var _session = null;
 var _thinkingEl = null;
-var _cardMap = {}; 
+var _cardMap = {}; // tc.id => card element
 var _busy = false;
+// ── Panel builder ───────────────────────────────────────────────
 function buildPanel() {
 const { AG, SKINS, applySkin } = window.AgentConfig;
 const cfg = AG.load();
@@ -742,6 +776,7 @@ panel.innerHTML = [
 '</div>',
 ].join('');
 document.body.appendChild(panel);
+// Welcome message
 const welcomeEl = document.createElement('div');
 welcomeEl.className = 'ag-bubble assistant';
 const isEn = (window._i18n?.lang || 'zh') === 'en';
@@ -760,7 +795,9 @@ isEn ? ['Generate password', '生成密码'] : ['生成密码', '生成密码'],
 ].map(([label, msg]) => `<span class="ag-welcome-chip" onclick="window._agChipSend && window._agChipSend(this,'${msg}')">${label}</span>`).join('') +
 '</div>';
 document.getElementById('agMessages').appendChild(welcomeEl);
+// Apply skin variables
 applySkin(cfg.skin);
+// ── Drag to move ────────────────────────────────────────────
 (function initDrag() {
 const header = panel.querySelector('.ag-header');
 let dragging = false, ox = 0, oy = 0;
@@ -789,6 +826,7 @@ dragging = false;
 header.style.cursor = 'grab';
 });
 })();
+// Wire close / clear / config
 document.getElementById('agCloseBtn').onclick = () => { panel.style.display = 'none'; };
 document.getElementById('agClearBtn').onclick = () => {
 if (_session) _session.clearHistory();
@@ -799,6 +837,7 @@ document.getElementById('agConfigBtn').onclick = () => openConfig();
 const input   = document.getElementById('agInput');
 const sendBtn = document.getElementById('agSendBtn');
 input.addEventListener('keydown', e => {
+// 补全浮层键盘导航
 const sug = document.getElementById('agCmdSuggest');
 if (sug) {
 const items = sug.querySelectorAll('.ag-sug-item');
@@ -816,6 +855,7 @@ if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); _h
 input.addEventListener('input', () => {
 input.style.height = 'auto';
 input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+// 斜杠命令补全
 const val = input.value;
 if (val.startsWith('/') && !val.includes(' ') && window.CmdParser) {
 const sugs = window.CmdParser.getSuggestions(val);
@@ -832,6 +872,7 @@ setBusy(false);
 stopBtn.classList.remove('visible');
 };
 }
+// Exported entry points for agent-loader
 var _sugIdx = -1;
 function _sugHighlight(items) {
 items.forEach((el,i) => el.classList.toggle('active', i === _sugIdx));
@@ -861,11 +902,13 @@ if (panel) panel.appendChild(box);
 window._agInjectCSS  = injectCSS;
 window._agBuildPanel = buildPanel;
 window._agMdToHtml   = mdToHtml;
+// Chip quick-send: clicking a hint chip fills and sends the input
 window._agChipSend = function(btn, text) {
 const input = document.getElementById('agInput');
 if (!input) return;
 input.value = text;
 input.style.height = 'auto';
 input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+// Trigger send via part2
 window._agDoSend && window._agDoSend();
 };

@@ -26,7 +26,7 @@ el.innerHTML = `
 <span style="font-size:11px;color:var(--text-muted)">本地时区: ${localTz}</span>
 </div>
 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="wcZonePicker">
-${ALL_ZONES.map(z => `<button class="btn btn-secondary" id="wcBtn_${z.tz.replace(/\
+${ALL_ZONES.map(z => `<button class="btn btn-secondary" id="wcBtn_${z.tz.replace(/\//g,'_')}" onclick="wcToggleZone('${z.tz}')" style="font-size:12px;padding:3px 10px">${z.flag} ${z.label}</button>`).join('')}
 </div>
 <div id="wcGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px"></div>
 </div>

@@ -35,7 +35,7 @@ el.innerHTML = `
 <div style="display:flex;gap:8px;flex-wrap:wrap">
 <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_cpBg('linear-gradient(135deg,var(--accent),var(--accent-blue))')">渐变</button>
 <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_cpBg('var(--accent)')">纯色</button>
-<button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_cpBg('url(https:
+<button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_cpBg('url(https://picsum.photos/300/300)')">图片</button>
 </div>
 </div>
 </div>

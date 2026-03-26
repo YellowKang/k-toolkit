@@ -253,6 +253,10 @@ box.appendChild(inputRow);
 box.appendChild(footer);
 overlay.appendChild(box);
 document.body.appendChild(overlay);
+if (_miniMessagesHtml && _miniSession && _miniSession.messages.length > 0) {
+messages.innerHTML = _miniMessagesHtml;
+messages.querySelectorAll('.ag-mini-bubble.thinking').forEach(el => el.remove());
+} else {
 const welcomeChips = [
 isEn ? 'Generate UUID' : '生成 UUID',
 isEn ? 'Format JSON' : '格式化 JSON',
@@ -270,6 +274,7 @@ input.value = chip.textContent;
 _miniSend();
 });
 });
+}
 setTimeout(() => input.focus(), 50);
 overlay.addEventListener('click', e => { if (e.target === overlay) closeMini(); });
 document.getElementById('agMiniCloseBtn').onclick = closeMini;
@@ -348,14 +353,15 @@ _miniSend();
 });
 sendBtn.addEventListener('click', _miniSend);
 }
+let _miniMessagesHtml = '';
 function closeMini() {
+const msgsEl = document.getElementById('agMiniMessages');
+if (msgsEl) _miniMessagesHtml = msgsEl.innerHTML;
 const el = document.getElementById('agMiniOverlay');
 if (el) el.remove();
 _miniThinkingEl = null;
 if (_miniSession) {
 _miniSession._handlers = {};
-_miniSession.clearHistory();
-_miniSession._routerInit = false;
 }
 }
 document.addEventListener('keydown', e => {

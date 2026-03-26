@@ -2,7 +2,7 @@ window.renderEnvParse = function(el) {
 el.innerHTML = `
 <div class="tool-card-panel">
 <div class="panel-label">粘贴 .env 内容</div>
-<textarea class="tool-textarea" id="epInput" rows="10" placeholder="# 注释行会被忽略\nAPP_NAME=MyApp\nPORT=3000\nDB_URL=postgres:
+<textarea class="tool-textarea" id="epInput" rows="10" placeholder="# 注释行会被忽略\nAPP_NAME=MyApp\nPORT=3000\nDB_URL=postgres://localhost/db" oninput="epParse()"></textarea>
 <div class="tool-actions">
 <button class="btn btn-primary" onclick="epParse()">解析</button>
 <button class="btn btn-secondary" onclick="epClear()">清空</button>

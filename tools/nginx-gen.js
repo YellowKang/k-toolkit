@@ -20,7 +20,7 @@ el.innerHTML = `
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
 <div>
 <div class="panel-label">根目录 / 代理地址</div>
-<input class="tool-input" id="ngRoot" value="/var/www/html" oninput="ngGen()" placeholder="/var/www/html 或 http:
+<input class="tool-input" id="ngRoot" value="/var/www/html" oninput="ngGen()" placeholder="/var/www/html 或 http://127.0.0.1:3000">
 </div>
 <div>
 <div class="panel-label">监听端口</div>
@@ -57,9 +57,9 @@ ngGen();
 const NG_SCENES = {
 static:      { root: '/var/www/html',          label: '静态网站' },
 spa:         { root: '/var/www/html',          label: 'SPA' },
-proxy:       { root: 'http:
+proxy:       { root: 'http://127.0.0.1:3000',  label: '反向代理' },
 https:       { root: '/var/www/html',          label: 'HTTPS' },
-loadbalance: { root: 'http:
+loadbalance: { root: 'http://127.0.0.1:3000',  label: '负载均衡' },
 };
 function ngApplyScene() {
 const scene = document.getElementById('ngScene').value;
@@ -107,7 +107,7 @@ if (scene === 'proxy' || scene === 'loadbalance') {
 const upstream = scene === 'loadbalance'
 ? `\nupstream backend {\n    server 127.0.0.1:3000;\n    server 127.0.0.1:3001;\n    keepalive 32;\n}\n`
 : '';
-const proxyTarget = scene === 'loadbalance' ? 'http:
+const proxyTarget = scene === 'loadbalance' ? 'http://backend' : root;
 locationBlock = `${upstream}
 location / {
 proxy_pass         ${proxyTarget};
@@ -144,7 +144,7 @@ conf = `# HTTP → HTTPS 重定向
 server {
 listen      80;
 server_name ${domain} www.${domain};
-return 301 https:
+return 301 https://$host$request_uri;
 }
 # HTTPS 主服务
 server {
