@@ -181,7 +181,7 @@ async function _chatSend() {
   _chatUpdateImgPreview();
 
   // Render user bubble
-  const msgList = document.getElementById('_chatMsgList');
+  const msgList = _chatGetMsgContainer();
   _chatRenderMsg(userMsg, msgList);
   input.value = '';
   input.style.height = 'auto';
@@ -254,7 +254,7 @@ function _chatStop() {
 }
 
 function _chatShowError(msg) {
-  const msgList = document.getElementById('_chatMsgList');
+  const msgList = _chatGetMsgContainer();
   if (!msgList) return;
   const el = document.createElement('div');
   el.className = '_chat-msg _chat-msg-error';
@@ -264,7 +264,7 @@ function _chatShowError(msg) {
 }
 
 function _chatShowNoKey() {
-  const msgList = document.getElementById('_chatMsgList');
+  const msgList = _chatGetMsgContainer();
   if (!msgList) return;
   const el = document.createElement('div');
   el.className = '_chat-msg _chat-msg-error';
@@ -283,6 +283,11 @@ function _chatShowNoKey() {
 function _chatScrollBottom() {
   const el = document.getElementById('_chatMsgList');
   if (el) requestAnimationFrame(() => el.scrollTop = el.scrollHeight);
+}
+
+function _chatGetMsgContainer() {
+  const list = document.getElementById('_chatMsgList');
+  return list?.querySelector('._chat-msgs-inner') || list;
 }
 
 function _chatUpdateButtons() {
@@ -343,7 +348,8 @@ function _chatClear() {
   _chatMessages = [];
   _chatImages = [];
   const msgList = document.getElementById('_chatMsgList');
-  if (msgList) msgList.innerHTML = '';
+  const inner = _chatGetMsgContainer();
+  if (inner) inner.innerHTML = '';
   _chatUpdateImgPreview();
   try { localStorage.removeItem(_CHAT_LS_KEY); } catch {}
 }
@@ -485,8 +491,9 @@ function renderAiChat(container) {
     ._chat-temp-wrap{display:flex;align-items:center;gap:4px}
     ._chat-temp-wrap input[type="range"]{width:80px;accent-color:#6366f1}
     ._chat-temp-val{font-size:12px;color:var(--text-secondary,#94a3b8);min-width:28px;text-align:center}
-    ._chat-msgs{flex:1;overflow-y:auto;padding:20px 16px;display:flex;flex-direction:column;gap:14px;min-height:0}
-    ._chat-msg{max-width:80%;animation:_chatFadeIn .25s ease}
+    ._chat-msgs{flex:1;overflow-y:auto;padding:20px 0;display:flex;flex-direction:column;gap:14px;min-height:0}
+    ._chat-msgs-inner{width:100%;max-width:860px;margin:0 auto;padding:0 20px;display:flex;flex-direction:column;gap:14px}
+    ._chat-msg{max-width:75%;animation:_chatFadeIn .25s ease}
     ._chat-msg-user{align-self:flex-end}
     ._chat-msg-ai{align-self:flex-start}
     ._chat-msg-error{align-self:center}
@@ -507,6 +514,7 @@ function renderAiChat(container) {
     pre:hover ._chat-copy-btn{opacity:1}
     ._chat-copy-btn:hover{background:rgba(255,255,255,.2);color:#e2e8f0}
     ._chat-input-area{display:flex;align-items:flex-end;gap:8px;padding:12px 20px 16px;border-top:1px solid var(--border-color,#2d2d4e);background:var(--bg-card,rgba(18,18,30,0.95));flex-shrink:0}
+    ._chat-input-inner{display:flex;align-items:flex-end;gap:8px;width:100%;max-width:860px;margin:0 auto}
     ._chat-input-area textarea{flex:1;resize:none;background:var(--bg-main,#0f172a);color:var(--text-color,#e2e8f0);border:1px solid var(--border-color,#334155);border-radius:14px;padding:12px 16px;font-size:14px;line-height:1.6;max-height:160px;outline:none;font-family:inherit;transition:border-color .15s}
     ._chat-input-area textarea:focus{border-color:#6366f1;box-shadow:0 0 0 2px rgba(99,102,241,.15)}
     ._chat-input-area textarea::placeholder{color:var(--text-secondary,#64748b)}
@@ -631,16 +639,19 @@ function renderAiChat(container) {
   const msgList = document.createElement('div');
   msgList.className = '_chat-msgs';
   msgList.id = '_chatMsgList';
+  const msgInner = document.createElement('div');
+  msgInner.className = '_chat-msgs-inner';
+  msgList.appendChild(msgInner);
 
   // Render history or welcome
   if (_chatMessages.length === 0) {
     const welcome = document.createElement('div');
     welcome.className = '_chat-welcome';
     welcome.innerHTML = `<span class="_chat-welcome-icon">💬</span>${_chatTl('welcome')}`;
-    msgList.appendChild(welcome);
+    msgInner.appendChild(welcome);
   } else {
     for (const m of _chatMessages) {
-      _chatRenderMsg(m, msgList);
+      _chatRenderMsg(m, msgInner);
     }
   }
   wrap.appendChild(msgList);
@@ -654,6 +665,8 @@ function renderAiChat(container) {
   // ── Input area ──
   const inputArea = document.createElement('div');
   inputArea.className = '_chat-input-area';
+  const inputInner = document.createElement('div');
+  inputInner.className = '_chat-input-inner';
 
   // Attach image button
   const attachBtn = document.createElement('button');
@@ -661,7 +674,7 @@ function renderAiChat(container) {
   attachBtn.innerHTML = '📎';
   attachBtn.title = _chatTl('attach_img');
   attachBtn.onclick = _chatAttachImage;
-  inputArea.appendChild(attachBtn);
+  inputInner.appendChild(attachBtn);
 
   // Textarea
   const textarea = document.createElement('textarea');
@@ -690,7 +703,7 @@ function renderAiChat(container) {
       }
     }
   });
-  inputArea.appendChild(textarea);
+  inputInner.appendChild(textarea);
 
   // Send button
   const sendBtn = document.createElement('button');
@@ -699,7 +712,7 @@ function renderAiChat(container) {
   sendBtn.innerHTML = '↑';
   sendBtn.title = _chatTl('send');
   sendBtn.onclick = _chatSend;
-  inputArea.appendChild(sendBtn);
+  inputInner.appendChild(sendBtn);
 
   // Stop button
   const stopBtn = document.createElement('button');
@@ -709,7 +722,8 @@ function renderAiChat(container) {
   stopBtn.innerHTML = '■';
   stopBtn.title = _chatTl('stop');
   stopBtn.onclick = _chatStop;
-  inputArea.appendChild(stopBtn);
+  inputInner.appendChild(stopBtn);
+  inputArea.appendChild(inputInner);
 
   wrap.appendChild(inputArea);
   container.appendChild(wrap);
