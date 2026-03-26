@@ -278,6 +278,14 @@ function renderHomePage(mode) {
     html += `<div class="home-section"><div class="section-title">🕐 ${t('recent_title')} <span class="section-count">${recent.length}</span></div><div class="tools-grid">${recentTools.map(renderToolCard).join('')}</div></div>`;
   }
 
+  // AI 对话固定入口
+  if (currentCatFilter === 'all') {
+    const aiTool = localizedTools.find(t => t.id === 'ai-chat');
+    if (aiTool) {
+      html += `<div class="home-section"><div class="section-title">🤖 AI ${t('stat_ai_chat') || '对话'}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
+    }
+  }
+
   // 分类工具区（IntersectionObserver 懒加载）
   const filteredCats = currentCatFilter === 'all' ? CATEGORIES : [currentCatFilter];
   filteredCats.forEach(cat => {
