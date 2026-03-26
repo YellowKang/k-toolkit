@@ -165,8 +165,13 @@ if (!content) return;
 const tools = getLocalizedTools(TOOLS);
 let html = '';
 if (mode === 'ai-chat') {
-const aiTool = getLocalizedTools(TOOLS).find(t => t.id === 'ai-chat');
-if (aiTool) { await renderToolPageFull(aiTool); return; }
+const aiTool = TOOLS.find(t => t.id === 'ai-chat');
+if (!aiTool) return;
+content.innerHTML = `<div id="_chatPageRoot" style="display:flex;flex-direction:column;flex:1;min-height:0"></div>`;
+content.classList.add('chat-page-mode');
+try { await loadTool(aiTool.id); } catch(e) { content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">${t('load_fail')}</div></div>`; content.classList.remove('chat-page-mode'); return; }
+const fn = window[aiTool.render];
+if (fn) fn(document.getElementById('_chatPageRoot'));
 return;
 }
 if (mode === 'favorites') {
@@ -437,6 +442,7 @@ location.hash = page;
 return;
 }
 if (window._activeCleanup) { window._activeCleanup(); window._activeCleanup = null; }
+document.getElementById('content')?.classList.remove('chat-page-mode');
 const prevPage = currentPage;
 const prevIsSpecial = ['home','favorites','recent','ai-chat'].includes(prevPage);
 const content = document.getElementById('content');
