@@ -479,4 +479,5 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
   // Export for external use
   window._agOpenMini = openMini;
   window._agCloseMini = closeMini;
+  window._agEnsureLoaded = ensureLoaded;
 })();

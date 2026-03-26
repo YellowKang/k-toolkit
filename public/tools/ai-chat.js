@@ -198,6 +198,10 @@ async function _chatSend() {
 
   try {
     _chatAbort = new AbortController();
+    // Ensure Agent module is loaded before using adapters
+    if (!window.AgentAdapters) {
+      if (window._agEnsureLoaded) await window._agEnsureLoaded();
+    }
     const adapter = window.AgentAdapters?.getAdapter(_chatAdapterId);
     if (!adapter) throw new Error(_chatTl('no_adapter'));
 
@@ -456,6 +460,8 @@ function renderAiChat(container) {
   _chatImages = [];
   _chatBusy = false;
 
+  // Trigger Agent module load in background (non-blocking, so adapters are ready when user sends)
+  if (!window.AgentAdapters && window._agEnsureLoaded) window._agEnsureLoaded().catch(() => {});
   // Get adapters
   const adapters = window.AgentAdapters?.listAdapters?.() || [];
   const adapterList = adapters.length > 0 ? adapters : [
