@@ -115,8 +115,8 @@ const TOOLS = [
 ];
 
 // ── 分类 & 计数（顶层常量，避免重复遍历）──
-const CATEGORIES = [...new Set(TOOLS.map(t => t.category))];
-const CAT_COUNTS = Object.fromEntries(CATEGORIES.map(c => [c, TOOLS.filter(t => t.category === c).length]));
+const CATEGORIES = [...new Set(TOOLS.filter(t => t.id !== 'ai-chat').map(t => t.category))];
+const CAT_COUNTS = Object.fromEntries(CATEGORIES.map(c => [c, TOOLS.filter(t => t.category === c && t.id !== 'ai-chat').length]));
 
 // ── 分类图标 ──
 const CAT_ICONS = {
@@ -312,7 +312,7 @@ function _initLazyCats() {
       const cat = entry.target.dataset.lazyCat;
       const grid = entry.target.querySelector('.tools-grid');
       if (!grid || grid.children.length) return;
-      grid.innerHTML = getLocalizedTools(TOOLS).filter(tool => TOOLS.find(x => x.id === tool.id && x.category === cat)).map(renderToolCard).join('');
+      grid.innerHTML = getLocalizedTools(TOOLS).filter(tool => tool.id !== 'ai-chat' && TOOLS.find(x => x.id === tool.id && x.category === cat)).map(renderToolCard).join('');
       _lazyCatObserver.unobserve(entry.target);
     });
   }, { rootMargin: '200px' });
