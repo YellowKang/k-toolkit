@@ -20,7 +20,7 @@ const SHELL = SHELL_FILES.map(f => new URL(f, self.registration.scope).pathname)
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(SHELL_FILES.map(f => new URL(f, self.registration.scope).href)))
+      .then(c => Promise.allSettled(SHELL_FILES.map(f => c.add(new URL(f, self.registration.scope).href))))
       .then(() => self.skipWaiting())
   );
 });
@@ -48,10 +48,11 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       caches.match(e.request).then(cached =>
         cached || fetch(e.request).then(res => {
+          if (!res.ok) return res;
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
           return res;
-        })
+        }).catch(() => caches.match(e.request))
       )
     );
     return;
