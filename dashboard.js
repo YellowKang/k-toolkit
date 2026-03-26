@@ -229,6 +229,12 @@ if (currentCatFilter === 'all' && recent.length) {
 const recentTools = recent.slice(0,6).map(id => localizedTools.find(t => t.id === id)).filter(Boolean);
 html += `<div class="home-section"><div class="section-title">🕐 ${t('recent_title')} <span class="section-count">${recent.length}</span></div><div class="tools-grid">${recentTools.map(renderToolCard).join('')}</div></div>`;
 }
+if (currentCatFilter === 'all') {
+const aiTool = localizedTools.find(t => t.id === 'ai-chat');
+if (aiTool) {
+html += `<div class="home-section"><div class="section-title">🤖 AI ${t('stat_ai_chat') || '对话'}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
+}
+}
 const filteredCats = currentCatFilter === 'all' ? CATEGORIES : [currentCatFilter];
 filteredCats.forEach(cat => {
 const sampleTool = localizedTools.find(tool => TOOLS.find(x => x.id === tool.id && x.category === cat));
