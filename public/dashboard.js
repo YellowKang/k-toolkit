@@ -205,7 +205,7 @@ async function renderHomePage(mode) {
   if (mode === 'ai-chat') {
     const aiTool = TOOLS.find(t => t.id === 'ai-chat');
     if (!aiTool) return;
-    content.innerHTML = `<div id="_chatPageRoot" style="display:flex;flex-direction:column;flex:1;min-height:0"></div>`;
+    content.innerHTML = `<div id="_chatPageRoot"></div>`;
     content.classList.add('chat-page-mode');
     try { await loadTool(aiTool.id); } catch(e) { content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">${t('load_fail')}</div></div>`; content.classList.remove('chat-page-mode'); return; }
     const fn = window[aiTool.render];
