@@ -209,6 +209,8 @@ function renderHomePage(mode) {
     } else {
       html = `<div class="home-section"><div class="section-title">${t('fav_title')} <span class="section-count">${favTools.length}</span></div><div class="tools-grid">${favTools.map(renderToolCard).join('')}</div></div>`;
     }
+    const aiTool = getLocalizedTools(TOOLS).find(t => t.id === 'ai-chat');
+    if (aiTool) html += `<div class="home-section"><div class="section-title">🤖 AI ${t('stat_ai_chat') || '对话'}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
     content.innerHTML = html;
     return;
   }
@@ -220,6 +222,8 @@ function renderHomePage(mode) {
     } else {
       html = `<div class="home-section"><div class="section-title">${t('recent_title')} <span class="section-count">${recentTools.length}</span></div><div class="tools-grid">${recentTools.map(renderToolCard).join('')}</div></div>`;
     }
+    const aiTool = getLocalizedTools(TOOLS).find(t => t.id === 'ai-chat');
+    if (aiTool) html += `<div class="home-section"><div class="section-title">🤖 AI ${t('stat_ai_chat') || '对话'}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
     content.innerHTML = html;
     return;
   }
