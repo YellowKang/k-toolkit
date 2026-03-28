@@ -20,8 +20,21 @@ function minifyCSS(src) {
     .trim();
 }
 
+// Tokens after which a '/' starts a regex literal (not division)
+const REGEX_BEFORE = new Set([
+  '(', '[', '{', ',', ';', '=', '!', '&', '|', '?', ':',
+  '~', '^', '+', '-', '*', '%', '<', '>', 'return', 'typeof',
+  'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw',
+  'case', 'yield', 'await',
+]);
+
+function lastToken(s) {
+  // Get the last non-whitespace token from output so far
+  const m = s.match(/([a-zA-Z_$][\w$]*|[^\s\w$])\s*$/);
+  return m ? m[1] : '';
+}
+
 function minifyJS(src) {
-  // Remove block comments, preserve strings
   let out = '';
   let i = 0;
   while (i < src.length) {
@@ -47,6 +60,32 @@ function minifyJS(src) {
     if (src[i] === '/' && src[i+1] === '/') {
       while (i < src.length && src[i] !== '\n') i++;
       continue;
+    }
+    // Regex literal: '/' not followed by '/' or '*', preceded by operator/keyword
+    if (src[i] === '/' && src[i+1] !== '/' && src[i+1] !== '*') {
+      const prev = lastToken(out);
+      if (prev === '' || REGEX_BEFORE.has(prev)) {
+        // Copy entire regex literal verbatim
+        out += src[i++]; // opening /
+        while (i < src.length && src[i] !== '\n') {
+          if (src[i] === '\\') { out += src[i] + src[i+1]; i += 2; continue; }
+          if (src[i] === '[') {
+            // character class — slashes inside are not terminators
+            out += src[i++];
+            while (i < src.length && src[i] !== ']') {
+              if (src[i] === '\\') { out += src[i] + src[i+1]; i += 2; continue; }
+              out += src[i++];
+            }
+            if (i < src.length) out += src[i++]; // ]
+            continue;
+          }
+          if (src[i] === '/') { out += src[i++]; break; } // closing /
+          out += src[i++];
+        }
+        // regex flags (g, i, m, s, u, y, d)
+        while (i < src.length && /[gimsuy]/.test(src[i])) out += src[i++];
+        continue;
+      }
     }
     out += src[i++];
   }
