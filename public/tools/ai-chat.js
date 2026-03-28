@@ -1085,7 +1085,7 @@ function renderAiChat(container) {
     ._chat-img-preview{display:none;gap:8px;padding:8px 16px;flex-wrap:wrap;align-items:center;background:var(--sidebar-bg);border-top:1px solid var(--border);flex-shrink:0}
     ._chat-img-preview-item{position:relative}
     ._chat-img-remove{position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:12px;line-height:18px;text-align:center;cursor:pointer;padding:0}
-    ._chat-input-area{border-top:1px solid var(--border);background:var(--sidebar-bg);flex-shrink:0;padding:14px 32px 18px;backdrop-filter:blur(12px)}
+    ._chat-input-area{border-top:1px solid var(--border);background:var(--sidebar-bg);flex-shrink:0;padding:14px 32px 18px;padding-bottom:max(18px,env(safe-area-inset-bottom,18px));backdrop-filter:blur(12px)}
     ._chat-input-inner{display:flex;align-items:flex-end;gap:8px}
     ._chat-input-area textarea{flex:1;resize:none;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:16px;padding:12px 16px;font-size:14px;line-height:1.6;max-height:160px;outline:none;font-family:inherit;transition:border-color .15s,box-shadow .15s}
     ._chat-input-area textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 15%,transparent)}
@@ -1183,7 +1183,7 @@ function renderAiChat(container) {
       ._chat-msg-ai ._chat-content h1{font-size:1.25em}
       ._chat-msg-ai ._chat-content h2{font-size:1.15em}
       ._chat-msg-ai ._chat-content th,._chat-msg-ai ._chat-content td{padding:6px 10px;font-size:12px}
-      ._chat-input-area{padding:8px 12px 12px}
+      ._chat-input-area{padding:8px 12px max(12px,env(safe-area-inset-bottom,12px))}
       ._chat-input-inner{gap:6px;width:100%}
       ._chat-input-area textarea{padding:10px 14px;font-size:13px;border-radius:14px}
       ._chat-btn{width:36px;height:36px;font-size:16px}
@@ -1204,7 +1204,7 @@ function renderAiChat(container) {
       ._chat-msg-user{max-width:clamp(140px,80%,300px)}
       ._chat-avatar{width:22px;height:22px;font-size:11px}
       ._chat-content{font-size:13px}
-      ._chat-input-area{padding:6px 8px 10px}
+      ._chat-input-area{padding:6px 8px max(10px,env(safe-area-inset-bottom,10px))}
       ._chat-toolbar-group:not(:first-child){display:none}
     }
   `;
