@@ -108,8 +108,8 @@ const AG_CSS = `
   align-items: center;
   gap: 4px;
   padding: 3px 10px;
-  background: rgba(99,102,241,0.15);
-  border: 1px solid rgba(99,102,241,0.3);
+  background: color-mix(in srgb,var(--ag-accent,#6366f1) 15%,transparent);
+  border: 1px solid color-mix(in srgb,var(--ag-accent,#6366f1) 30%,transparent);
   border-radius: 20px;
   font-size: 11px;
   color: var(--ag-accent,#6366f1);
@@ -127,7 +127,7 @@ const AG_CSS = `
   transition: background 0.15s;
   font-family: var(--ag-font,inherit);
 }
-.ag-chip:hover { background: var(--ag-accent,#6366f1); color: #fff; border-color: var(--ag-accent,#6366f1); }
+.ag-chip:hover { background: var(--ag-accent,#6366f1); color: var(--ag-accent-text,#fff); border-color: var(--ag-accent,#6366f1); }
 .ag-auto-hint { opacity: 0.88; border-left: 2px solid var(--ag-accent,#6366f1); }
 .ag-thinking-dots { display: flex; gap: 3px; }
 .ag-thinking-dots span {
@@ -166,7 +166,7 @@ const AG_CSS = `
 .ag-card-detail { display: none; margin-top: 6px; }
 .ag-card-detail.open { display: block; }
 .ag-card-detail pre {
-  background: rgba(0,0,0,0.3);
+  background: color-mix(in srgb,var(--ag-bg,#000) 70%,transparent);
   border-radius: 6px;
   padding: 8px;
   font-size: 11px;
@@ -228,7 +228,7 @@ const AG_CSS = `
   border-radius: 10px;
   overflow: hidden;
   z-index: 10001;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  box-shadow: var(--ag-shadow,0 4px 16px rgba(0,0,0,0.3));
 }
 .ag-sug-item {
   display: flex;
@@ -241,7 +241,7 @@ const AG_CSS = `
 .ag-sug-item:hover, .ag-sug-item.active { background: var(--ag-bg2,rgba(255,255,255,0.08)); }
 .ag-sug-cmd { font-family: monospace; font-size: 12px; color: var(--ag-accent,#6366f1); min-width: 80px; }
 .ag-sug-desc { font-size: 12px; color: var(--ag-text2,#94a3b8); }
-#agSendBtn:hover { background: #7c3aed; transform: scale(1.05); }
+#agSendBtn:hover { background: var(--ag-accent2,var(--ag-accent,#6366f1)); filter: brightness(1.15); transform: scale(1.05); }
 #agSendBtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 /* Config modal */
@@ -256,35 +256,35 @@ const AG_CSS = `
   animation: ag-rp-fadein 0.15s;
 }
 .ag-config-box {
-  background: rgba(15,23,42,0.97);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 18px;
+  background: var(--ag-bg,rgba(15,23,42,0.97));
+  backdrop-filter: var(--ag-blur,blur(20px));
+  -webkit-backdrop-filter: var(--ag-blur,blur(20px));
+  border: 1px solid var(--ag-border,rgba(255,255,255,0.1));
+  border-radius: var(--ag-radius,18px);
   padding: 0;
-  width: 400px;
+  width: 420px;
   max-height: 88vh;
   overflow-y: auto;
   color: var(--ag-text,#e2e8f0);
   font-family: var(--ag-font,inherit);
-  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  box-shadow: var(--ag-shadow,0 24px 80px rgba(0,0,0,0.6));
   animation: ag-rp-slideup 0.2s ease-out;
 }
 .ag-config-box::-webkit-scrollbar { width: 4px; }
-.ag-config-box::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+.ag-config-box::-webkit-scrollbar-thumb { background: var(--ag-border,rgba(255,255,255,0.1)); border-radius: 2px; }
 .ag-config-header {
   padding: 20px 24px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid var(--ag-border,rgba(255,255,255,0.06));
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 .ag-config-header h3 { margin: 0; font-size: 16px; font-weight: 600; }
 .ag-config-header .ag-config-close {
-  background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer;
+  background: none; border: none; color: var(--ag-text2,#94a3b8); font-size: 18px; cursor: pointer;
   padding: 4px 8px; border-radius: 6px; transition: all 0.15s;
 }
-.ag-config-header .ag-config-close:hover { background: rgba(255,255,255,0.08); color: #f1f5f9; }
+.ag-config-header .ag-config-close:hover { background: var(--ag-bg2,rgba(255,255,255,0.08)); color: var(--ag-text,#f1f5f9); }
 .ag-config-section { padding: 16px 24px 0; }
 .ag-config-section-title {
   font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
@@ -292,14 +292,14 @@ const AG_CSS = `
   display: flex; align-items: center; gap: 6px;
 }
 .ag-config-section-title::after {
-  content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.06);
+  content: ''; flex: 1; height: 1px; background: var(--ag-border,rgba(255,255,255,0.06));
 }
 .ag-config-row { margin-bottom: 14px; }
 .ag-config-label { font-size: 12px; color: var(--ag-text2,#94a3b8); margin-bottom: 5px; display: flex; align-items: center; gap: 4px; }
 .ag-config-row input, .ag-config-row select {
   width: 100%; box-sizing: border-box;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--ag-bg2,rgba(255,255,255,0.04));
+  border: 1px solid var(--ag-border,rgba(255,255,255,0.1));
   border-radius: 8px;
   color: var(--ag-text,#e2e8f0);
   padding: 8px 12px;
@@ -308,38 +308,38 @@ const AG_CSS = `
   transition: border-color 0.15s;
 }
 .ag-config-row input:focus, .ag-config-row select:focus { border-color: var(--ag-accent,#6366f1); }
-.ag-config-row select option { background: #1e1e2e; }
+.ag-config-row select option { background: var(--ag-bg,#1e1e2e); }
 .ag-adapter-btns, .ag-pos-btns, .ag-size-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .ag-opt-btn {
   padding: 6px 14px;
   border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--ag-border,rgba(255,255,255,0.1));
+  background: var(--ag-bg2,rgba(255,255,255,0.04));
   color: var(--ag-text,#e2e8f0);
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s;
 }
-.ag-opt-btn:hover { background: rgba(255,255,255,0.08); }
+.ag-opt-btn:hover { background: var(--ag-bg2,rgba(255,255,255,0.08)); }
 .ag-opt-btn.active { background: var(--ag-accent,#6366f1); color: var(--ag-accent-text,#fff); border-color: var(--ag-accent,#6366f1); }
 /* Skin buttons with color dot preview */
 .ag-skin-btns { display: flex; flex-wrap: wrap; gap: 8px; }
 .ag-skin-btn {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 12px; border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--ag-border,rgba(255,255,255,0.1));
+  background: var(--ag-bg2,rgba(255,255,255,0.04));
   color: var(--ag-text,#e2e8f0);
   font-size: 12px; cursor: pointer;
   transition: all 0.15s;
 }
-.ag-skin-btn:hover { background: rgba(255,255,255,0.08); }
-.ag-skin-btn.active { border-color: var(--ag-accent,#6366f1); background: rgba(99,102,241,0.15); }
-.ag-skin-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0; }
+.ag-skin-btn:hover { background: var(--ag-bg2,rgba(255,255,255,0.08)); }
+.ag-skin-btn.active { border-color: var(--ag-accent,#6366f1); background: color-mix(in srgb,var(--ag-accent,#6366f1) 15%,transparent); }
+.ag-skin-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--ag-border,rgba(255,255,255,0.2)); flex-shrink: 0; }
 .ag-range { width: 100%; accent-color: var(--ag-accent,#6366f1); margin-top: 2px; }
 .ag-config-footer {
   display: flex; gap: 8px; padding: 16px 24px;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid var(--ag-border,rgba(255,255,255,0.06));
   justify-content: flex-end;
 }
 .ag-config-footer .ag-btn { padding: 6px 18px; font-size: 13px; }
@@ -355,18 +355,18 @@ const AG_CSS = `
 .ag-color-row input[type="color"] { width: 40px; height: 32px; border: none; background: none; cursor: pointer; padding: 0; border-radius: 6px; }
 /* Shortcut display in config */
 .ag-shortcuts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.ag-shortcut-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 12px; }
-.ag-shortcut-key { font-family: 'SF Mono', monospace; font-size: 11px; color: var(--ag-accent,#6366f1); background: rgba(99,102,241,0.12); padding: 2px 6px; border-radius: 4px; }
+.ag-shortcut-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: var(--ag-bg2,rgba(255,255,255,0.03)); border-radius: 6px; font-size: 12px; }
+.ag-shortcut-key { font-family: 'SF Mono', monospace; font-size: 11px; color: var(--ag-accent,#6366f1); background: color-mix(in srgb,var(--ag-accent,#6366f1) 12%,transparent); padding: 2px 6px; border-radius: 4px; }
 
 /* Markdown basics in assistant bubble */
 .ag-bubble.assistant code {
-  background: rgba(0,0,0,0.3);
+  background: color-mix(in srgb,var(--ag-bg,#000) 70%,transparent);
   padding: 1px 4px;
   border-radius: 3px;
   font-family: monospace;
   font-size: 12px;
 }
-.ag-bubble.assistant strong { color: #fff; }
+.ag-bubble.assistant strong { color: var(--ag-text,#fff); }
 
 /* Enhanced tool cards with status colors */
 .ag-card.success { border-color: rgba(34,197,94,0.3); }
@@ -404,8 +404,8 @@ const AG_CSS = `
 
 /* Enhanced markdown in assistant bubbles */
 .ag-bubble.assistant pre {
-  background: rgba(0,0,0,0.35);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: color-mix(in srgb,var(--ag-bg,#000) 70%,transparent);
+  border: 1px solid var(--ag-border,rgba(255,255,255,0.08));
   border-radius: 6px;
   padding: 10px;
   font-family: 'SF Mono', 'Fira Code', monospace;
@@ -427,13 +427,13 @@ const AG_CSS = `
 .ag-bubble.assistant a {
   color: var(--ag-accent,#6366f1);
   text-decoration: underline;
-  text-decoration-color: rgba(99,102,241,0.4);
+  text-decoration-color: color-mix(in srgb,var(--ag-accent,#6366f1) 40%,transparent);
 }
 .ag-bubble.assistant h1,.ag-bubble.assistant h2,.ag-bubble.assistant h3 {
   font-size: 14px;
   font-weight: 600;
   margin: 8px 0 4px;
-  color: #fff;
+  color: var(--ag-text,#fff);
 }
 .ag-bubble.assistant blockquote {
   border-left: 3px solid var(--ag-accent,#6366f1);
@@ -448,12 +448,12 @@ const AG_CSS = `
   width: 100%;
 }
 .ag-bubble.assistant th, .ag-bubble.assistant td {
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid var(--ag-border,rgba(255,255,255,0.12));
   padding: 4px 8px;
   text-align: left;
 }
 .ag-bubble.assistant th {
-  background: rgba(255,255,255,0.06);
+  background: var(--ag-bg2,rgba(255,255,255,0.06));
   font-weight: 600;
 }
 
@@ -462,8 +462,8 @@ const AG_CSS = `
   position: absolute;
   top: 6px;
   right: 6px;
-  background: rgba(0,0,0,0.4);
-  border: 1px solid rgba(255,255,255,0.15);
+  background: color-mix(in srgb,var(--ag-bg,#000) 70%,transparent);
+  border: 1px solid var(--ag-border,rgba(255,255,255,0.15));
   color: var(--ag-text2,#94a3b8);
   border-radius: 4px;
   padding: 2px 6px;
@@ -482,8 +482,8 @@ const AG_CSS = `
 /* Welcome enhancement */
 .ag-welcome-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .ag-welcome-chip {
-  background: rgba(99,102,241,0.1);
-  border: 1px solid rgba(99,102,241,0.25);
+  background: color-mix(in srgb,var(--ag-accent,#6366f1) 10%,transparent);
+  border: 1px solid color-mix(in srgb,var(--ag-accent,#6366f1) 25%,transparent);
   border-radius: 16px;
   padding: 4px 12px;
   font-size: 12px;
@@ -491,7 +491,7 @@ const AG_CSS = `
   cursor: pointer;
   transition: all 0.15s;
 }
-.ag-welcome-chip:hover { background: var(--ag-accent,#6366f1); color: #fff; }
+.ag-welcome-chip:hover { background: var(--ag-accent,#6366f1); color: var(--ag-accent-text,#fff); }
 
 /* ── Mini dialog (chat style) ─────────────────────────────────── */
 #agMiniOverlay {
@@ -507,12 +507,12 @@ const AG_CSS = `
 }
 #agMiniBox {
   width: min(480px, 92vw);
-  background: rgba(15,23,42,0.96);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(99,102,241,0.25);
-  border-radius: 16px;
-  box-shadow: 0 24px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(99,102,241,0.08) inset;
+  background: var(--ag-bg,rgba(15,23,42,0.96));
+  backdrop-filter: var(--ag-blur,blur(24px));
+  -webkit-backdrop-filter: var(--ag-blur,blur(24px));
+  border: 1px solid color-mix(in srgb,var(--ag-accent,#6366f1) 25%,transparent);
+  border-radius: var(--ag-radius,16px);
+  box-shadow: var(--ag-shadow,0 24px 80px rgba(0,0,0,0.55));
   overflow: hidden;
   animation: ag-rp-slideup 0.2s ease-out;
   display: flex;
@@ -526,7 +526,7 @@ const AG_CSS = `
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid var(--ag-border,rgba(255,255,255,0.08));
   flex-shrink: 0;
 }
 .ag-mini-header-title {
@@ -536,8 +536,8 @@ const AG_CSS = `
 }
 .ag-mini-header-actions { display: flex; gap: 4px; }
 .ag-mini-hdr-btn {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--ag-bg2,rgba(255,255,255,0.06));
+  border: 1px solid var(--ag-border,rgba(255,255,255,0.1));
   color: var(--ag-text2,#94a3b8);
   border-radius: 6px;
   width: 26px; height: 26px;
@@ -548,7 +548,7 @@ const AG_CSS = `
   justify-content: center;
   transition: background 0.15s, color 0.15s;
 }
-.ag-mini-hdr-btn:hover { background: rgba(255,255,255,0.12); color: #f1f5f9; }
+.ag-mini-hdr-btn:hover { background: var(--ag-bg2,rgba(255,255,255,0.12)); color: var(--ag-text,#f1f5f9); }
 
 /* Mini messages area */
 #agMiniMessages {
@@ -562,7 +562,7 @@ const AG_CSS = `
   min-height: 60px;
 }
 #agMiniMessages::-webkit-scrollbar { width: 3px; }
-#agMiniMessages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+#agMiniMessages::-webkit-scrollbar-thumb { background: var(--ag-border,rgba(255,255,255,0.1)); border-radius: 2px; }
 
 /* Mini bubbles — compact version of full-panel bubbles */
 .ag-mini-bubble {
@@ -588,15 +588,15 @@ const AG_CSS = `
   border-bottom-left-radius: 3px;
 }
 .ag-mini-bubble.assistant code {
-  background: rgba(0,0,0,0.3);
+  background: color-mix(in srgb,var(--ag-bg,#000) 70%,transparent);
   padding: 1px 4px;
   border-radius: 3px;
   font-family: 'SF Mono', monospace;
   font-size: 12px;
 }
 .ag-mini-bubble.assistant pre {
-  background: rgba(0,0,0,0.35);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: color-mix(in srgb,var(--ag-bg,#000) 70%,transparent);
+  border: 1px solid var(--ag-border,rgba(255,255,255,0.08));
   border-radius: 6px;
   padding: 8px;
   font-family: 'SF Mono', monospace;
@@ -605,7 +605,7 @@ const AG_CSS = `
   margin: 4px 0;
 }
 .ag-mini-bubble.assistant pre code { background: none; padding: 0; font-size: inherit; }
-.ag-mini-bubble.assistant strong { color: #fff; }
+.ag-mini-bubble.assistant strong { color: var(--ag-text,#fff); }
 .ag-mini-bubble.error {
   align-self: flex-start;
   background: rgba(239,68,68,0.12);
@@ -634,8 +634,8 @@ const AG_CSS = `
 .ag-mini-welcome-text { display: block; margin-bottom: 8px; }
 .ag-mini-chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
 .ag-mini-chip {
-  background: rgba(99,102,241,0.1);
-  border: 1px solid rgba(99,102,241,0.25);
+  background: color-mix(in srgb,var(--ag-accent,#6366f1) 10%,transparent);
+  border: 1px solid color-mix(in srgb,var(--ag-accent,#6366f1) 25%,transparent);
   border-radius: 14px;
   padding: 3px 10px;
   font-size: 11px;
@@ -643,7 +643,7 @@ const AG_CSS = `
   cursor: pointer;
   transition: all 0.15s;
 }
-.ag-mini-chip:hover { background: var(--ag-accent,#6366f1); color: #fff; }
+.ag-mini-chip:hover { background: var(--ag-accent,#6366f1); color: var(--ag-accent-text,#fff); }
 
 /* Mini input row */
 .ag-mini-input-row {
@@ -651,22 +651,22 @@ const AG_CSS = `
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid var(--ag-border,rgba(255,255,255,0.08));
   flex-shrink: 0;
 }
 #agMiniInput {
   flex: 1;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--ag-bg2,rgba(255,255,255,0.06));
+  border: 1px solid var(--ag-border,rgba(255,255,255,0.1));
   border-radius: 10px;
-  color: #f1f5f9;
+  color: var(--ag-text,#f1f5f9);
   font-size: 14px;
   padding: 9px 14px;
   outline: none;
   font-family: inherit;
   transition: border-color 0.15s;
 }
-#agMiniInput::placeholder { color: #64748b; }
+#agMiniInput::placeholder { color: var(--ag-text2,#64748b); }
 #agMiniInput:focus { border-color: var(--ag-accent,#6366f1); }
 #agMiniSendBtn {
   width: 34px; height: 34px;
@@ -682,29 +682,29 @@ const AG_CSS = `
   justify-content: center;
   transition: background 0.15s, transform 0.1s;
 }
-#agMiniSendBtn:hover { background: #7c3aed; transform: scale(1.05); }
+#agMiniSendBtn:hover { background: var(--ag-accent2,var(--ag-accent,#6366f1)); filter: brightness(1.15); transform: scale(1.05); }
 #agMiniSendBtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 /* Mini footer */
 .ag-mini-footer {
   padding: 6px 14px;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid var(--ag-border,rgba(255,255,255,0.06));
   display: flex;
   justify-content: center;
   align-items: center;
   font-size: 11px;
-  color: #64748b;
+  color: var(--ag-text2,#64748b);
   flex-shrink: 0;
 }
 .ag-mini-keys { display: flex; gap: 10px; }
 .ag-mini-key {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--ag-bg2,rgba(255,255,255,0.06));
+  border: 1px solid var(--ag-border,rgba(255,255,255,0.1));
   border-radius: 4px;
   padding: 1px 6px;
   font-family: inherit;
   font-size: 10px;
-  color: #94a3b8;
+  color: var(--ag-text2,#94a3b8);
 }
 
 @media (max-width: 639px) {
@@ -728,33 +728,84 @@ function injectCSS() {
 }
 
 function mdToHtml(text) {
-  let html = text;
-  // Code blocks (```lang\n...\n```)
+  // Normalize line endings
+  let html = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Code blocks (```lang\n...\n```) — extract first to protect from other transforms
+  const codeBlocks = [];
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-    return '<pre><code class="lang-' + (lang||'text') + '">' + code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code></pre>';
+    const idx = codeBlocks.length;
+    const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const langLabel = lang ? '<span class="md-code-lang">' + lang + '</span>' : '';
+    codeBlocks.push('<pre class="md-pre">' + langLabel + '<code class="lang-' + (lang||'text') + '">' + escaped + '</code></pre>');
+    return '\x00CB' + idx + '\x00';
   });
+
   // Inline code
-  html = html.replace(/`([^`]+)`/g, (_, code) => '<code>' + code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code>');
+  html = html.replace(/`([^`]+)`/g, (_, code) => '<code class="md-inline-code">' + code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code>');
+
   // Escape remaining HTML (but not our tags)
-  const parts = html.split(/(<\/?(?:pre|code|strong|em|a|ul|ol|li|h[1-3]|blockquote|table|thead|tbody|tr|th|td|br)[^>]*>)/);
-  html = parts.map((p, i) => i % 2 === 0 ? p.replace(/&(?!amp;|lt;|gt;)/g, '&amp;').replace(/<(?!\/?(?:pre|code|strong|em|a|ul|ol|li|h[1-3]|blockquote|table|thead|tbody|tr|th|td|br))/g, '&lt;') : p).join('');
+  const allowedTags = 'pre|code|strong|em|del|a|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tr|th|td|br|hr|span|p';
+  const parts = html.split(new RegExp('(<\\/?(?:' + allowedTags + ')[^>]*>)'));
+  html = parts.map((p, i) => i % 2 === 0 ? p.replace(/&(?!amp;|lt;|gt;)/g, '&amp;').replace(new RegExp('<(?!\\/?(?:' + allowedTags + '))','g'), '&lt;') : p).join('');
+
+  // Tables (| col | col | ... with |---|---| separator)
+  html = html.replace(/(?:^|\n)((?:\|.+\|\n?)+)/g, (match, block) => {
+    const rows = block.trim().split('\n').filter(r => r.trim());
+    if (rows.length < 2) return match;
+    // Check if 2nd row is separator
+    const sep = rows[1];
+    if (!/^\|[\s:]*-{2,}[\s:]*/.test(sep)) return match;
+
+    const parseRow = r => r.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+    const headers = parseRow(rows[0]);
+    const bodyRows = rows.slice(2);
+
+    let table = '<table class="md-table"><thead><tr>';
+    for (const h of headers) table += '<th>' + h + '</th>';
+    table += '</tr></thead><tbody>';
+    for (const r of bodyRows) {
+      const cells = parseRow(r);
+      table += '<tr>';
+      for (const c of cells) table += '<td>' + c + '</td>';
+      table += '</tr>';
+    }
+    table += '</tbody></table>';
+    return table;
+  });
+
+  // Horizontal rules
+  html = html.replace(/^(?:---|\*\*\*|___)\s*$/gm, '<hr class="md-hr">');
+
   // Headers (### > ## > #)
+  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
   html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
   html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
   html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-  // Bold & italic
+
+  // Bold & italic (order matters)
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+  // Strikethrough
+  html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+
   // Links (reject javascript: and data: schemes to prevent XSS)
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
     if (/^\s*(?:javascript|data|vbscript):/i.test(url)) return text;
     return '<a href="' + url + '" target="_blank" rel="noopener">' + text + '</a>';
   });
-  // Blockquotes
-  html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
-  // Unordered lists
-  html = html.replace(/(?:^|\n)((?:- .+\n?)+)/g, (_, list) => {
-    const items = list.trim().split('\n').map(l => '<li>' + l.replace(/^- /, '') + '</li>').join('');
+
+  // Blockquotes (multi-line merge)
+  html = html.replace(/((?:^> .+\n?)+)/gm, (_, block) => {
+    const content = block.replace(/^> /gm, '').trim();
+    return '<blockquote class="md-blockquote">' + content + '</blockquote>';
+  });
+
+  // Unordered lists (support -, *, + markers)
+  html = html.replace(/(?:^|\n)((?:[\-\*\+] .+\n?)+)/g, (_, list) => {
+    const items = list.trim().split('\n').map(l => '<li>' + l.replace(/^[\-\*\+] /, '') + '</li>').join('');
     return '<ul>' + items + '</ul>';
   });
   // Ordered lists
@@ -762,11 +813,16 @@ function mdToHtml(text) {
     const items = list.trim().split('\n').map(l => '<li>' + l.replace(/^\d+\. /, '') + '</li>').join('');
     return '<ol>' + items + '</ol>';
   });
+
   // Line breaks (but not inside pre/code)
   html = html.replace(/\n/g, '<br>');
   // Clean up br inside block elements
-  html = html.replace(/<br>(<\/?(?:pre|ul|ol|li|h[1-3]|blockquote|table))/g, '$1');
-  html = html.replace(/(<\/(?:pre|ul|ol|li|h[1-3]|blockquote|table)>)<br>/g, '$1');
+  html = html.replace(/<br>(<\/?(?:pre|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tr|th|td|hr))/g, '$1');
+  html = html.replace(/(<\/(?:pre|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tr|th|td|hr)>)<br>/g, '$1');
+
+  // Restore code blocks
+  html = html.replace(/\x00CB(\d+)\x00/g, (_, i) => codeBlocks[+i]);
+
   return html;
 }
 
@@ -788,6 +844,8 @@ function buildPanel() {
   const { AG, SKINS, applySkin } = window.AgentConfig;
   const cfg = AG.load();
 
+  const t = window.AgentI18n?.t || (k => k);
+
   let panel = document.getElementById('agentPanel');
   if (panel) { panel.style.display = 'flex'; return; }
 
@@ -802,15 +860,15 @@ function buildPanel() {
     '<div class="ag-header">',
     '  <div class="ag-header-title">&#129302; K Assistant</div>',
     '  <div class="ag-header-actions">',
-    '    <button class="ag-btn ag-btn-icon" id="agConfigBtn" title="\u8bbe\u7f6e">&#9881;&#65039;</button>',
-    '    <button class="ag-btn ag-btn-icon" id="agClearBtn" title="\u6e05\u7a7a">&#128465;</button>',
-    '    <button class="ag-btn ag-btn-icon" id="agCloseBtn" title="\u5173\u95ed">&#10005;</button>',
+    `    <button class="ag-btn ag-btn-icon" id="agConfigBtn" title="${t('settings')}">&#9881;&#65039;</button>`,
+    `    <button class="ag-btn ag-btn-icon" id="agClearBtn" title="${t('clear')}">&#128465;</button>`,
+    `    <button class="ag-btn ag-btn-icon" id="agCloseBtn" title="${t('close')}">&#10005;</button>`,
     '  </div>',
     '</div>',
     '<div class="ag-messages" id="agMessages"></div>',
     '<div class="ag-footer">',
-    '  <textarea id="agInput" rows="1" placeholder="\u95ee\u6211\u4efb\u4f55\u4e8b... Enter \u53d1\u9001"></textarea>',
-    '  <button id="agStopBtn" title="\u505c\u6b62\u751f\u6210">&#9724;</button>',
+    `  <textarea id="agInput" rows="1" placeholder="${t('panel_placeholder')}"></textarea>`,
+    `  <button id="agStopBtn" title="${t('stop')}">&#9724;</button>`,
     '  <button id="agSendBtn">&#8593;</button>',
     '</div>',
   ].join('');
@@ -820,25 +878,25 @@ function buildPanel() {
   // Welcome message
   const welcomeEl = document.createElement('div');
   welcomeEl.className = 'ag-bubble assistant';
-  const isEn = (window._i18n?.lang || 'zh') === 'en';
   const kbdMod = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl';
-  welcomeEl.innerHTML = (isEn
-    ? `👋 Hi! How can I help?<br><span style="font-size:11px;opacity:0.5">${kbdMod}+J quick ask · Alt+A full panel</span>`
-    : `👋 你好！有什么可以帮你的？<br><span style="font-size:11px;opacity:0.5">${kbdMod}+J 快速提问 · Alt+A 完整面板</span>`) +
-    '<div class="ag-welcome-chips">' +
-    [
-      isEn ? ['Generate UUID', '生成 UUID'] : ['生成 UUID', '生成 UUID'],
-      isEn ? ['Hash text', '帮我哈希'] : ['帮我算哈希', '帮我算哈希'],
-      isEn ? ['Format JSON', '格式化 JSON'] : ['格式化 JSON', '格式化 JSON'],
-      isEn ? ['Convert time', '时间戳转换'] : ['时间戳转换', '时间戳转换'],
-      isEn ? ['Base64 encode', 'Base64 编码'] : ['Base64 编码', 'Base64 编码'],
-      isEn ? ['Generate password', '生成密码'] : ['生成密码', '生成密码'],
-    ].map(([label, msg]) => `<span class="ag-welcome-chip" onclick="window._agChipSend && window._agChipSend(this,'${msg}')">${label}</span>`).join('') +
-    '</div>';
+  welcomeEl.id = 'agWelcome';
+  const chipKeys = ['chip_uuid','chip_hash','chip_json','chip_time','chip_b64','chip_pw'];
+  function renderWelcome() {
+    const _t = window.AgentI18n?.t || (k => k);
+    welcomeEl.innerHTML = `${_t('welcome')}<br><span style="font-size:11px;opacity:0.5">${_t('welcome_hint').replace('{mod}', kbdMod)}</span>` +
+      '<div class="ag-welcome-chips">' +
+      chipKeys.map(k => `<span class="ag-welcome-chip" data-chip="${k}">${_t(k)}</span>`).join('') +
+      '</div>';
+    welcomeEl.querySelectorAll('[data-chip]').forEach(chip => {
+      chip.onclick = () => window._agChipSend && window._agChipSend(chip, chip.textContent);
+    });
+  }
+  renderWelcome();
+  window._agRefreshWelcome = renderWelcome;
   document.getElementById('agMessages').appendChild(welcomeEl);
 
   // Apply skin variables
-  applySkin(cfg.skin);
+  applySkin();
 
   // ── Drag to move ────────────────────────────────────────────
   (function initDrag() {
@@ -947,6 +1005,30 @@ function _showSuggest(sugs, input) {
   if (panel) panel.appendChild(box);
 }
 window._agInjectCSS  = injectCSS;
+// 语言切换时刷新面板内的静态文本（不重建 DOM，保留对话）
+function refreshPanelI18n() {
+  const t = window.AgentI18n?.t || (k => k);
+  const panel = document.getElementById('agentPanel');
+  if (!panel) return;
+  // 按钮 title
+  const cfg = panel.querySelector('#agConfigBtn');
+  if (cfg) cfg.title = t('settings');
+  const clr = panel.querySelector('#agClearBtn');
+  if (clr) clr.title = t('clear');
+  const cls = panel.querySelector('#agCloseBtn');
+  if (cls) cls.title = t('close');
+  // 输入框
+  const inp = panel.querySelector('#agInput');
+  if (inp) inp.placeholder = t('panel_placeholder');
+  const stop = panel.querySelector('#agStopBtn');
+  if (stop) stop.title = t('stop');
+  // 欢迎消息
+  if (typeof window._agRefreshWelcome === 'function' && document.getElementById('agWelcome')) {
+    window._agRefreshWelcome();
+  }
+}
+
+window._agRefreshI18n = refreshPanelI18n;
 window._agBuildPanel = buildPanel;
 window._agMdToHtml   = mdToHtml;
 

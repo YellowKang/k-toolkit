@@ -203,6 +203,8 @@ async function renderHomePage(mode) {
   let html = '';
 
   if (mode === 'ai-chat') {
+    // If already mounted, skip re-render (e.g. lang switch)
+    if (document.getElementById('_chatPageRoot') && content.classList.contains('chat-page-mode')) return;
     const aiTool = TOOLS.find(t => t.id === 'ai-chat');
     if (!aiTool) return;
     content.innerHTML = `<div id="_chatPageRoot"></div>`;
@@ -457,6 +459,9 @@ function toggleNavCat(cat) {
 
 // ── 初始化 ──
 function init() {
+  // Sync lang button text with saved language
+  const langBtn = document.getElementById('langBtn');
+  if (langBtn) langBtn.textContent = t('lang_btn');
   buildSidebarNav();
   applyTheme();
   applySidebarCollapse();
@@ -842,6 +847,10 @@ function applyTheme() {
   const th = THEMES.find(th => th.key === theme) || THEMES[0];
   const btn = document.getElementById('themeBtn');
   if (btn) btn.innerHTML = `<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${th.color};border:2.5px solid ${th.border};box-shadow:0 0 8px ${th.color},0 0 2px ${th.border};vertical-align:middle;flex-shrink:0"></span><span style="font-size:11px;margin-left:6px;color:var(--text);vertical-align:middle;font-weight:500">${t(th.i18n)}</span>`;
+  // 刷新 Agent 面板配色以跟随全局主题
+  if (window.AgentConfig?.applySkin) {
+    window.AgentConfig.applySkin();
+  }
 }
 
 function toggleTheme() {

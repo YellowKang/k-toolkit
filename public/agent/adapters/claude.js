@@ -107,6 +107,56 @@ const ClaudeAdapter = {
       raw,
     };
   },
+
+  async *chatStream({ messages, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
+    const base = baseUrl || 'https://api.anthropic.com';
+    const url = `${base}/v1/messages`;
+
+    const sysMsg = messages.find(m => m.role === 'system');
+    const chatMsgs = messages.filter(m => m.role !== 'system').map(m => {
+      return { role: m.role, content: m.content };
+    });
+
+    const body = {
+      model: model || this.defaultModel,
+      max_tokens: max_tokens || 2000,
+      temperature: temperature ?? 0.7,
+      messages: chatMsgs,
+      stream: true,
+    };
+    if (sysMsg) body.system = sysMsg.content;
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey || '',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(`Claude API error ${resp.status}: ${err}`);
+    }
+
+    let inputTokens = 0, outputTokens = 0;
+    for await (const evt of parseSSEStream(resp, signal)) {
+      if (evt.type === 'message_start') {
+        inputTokens = evt.message?.usage?.input_tokens || 0;
+      } else if (evt.type === 'content_block_delta') {
+        const text = evt.delta?.text;
+        if (text) yield { type: 'delta', text };
+      } else if (evt.type === 'message_delta') {
+        outputTokens = evt.usage?.output_tokens || 0;
+      } else if (evt.type === 'message_stop') {
+        yield { type: 'done', usage: { input: inputTokens, output: outputTokens } };
+      }
+    }
+  },
 };
 
 window.ClaudeAdapter = ClaudeAdapter;

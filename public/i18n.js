@@ -305,12 +305,18 @@ function setLang(lang) {
   // 刷新主题按钮名称
   if (typeof applyTheme === 'function') applyTheme();
   // 如果当前在工具页，重新渲染工具内容
-  if (typeof currentPage !== 'undefined' && !['home','favorites','recent'].includes(currentPage)) {
+  if (typeof currentPage !== 'undefined' && !['home','favorites','recent','ai-chat'].includes(currentPage)) {
     if (typeof TOOLS !== 'undefined' && typeof renderToolPageFull === 'function') {
       const tool = TOOLS.find(t => t.id === currentPage);
       if (tool) renderToolPageFull(tool);
     }
   }
+  // 如果当前在 ai-chat 页，刷新 UI 文字（不重新挂载）
+  if (typeof window._chatRefreshI18n === 'function' && document.getElementById('_chatPageRoot')) {
+    window._chatRefreshI18n();
+  }
+  // 刷新 Agent 面板内文字
+  if (typeof window._agRefreshI18n === 'function') window._agRefreshI18n();
 }
 
 // ── 获取当前语言下的工具数据（覆盖 name/desc/category）──

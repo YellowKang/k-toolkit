@@ -76,6 +76,50 @@ const OpenAIChatAdapter = {
       raw,
     };
   },
+
+  async *chatStream({ messages, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
+    const base = baseUrl || 'https://api.openai.com';
+    const url = `${base}/v1/chat/completions`;
+
+    const oaiMsgs = messages.map(m => ({ role: m.role, content: m.content }));
+
+    const body = {
+      model: model || this.defaultModel,
+      max_tokens: max_tokens || 2000,
+      temperature: temperature ?? 0.7,
+      messages: oaiMsgs,
+      stream: true,
+    };
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey || ''}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error(`OpenAI API error ${resp.status}: ${err}`);
+    }
+
+    let usage = { input: 0, output: 0 };
+    for await (const chunk of parseSSEStream(resp, signal)) {
+      const delta = chunk.choices?.[0]?.delta;
+      if (delta?.content) {
+        yield { type: 'delta', text: delta.content };
+      }
+      if (chunk.usage) {
+        usage = { input: chunk.usage.prompt_tokens || 0, output: chunk.usage.completion_tokens || 0 };
+      }
+      if (chunk.choices?.[0]?.finish_reason) {
+        yield { type: 'done', usage };
+      }
+    }
+  },
 };
 
 window.OpenAIChatAdapter = OpenAIChatAdapter;

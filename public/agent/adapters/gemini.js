@@ -64,6 +64,15 @@ const GeminiAdapter = {
       raw,
     };
   },
+
+  async *chatStream({ messages, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
+    // Gemini uses OpenAI-compatible endpoint, reuse OpenAI Chat stream logic
+    const base = baseUrl || 'https://generativelanguage.googleapis.com/v1beta/openai';
+    yield* window.OpenAIChatAdapter.chatStream.call(
+      { ...window.OpenAIChatAdapter, defaultModel: this.defaultModel },
+      { messages, model: model || this.defaultModel, max_tokens, temperature, baseUrl: base, apiKey, signal }
+    );
+  },
 };
 
 window.GeminiAdapter = GeminiAdapter;

@@ -1224,6 +1224,7 @@ const NavActions = [
 
 // ── 通用结果面板 DOM/CSS ──────────────────────────────────────────
 function _showResultPanel(title, items, copyAll, toolId) {
+  const t = window.AgentI18n?.t || (k => k);
   // 注入样式（仅一次）
   if (!document.getElementById('ag-result-panel-css')) {
     const style = document.createElement('style');
@@ -1233,35 +1234,35 @@ function _showResultPanel(title, items, copyAll, toolId) {
       @keyframes ag-rp-fadein{from{opacity:0}to{opacity:1}}
       @keyframes ag-rp-slideup{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
       @keyframes ag-rp-item-in{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
-      .ag-rp-box{background:rgba(15,23,42,.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(99,102,241,.25);border-radius:18px;padding:0;width:min(500px,92vw);max-height:80vh;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 0 1px rgba(99,102,241,.1) inset;display:flex;flex-direction:column;animation:ag-rp-slideup .3s ease-out}
-      .ag-rp-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)}
-      .ag-rp-title{font-size:15px;font-weight:600;color:#f1f5f9;display:flex;align-items:center;gap:8px}
-      .ag-rp-title::before{content:'';display:inline-block;width:3px;height:16px;border-radius:2px;background:linear-gradient(180deg,#6366f1,#8b5cf6)}
-      .ag-rp-close{background:none;border:none;color:#94a3b8;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .15s}
-      .ag-rp-close:hover{background:rgba(255,255,255,.08);color:#f1f5f9}
+      .ag-rp-box{background:var(--sidebar-bg,rgba(15,23,42,.95));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid color-mix(in srgb,var(--accent,#6366f1) 25%,transparent);border-radius:18px;padding:0;width:min(500px,92vw);max-height:80vh;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 0 1px color-mix(in srgb,var(--accent,#6366f1) 10%,transparent) inset;display:flex;flex-direction:column;animation:ag-rp-slideup .3s ease-out;color:var(--text,#e2e8f0)}
+      .ag-rp-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border,rgba(255,255,255,.06));background:var(--surface,rgba(255,255,255,.02))}
+      .ag-rp-title{font-size:15px;font-weight:600;color:var(--text,#f1f5f9);display:flex;align-items:center;gap:8px}
+      .ag-rp-title::before{content:'';display:inline-block;width:3px;height:16px;border-radius:2px;background:linear-gradient(180deg,var(--accent,#6366f1),var(--accent2,#8b5cf6))}
+      .ag-rp-close{background:none;border:none;color:var(--text-muted,#94a3b8);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .15s}
+      .ag-rp-close:hover{background:var(--surface,rgba(255,255,255,.08));color:var(--text,#f1f5f9)}
       .ag-rp-body{padding:12px 20px 16px;overflow-y:auto;flex:1}
-      .ag-rp-item{margin-bottom:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:10px 14px;position:relative;animation:ag-rp-item-in .25s ease-out backwards;transition:border-color .15s}
-      .ag-rp-item:hover{border-color:rgba(99,102,241,.25)}
-      .ag-rp-label{font-size:11px;color:#94a3b8;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:500}
-      .ag-rp-value{font-size:13px;color:#e2e8f0;word-break:break-all;line-height:1.5;white-space:pre-wrap}
-      .ag-rp-value.mono{font-family:'SF Mono',Monaco,Consolas,monospace;font-size:12px;color:#a5b4fc}
-      .ag-rp-copy{position:absolute;top:8px;right:8px;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.2);color:#a5b4fc;font-size:11px;padding:2px 8px;border-radius:6px;cursor:pointer;opacity:0;transition:opacity .15s}
+      .ag-rp-item{margin-bottom:10px;background:var(--surface,rgba(255,255,255,.03));border:1px solid var(--border,rgba(255,255,255,.06));border-radius:10px;padding:10px 14px;position:relative;animation:ag-rp-item-in .25s ease-out backwards;transition:border-color .15s}
+      .ag-rp-item:hover{border-color:color-mix(in srgb,var(--accent,#6366f1) 25%,transparent)}
+      .ag-rp-label{font-size:11px;color:var(--text-muted,#94a3b8);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px;font-weight:500}
+      .ag-rp-value{font-size:13px;color:var(--text,#e2e8f0);word-break:break-all;line-height:1.5;white-space:pre-wrap}
+      .ag-rp-value.mono{font-family:'SF Mono',Monaco,Consolas,monospace;font-size:12px;color:var(--accent3,#a5b4fc)}
+      .ag-rp-copy{position:absolute;top:8px;right:8px;background:color-mix(in srgb,var(--accent,#6366f1) 15%,transparent);border:1px solid color-mix(in srgb,var(--accent,#6366f1) 20%,transparent);color:var(--accent3,#a5b4fc);font-size:11px;padding:2px 8px;border-radius:6px;cursor:pointer;opacity:0;transition:opacity .15s}
       .ag-rp-item:hover .ag-rp-copy{opacity:1}
-      .ag-rp-copy:hover{background:rgba(99,102,241,.3)}
-      .ag-rp-footer{padding:10px 20px 14px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:8px;justify-content:flex-end;background:rgba(255,255,255,.01)}
-      .ag-rp-btn{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;font-size:12px;padding:6px 16px;border-radius:8px;cursor:pointer;transition:all .15s;font-weight:500}
+      .ag-rp-copy:hover{background:color-mix(in srgb,var(--accent,#6366f1) 30%,transparent)}
+      .ag-rp-footer{padding:10px 20px 14px;border-top:1px solid var(--border,rgba(255,255,255,.06));display:flex;gap:8px;justify-content:flex-end;background:var(--surface,rgba(255,255,255,.01))}
+      .ag-rp-btn{background:linear-gradient(135deg,var(--accent,#6366f1),var(--accent2,#8b5cf6));border:none;color:var(--text-on-accent,#fff);font-size:12px;padding:6px 16px;border-radius:8px;cursor:pointer;transition:all .15s;font-weight:500}
       .ag-rp-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
-      .ag-rp-btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.1);color:#94a3b8}
-      .ag-rp-btn.ghost:hover{background:rgba(255,255,255,.05);color:#e2e8f0}
+      .ag-rp-btn.ghost{background:transparent;border:1px solid var(--border,rgba(255,255,255,.1));color:var(--text-muted,#94a3b8)}
+      .ag-rp-btn.ghost:hover{background:var(--surface,rgba(255,255,255,.05));color:var(--text,#e2e8f0)}
       .ag-rp-color-swatch{display:inline-flex;align-items:center;gap:10px}
-      .ag-rp-color-box{width:40px;height:40px;border-radius:8px;border:2px solid rgba(255,255,255,.15);box-shadow:0 2px 8px rgba(0,0,0,.3)}
-      .ag-rp-color-hex{font-family:'SF Mono',Monaco,monospace;font-size:13px;color:#e2e8f0}
-      .ag-rp-code{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:12px;font-family:'SF Mono','Fira Code',monospace;font-size:12px;color:#e2e8f0;overflow-x:auto;line-height:1.5;white-space:pre;max-height:200px;overflow-y:auto}
-      .ag-rp-code .kw{color:#c084fc}.ag-rp-code .str{color:#34d399}.ag-rp-code .num{color:#fbbf24}.ag-rp-code .cmt{color:#64748b;font-style:italic}
+      .ag-rp-color-box{width:40px;height:40px;border-radius:8px;border:2px solid var(--border,rgba(255,255,255,.15));box-shadow:0 2px 8px rgba(0,0,0,.3)}
+      .ag-rp-color-hex{font-family:'SF Mono',Monaco,monospace;font-size:13px;color:var(--text,#e2e8f0)}
+      .ag-rp-code{background:color-mix(in srgb,var(--bg,#000) 80%,transparent);border:1px solid var(--border,rgba(255,255,255,.06));border-radius:8px;padding:12px;font-family:'SF Mono','Fira Code',monospace;font-size:12px;color:var(--text,#e2e8f0);overflow-x:auto;line-height:1.5;white-space:pre;max-height:200px;overflow-y:auto}
+      .ag-rp-code .kw{color:#c084fc}.ag-rp-code .str{color:#34d399}.ag-rp-code .num{color:#fbbf24}.ag-rp-code .cmt{color:var(--text-muted,#64748b);font-style:italic}
       .ag-rp-table{width:100%;border-collapse:collapse;font-size:12px}
-      .ag-rp-table th,.ag-rp-table td{border:1px solid rgba(255,255,255,.08);padding:6px 10px;text-align:left}
-      .ag-rp-table th{background:rgba(99,102,241,.1);color:#a5b4fc;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
-      .ag-rp-table tr:hover td{background:rgba(255,255,255,.03)}
+      .ag-rp-table th,.ag-rp-table td{border:1px solid var(--border,rgba(255,255,255,.08));padding:6px 10px;text-align:left}
+      .ag-rp-table th{background:color-mix(in srgb,var(--accent,#6366f1) 10%,transparent);color:var(--accent3,#a5b4fc);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.3px}
+      .ag-rp-table tr:hover td{background:var(--surface,rgba(255,255,255,.03))}
     `;
     document.head.appendChild(style);
   }
@@ -1278,14 +1279,14 @@ function _showResultPanel(title, items, copyAll, toolId) {
 
   // Footer buttons
   let footerHtml = '<div class="ag-rp-footer">';
-  if (toolId) footerHtml += `<button class="ag-rp-btn ghost" data-action="open-tool">打开工具 →</button>`;
-  if (copyAll) footerHtml += '<button class="ag-rp-btn ghost" data-action="copy-all">复制全部</button>';
-  footerHtml += '<button class="ag-rp-btn" data-action="close">关闭</button></div>';
+  if (toolId) footerHtml += `<button class="ag-rp-btn ghost" data-action="open-tool">${t('open_tool')}</button>`;
+  if (copyAll) footerHtml += `<button class="ag-rp-btn ghost" data-action="copy-all">${t('copy_all')}</button>`;
+  footerHtml += `<button class="ag-rp-btn" data-action="close">${t('close')}</button></div>`;
 
   box.innerHTML = `
     <div class="ag-rp-header">
       <div class="ag-rp-title">${_rpEsc(title)}</div>
-      <button class="ag-rp-close" title="关闭">&times;</button>
+      <button class="ag-rp-close" title="${t('close')}">&times;</button>
     </div>
     <div class="ag-rp-body"></div>
     ${footerHtml}
@@ -1322,7 +1323,7 @@ function _showResultPanel(title, items, copyAll, toolId) {
     div.innerHTML = `
       ${item.label ? `<div class="ag-rp-label">${_rpEsc(item.label)}</div>` : ''}
       ${contentHtml}
-      <button class="ag-rp-copy" data-val="${_rpAttr(item.value || '')}">复制</button>
+      <button class="ag-rp-copy" data-val="${_rpAttr(item.value || '')}">${t('copy')}</button>
     `;
     body.appendChild(div);
   });
@@ -1339,8 +1340,8 @@ function _showResultPanel(title, items, copyAll, toolId) {
   box.querySelectorAll('[data-action="copy-all"]').forEach(b => {
     b.addEventListener('click', () => {
       navigator.clipboard.writeText(copyAll || '').then(() => {
-        b.textContent = '已复制 ✓';
-        setTimeout(() => { b.textContent = '复制全部'; }, 1500);
+        b.textContent = t('rp_copied');
+        setTimeout(() => { b.textContent = t('copy_all'); }, 1500);
       });
     });
   });
@@ -1353,8 +1354,8 @@ function _showResultPanel(title, items, copyAll, toolId) {
   box.querySelectorAll('.ag-rp-copy').forEach(btn => {
     btn.addEventListener('click', () => {
       navigator.clipboard.writeText(btn.dataset.val || '').then(() => {
-        btn.textContent = '已复制 ✓';
-        setTimeout(() => { btn.textContent = '复制'; }, 1500);
+        btn.textContent = t('rp_copied');
+        setTimeout(() => { btn.textContent = t('copy'); }, 1500);
       });
     });
   });

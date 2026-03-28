@@ -19,7 +19,7 @@ const AG = {
       model:       AG.get('model', ''),
       temperature: AG.get('temperature', 0.7),
       max_tokens:  AG.get('max_tokens', 2000),
-      skin:        AG.get('skin', 'glass'),
+      skin:        AG.get('skin', 'theme'),
       position:    AG.get('position', 'right'),
       size:        AG.get('size', 'normal'),
       show_cards:  AG.get('show_cards', true),
@@ -48,6 +48,20 @@ const AG = {
 
 // Skin CSS variable definitions
 const SKINS = {
+  // 跟随主题：映射 --ag-* → 全局 CSS 变量名（applySkin 会从 :root 读计算值）
+  theme: {
+    '--ag-bg':          '--sidebar-bg',
+    '--ag-bg2':         '--surface',
+    '--ag-border':      '--border',
+    '--ag-text':        '--text',
+    '--ag-text2':       '--text-muted',
+    '--ag-accent':      '--accent',
+    '--ag-accent-text': '--text-on-accent',
+    '--ag-shadow':      '0 8px 32px rgba(0,0,0,0.4)',
+    '--ag-blur':        'blur(24px)',
+    '--ag-font':        'inherit',
+    '--ag-radius':      '12px',
+  },
   glass: {
     '--ag-bg':          'rgba(18,18,30,0.82)',
     '--ag-bg2':         'rgba(255,255,255,0.06)',
@@ -154,14 +168,33 @@ const SKINS = {
   },
 };
 
-// Apply skin by id, or by raw vars object (for custom)
-function applySkin(skinIdOrVars) {
+// Apply skin — always resolve from current global theme
+function applySkin() {
   const panel = document.getElementById('agentPanel');
   if (!panel) return;
-  const vars = typeof skinIdOrVars === 'object' ? skinIdOrVars : (SKINS[skinIdOrVars] || SKINS.glass);
-  const id   = typeof skinIdOrVars === 'string' ? skinIdOrVars : 'custom';
-  panel.setAttribute('data-skin', id);
-  for (const [k, v] of Object.entries(vars)) panel.style.setProperty(k, v);
+  panel.setAttribute('data-skin', 'theme');
+
+  const rootStyle = getComputedStyle(document.documentElement);
+  const themeMap = SKINS.theme;
+  for (const [agVar, globalVar] of Object.entries(themeMap)) {
+    if (globalVar.startsWith('--')) {
+      const val = rootStyle.getPropertyValue(globalVar).trim();
+      panel.style.setProperty(agVar, val || '');
+    } else {
+      panel.style.setProperty(agVar, globalVar);
+    }
+  }
+
+  // 同步更新已打开的 config modal 和 mini dialog
+  ['agConfigModal', 'agMiniBox'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const target = id === 'agConfigModal' ? el.querySelector('.ag-config-box') || el : el;
+    for (let i = 0; i < panel.style.length; i++) {
+      const prop = panel.style[i];
+      if (prop.startsWith('--ag-')) target.style.setProperty(prop, panel.style.getPropertyValue(prop));
+    }
+  });
 }
 
 window.AgentConfig = { AG, SKINS, applySkin };
