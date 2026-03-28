@@ -725,8 +725,11 @@ ex.className = '_chat-dropdown-item';
 ex.textContent = _chatTl('export_md');
 ex.onclick = () => { menu.remove(); _chatExportMd(); };
 menu.appendChild(ex);
-btn.parentElement.style.position = 'relative';
-btn.parentElement.appendChild(menu);
+const rect = btn.getBoundingClientRect();
+menu.style.top = (rect.bottom + 6) + 'px';
+menu.style.left = rect.left + 'px';
+const root = document.getElementById('_chatPageRoot') || document.body;
+root.appendChild(menu);
 setTimeout(() => {
 const handler = e => { if (!menu.contains(e.target) && e.target !== btn) { menu.remove(); document.removeEventListener('click', handler); } };
 document.addEventListener('click', handler);
@@ -926,7 +929,7 @@ pre:hover ._chat-copy-btn,.md-pre:hover ._chat-copy-btn{opacity:1}
 @keyframes _chatDots{0%,100%{content:'...'}33%{content:'.'}66%{content:'..'}}
 ._chat-cursor{display:inline;animation:_chatBlink .6s step-end infinite;color:var(--accent,#6366f1);font-weight:bold}
 @keyframes _chatBlink{0%,100%{opacity:1}50%{opacity:0}}
-._chat-dropdown{position:absolute;top:calc(100% + 6px);left:0;background:var(--sidebar-bg,rgba(18,18,30,.98));border:1px solid var(--border,rgba(255,255,255,.1));border-radius:12px;min-width:160px;z-index:1000;box-shadow:0 8px 32px rgba(0,0,0,.4);overflow:hidden;backdrop-filter:blur(12px)}
+._chat-dropdown{position:fixed;background:var(--sidebar-bg,rgba(18,18,30,.98));border:1px solid var(--border,rgba(255,255,255,.1));border-radius:12px;min-width:160px;z-index:9998;box-shadow:0 8px 32px rgba(0,0,0,.4);overflow:hidden;backdrop-filter:blur(12px)}
 ._chat-dropdown-item{padding:9px 14px;font-size:13px;cursor:pointer;color:var(--text,#f1f5f9);transition:background .1s}
 ._chat-dropdown-item:hover{background:var(--surface-hover,rgba(255,255,255,.07))}
 ._chat-no-key{display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:12px;margin:16px 0;color:#f59e0b;font-size:13px}
