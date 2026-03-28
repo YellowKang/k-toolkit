@@ -127,11 +127,10 @@ var trimmed = url.trim().toLowerCase();
 if (trimmed.startsWith('javascript:') || trimmed.startsWith('data:') || trimmed.startsWith('vbscript:')) return '';
 return url.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 }
-// Generate slug from heading text for anchor ids
 function _mdSlug(text) {
 return text.trim().toLowerCase()
-.replace(/<[^>]+>/g, '')           // strip HTML tags from parsed inline
-.replace(/[^\w\u4e00-\u9fff -]/g, '') // keep word chars, CJK, spaces, hyphens
+.replace(/<[^>]+>/g, '')           
+.replace(/[^\w\u4e00-\u9fff -]/g, '') 
 .replace(/\s+/g, '-')
 .replace(/-+/g, '-')
 .replace(/^-|-$/g, '');
@@ -148,7 +147,6 @@ html = html.replace(/`([^`]+)`/g, function(_,c) {
 inlines.push('<code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;font-size:12px;color:var(--neon)">'+c.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</code>');
 return '\x00I'+(inlines.length-1)+'\x00';
 });
-// track checkbox index for clickable toggling
 var _mdCheckboxIdx = 0;
 html = html
 .replace(/^### (.+)$/gm, function(_,t){ return '<h3 id="md-h-'+_mdSlug(t)+'" style="font-size:16px;font-weight:700;margin:16px 0 8px">'+t+'</h3>'; })
@@ -184,7 +182,6 @@ blocks.forEach(function(b,i){html=html.replace('\x00B'+i+'\x00',b);});
 inlines.forEach(function(b,i){html=html.replace('\x00I'+i+'\x00',b);});
 return html;
 }
-// Bind click handlers on rendered checkboxes to toggle source markdown
 function _mdBindCheckboxes() {
 var preview = document.getElementById('mdPreview');
 if (!preview) return;
@@ -195,7 +192,6 @@ var ta = document.getElementById('mdInput');
 if (!ta) return;
 var cbIndex = parseInt(span.getAttribute('data-cb-index'), 10);
 var isChecked = span.getAttribute('data-cb-checked') === '1';
-// find the n-th checkbox pattern in source
 var src = ta.value;
 var re = /^- \[([ x])\] /gm;
 var match, count = 0;
@@ -211,7 +207,6 @@ count++;
 };
 });
 }
-// Generate TOC from markdown source and insert at cursor
 function mdGenerateToc() {
 var ta = document.getElementById('mdInput');
 if (!ta) return;
@@ -221,7 +216,7 @@ var tocLines = [];
 for (var i = 0; i < lines.length; i++) {
 var m;
 if ((m = lines[i].match(/^(#{1,3}) (.+)$/))) {
-var level = m[1].length; // 1, 2, or 3
+var level = m[1].length; 
 var title = m[2].trim();
 var slug = _mdSlug(title);
 var indent = '  '.repeat(level - 1);
@@ -233,7 +228,6 @@ showToast(_mdTl('toc_empty'));
 return;
 }
 var toc = '## ' + _mdTl('toc_title') + '\n\n' + tocLines.join('\n') + '\n\n';
-// insert at cursor position
 var s = ta.selectionStart;
 ta.value = ta.value.slice(0, s) + toc + ta.value.slice(s);
 ta.selectionStart = ta.selectionEnd = s + toc.length;

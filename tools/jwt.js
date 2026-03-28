@@ -279,7 +279,7 @@ document.getElementById('jwtInput').value='';
 document.getElementById('jwtResultPanel').style.display='none';
 }
 function b64url(str) {
-return btoa(str).replace(/\+/g,'-').replace(/\
+return btoa(str).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
 }
 async function jwtGenerate() {
 const tl = _jwtTl();
@@ -304,7 +304,7 @@ try {
 const enc = new TextEncoder();
 const key = await crypto.subtle.importKey('raw', enc.encode(secret), {name:'HMAC',hash:'SHA-256'}, false, ['sign']);
 const sig = await crypto.subtle.sign('HMAC', key, enc.encode(msg));
-const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/\+/g,'-').replace(/\
+const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
 const token = msg + '.' + sigB64;
 const parts = token.split('.');
 output.innerHTML = `<span style="color:#f59e0b">${parts[0]}</span>.<span style="color:#10b981">${parts[1]}</span>.<span style="color:#8b5cf6">${parts[2]}</span>`;

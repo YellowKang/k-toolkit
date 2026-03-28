@@ -1231,6 +1231,7 @@ body.appendChild(div);
 });
 overlay.appendChild(box);
 document.body.appendChild(overlay);
+// Events
 const onKey = e => { if (e.key === 'Escape') close(); };
 const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
 overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
@@ -1260,6 +1261,7 @@ setTimeout(() => { btn.textContent = '复制'; }, 1500);
 });
 document.addEventListener('keydown', onKey);
 }
+// Simple syntax highlighting for code blocks
 function _rpHighlight(code) {
 return _rpEsc(code)
 .replace(/\b(const|let|var|function|return|if|else|for|while|import|export|from|class|new|async|await|try|catch|throw|switch|case|break|default|typeof|instanceof|in|of|void|delete|this|super|extends|implements|interface|type|enum|public|private|protected|static|readonly|abstract|override|declare|module|namespace|require|yield|as|is|keyof|infer|never|unknown|any|string|number|boolean|null|undefined|true|false|SELECT|FROM|WHERE|AND|OR|INSERT|UPDATE|DELETE|CREATE|TABLE|INTO|VALUES|SET|JOIN|LEFT|RIGHT|INNER|ON|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|ALTER|DROP|INDEX|PRIMARY|KEY|FOREIGN|REFERENCES|NOT|NULL|DEFAULT|UNIQUE|CHECK|EXISTS|BETWEEN|LIKE|IN|AS|DISTINCT|COUNT|SUM|AVG|MAX|MIN|UNION|ALL|CASE|WHEN|THEN|ELSE|END|DESC|ASC)\b/g, '<span class="kw">$&</span>')
@@ -1272,7 +1274,6 @@ function _rpRenderTable(jsonStr) {
 try {
 const data = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
 if (!Array.isArray(data) || data.length === 0) return `<div class="ag-rp-value">${_rpEsc(String(jsonStr))}</div>`;
-// If array of objects, extract headers from keys
 if (typeof data[0] === 'object' && !Array.isArray(data[0])) {
 const headers = Object.keys(data[0]);
 let html = '<table class="ag-rp-table"><thead><tr>';
@@ -1286,7 +1287,6 @@ html += '</tr>';
 html += '</tbody></table>';
 return html;
 }
-// Array of arrays
 if (Array.isArray(data[0])) {
 let html = '<table class="ag-rp-table"><thead><tr>';
 data[0].forEach(h => { html += `<th>${_rpEsc(String(h))}</th>`; });

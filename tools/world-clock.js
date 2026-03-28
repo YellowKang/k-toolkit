@@ -54,7 +54,7 @@ _wcRender();
 }
 function wcUpdateButtons() {
 window._wcAllZones.forEach(z => {
-const btn = document.getElementById('wcBtn_' + z.tz.replace(/\
+const btn = document.getElementById('wcBtn_' + z.tz.replace(/\//g,'_'));
 if (btn) btn.style.borderColor = window._wcVisible.has(z.tz) ? 'var(--accent)' : 'var(--glass-border)';
 });
 }

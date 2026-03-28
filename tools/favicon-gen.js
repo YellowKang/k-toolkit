@@ -134,7 +134,6 @@ code.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>' +
 '<button class="btn btn-secondary" style="position:absolute;top:8px;right:8px;font-size:11px;padding:2px 10px" onclick="copyText(\'' +
 code.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\',this)">' + T('copy') + '</button></div>';
 }
-/* ── Download PNG / SVG ── */
 function _favDownloadPng(cvs, size) {
 var a = document.createElement('a');
 a.href = cvs.toDataURL('image/png'); a.download = 'favicon-' + size + '.png'; a.click();

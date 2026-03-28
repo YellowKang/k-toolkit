@@ -263,14 +263,11 @@ function _jShowPath(el, e) {
 e.stopPropagation();
 const path = el.getAttribute('data-jpath');
 if (!path) return;
-// remove previous active
 const prev = document.querySelector('.jt-active');
 if (prev) prev.classList.remove('jt-active');
 el.classList.add('jt-active');
-// compute wildcard path
 const wildcard = path.replace(/\[\d+\]/g, '[*]');
 const hasWildcard = wildcard !== path;
-// render path bar
 let bar = document.getElementById('jsonPathBar');
 if (!bar) {
 bar = document.createElement('div');
@@ -283,15 +280,13 @@ const row = (p) => `<div style="display:flex;align-items:center;gap:8px"><code s
 bar.innerHTML = row(path) + (hasWildcard ? row(wildcard) : '');
 bar.style.cssText = 'position:sticky;top:0;z-index:2;background:rgba(30,30,40,0.95);border:1px solid var(--glass-border);border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:4px;backdrop-filter:blur(8px)';
 }
-// ── Tree view inline editing ──
 function _jTreeEdit(span, e) {
 e.stopPropagation();
-if (span.querySelector('input')) return; // already editing
+if (span.querySelector('input')) return; 
 const jpath = span.getAttribute('data-jpath');
 const jtype = span.getAttribute('data-jtype');
 if (!jpath || !jtype) return;
 const originalText = span.textContent;
-// For strings, strip the surrounding quotes
 let editVal = originalText;
 if (jtype === 'string') editVal = originalText.slice(1, -1);
 const input = document.createElement('input');
@@ -313,22 +308,18 @@ const raw = input.value;
 let newVal;
 try {
 if (jtype === 'string') {
-newVal = raw; // keep as string
+newVal = raw; 
 } else {
-newVal = JSON.parse(raw); // number, boolean, null
-// Validate type consistency (allow type change for flexibility)
+newVal = JSON.parse(raw); 
 }
 } catch {
 showToast(_jsonTl('edit_save_fail'));
 span.textContent = originalText;
 return;
 }
-// Write new value back into _jsonParsedObj via path
 _jSetByPath(_jsonParsedObj, jpath, newVal);
-// Re-render output
 const newText = JSON.stringify(_jsonParsedObj, null, 2);
 document.getElementById('jsonOutput').textContent = newText;
-// Re-render tree
 const treeEl = document.getElementById('jsonTreeOutput');
 treeEl.innerHTML = _jsonBuildTree(_jsonParsedObj, 0, '$');
 };
@@ -338,7 +329,6 @@ if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
 });
 input.addEventListener('blur', () => finish(false));
 }
-// Set a value in an object by JSONPath string like "$.foo.bar[2].name"
 function _jSetByPath(obj, jpath, val) {
 const parts = [];
 let rem = jpath.replace(/^\$/, '');
@@ -360,7 +350,6 @@ if (cur !== null && cur !== undefined && parts.length) {
 cur[parts[parts.length - 1]] = val;
 }
 }
-// inject hover/active styles once
 (function() {
 if (document.getElementById('jt-click-styles')) return;
 const style = document.createElement('style');
@@ -389,11 +378,9 @@ resultEl.innerHTML = `<pre class="result-box" style="max-height:200px;overflow-y
 resultEl.innerHTML = `<span style="color:#ef4444;font-size:12px">${_jsonTl('path_error')}${e.message}</span>`;
 }
 }
-// ── JSONPath 实现：支持 $、.key、[n]、..key、[*]、[?(@.key op value)] ──
 function _jsonPath(obj, path) {
 if (path === '$') return obj;
 let p = path.replace(/^\$/, '');
-// 递归下降 ..key
 if (p.startsWith('..')) {
 const key = p.slice(2).split(/[.[\s]/, 1)[0];
 const rest = p.slice(2 + key.length);
@@ -409,11 +396,9 @@ Object.values(node).forEach(descend);
 descend(obj);
 return results.length === 1 ? results[0] : results.length ? results : undefined;
 }
-// 逐段解析，支持 [*] 和 [?()]
-let cur = [obj]; // work with array of candidates for wildcard/filter support
+let cur = [obj]; 
 let rem = p;
 while (rem) {
-// [*] array wildcard
 const wildcard = rem.match(/^\[\*\](.*)/);
 if (wildcard) {
 const next = [];
@@ -425,13 +410,11 @@ cur = next;
 rem = wildcard[1];
 continue;
 }
-// [?(@.key op value)] filter expression
 const filter = rem.match(/^\[\?\(@\.([\w$]+)\s*(==|!=|>|>=|<|<=)\s*(.+?)\)\](.*)/);
 if (filter) {
 const fKey = filter[1];
 const fOp = filter[2];
 let fVal = filter[3].trim();
-// parse the comparison value
 if (fVal === 'true') fVal = true;
 else if (fVal === 'false') fVal = false;
 else if (fVal === 'null') fVal = null;
@@ -459,21 +442,18 @@ cur = next;
 rem = filter[4];
 continue;
 }
-// .key
 const dot = rem.match(/^\.([\w$]+)(.*)/);
 if (dot) {
 cur = cur.map(c => (c !== null && c !== undefined) ? c[dot[1]] : undefined).filter(v => v !== undefined);
 rem = dot[2];
 continue;
 }
-// [n] numeric index
 const bracket = rem.match(/^\[(\d+)\](.*)/);
 if (bracket) {
 cur = cur.map(c => (c !== null && c !== undefined) ? c[Number(bracket[1])] : undefined).filter(v => v !== undefined);
 rem = bracket[2];
 continue;
 }
-// ['key'] or ["key"]
 const bracketKey = rem.match(/^\[['"](.*?)['"]\](.*)/);
 if (bracketKey) {
 cur = cur.map(c => (c !== null && c !== undefined) ? c[bracketKey[1]] : undefined).filter(v => v !== undefined);
@@ -486,7 +466,6 @@ if (cur.length === 0) return undefined;
 if (cur.length === 1) return cur[0];
 return cur;
 }
-// ── JSON → TypeScript Interface ──
 function jsonToTsInterface() {
 const v = document.getElementById('jsonInput').value.trim();
 if (!v) return;
@@ -502,7 +481,6 @@ _jsonRender(result, _jsonTl('ts_done'), true);
 }
 function _jsonToTs(val, name, interfaces) {
 if (val === null || typeof val !== 'object') {
-// Primitive at root level — just show the type
 interfaces.push(`type ${name} = ${_jsonTsType(val, name, interfaces)};`);
 return;
 }

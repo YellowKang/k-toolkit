@@ -167,7 +167,6 @@ if (methodMatch) result.method = methodMatch[1].toUpperCase();
 const urlMatch = normalized.match(/(?:curl\s+)?(?:.*?\s+)?((?:https?|ftp):\/\/[^\s'"]+)/i)
 || normalized.match(/['"]?(https?:\/\/[^\s'"]+)['"]?/i);
 if (urlMatch) result.url = urlMatch[1].replace(/['"]$/,'');
-// Extract headers -H 'Key: Value' or -H "Key: Value"
 const headerRe = /-H\s+['"]([^'"]+)['"]/gi;
 let hm;
 while ((hm = headerRe.exec(normalized)) !== null) {
@@ -176,7 +175,6 @@ if (colonIdx > 0) {
 result.headers[hm[1].slice(0,colonIdx).trim()] = hm[1].slice(colonIdx+1).trim();
 }
 }
-// Extract body -d or --data or --data-raw
 const bodyMatch = normalized.match(/(?:-d|--data(?:-raw)?)\s+['"](.+?)['"]\s*(?:-|$)/i)
 || normalized.match(/(?:-d|--data(?:-raw)?)\s+['"](.+?)['"]$/i)
 || normalized.match(/(?:-d|--data(?:-raw)?)\s+(\S+)/i);

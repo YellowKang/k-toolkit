@@ -898,7 +898,6 @@ navigator.clipboard.writeText(url).then(() => showToast('链接已复制 🔗'))
 function escHtml(s) {
 return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-// ── Command Palette (lazy-loaded via dashboard-cmd.js) ──
 let _cmdLoaded = false;
 function _loadCmd(cb) {
 if (_cmdLoaded) { cb(); return; }
@@ -909,8 +908,6 @@ document.head.appendChild(s);
 }
 function openCmdPalette() { _loadCmd(() => _cmdOpen()); }
 function closeCmdPalette() { const el = document.getElementById('cmdPalette'); if (el) el.remove(); if (typeof _cmdIdx !== 'undefined') _cmdIdx = -1; }
-// ── 全局 UE 增强 ──
-// 增强 1：Ctrl/Cmd+Enter 提交 + Input Enter 提交
 function _initGlobalKeySubmit() {
 const content = document.getElementById('content');
 if (!content) return;
@@ -920,13 +917,11 @@ const panel = el.closest('.tool-card-panel') || el.closest('.tool-body');
 if (!panel) return;
 const btn = panel.querySelector('.btn-primary');
 if (!btn) return;
-// Ctrl/Cmd+Enter: textarea 和 input 都触发
 if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
 e.preventDefault();
 btn.click();
 return;
 }
-// Enter on input（非 textarea）触发
 if (e.key === 'Enter' && !e.isComposing && el.tagName === 'INPUT' && (el.classList.contains('tool-input') || el.type === 'text')) {
 if (el.id === 'searchInput' || el.closest('.search-wrap') || el.closest('.cmd-palette')) return;
 e.preventDefault();
@@ -934,7 +929,6 @@ btn.click();
 }
 });
 }
-// 增强 2：粘贴自动执行
 function _initGlobalPasteExec() {
 const content = document.getElementById('content');
 if (!content) return;
@@ -942,9 +936,7 @@ content.addEventListener('paste', e => {
 const el = e.target;
 if (!el.matches('textarea.tool-textarea, input.tool-input')) return;
 if (el.dataset.noAutopaste !== undefined) return;
-// 排除 text-diff 双输入框和 markdown 编辑器
 if (el.id === 'diffA' || el.id === 'diffB' || el.id === 'mdInput') return;
-// 仅对空输入框粘贴时触发
 if (el.value.trim()) return;
 const panel = el.closest('.tool-card-panel') || el.closest('.tool-body');
 if (!panel) return;
@@ -953,7 +945,6 @@ if (!btn) return;
 setTimeout(() => btn.click(), 200);
 });
 }
-// 增强 3：textarea 字符统计
 function _initTextareaCounter() {
 const content = document.getElementById('content');
 if (!content) return;
@@ -979,22 +970,18 @@ init();
 _initGlobalKeySubmit();
 _initGlobalPasteExec();
 _initTextareaCounter();
-// ── Agent 桥接：暴露内部变量给 agent 层 ──
 window.TOOLS        = TOOLS;
 window.navigateTo   = navigateTo;
 window.showToast    = showToast;
 window.getCurrentLang = getCurrentLang;
-// currentPage / favorites / recent 是 let，用 getter 保持同步
 Object.defineProperties(window, {
 currentPage: { get: () => currentPage, configurable: true },
 favorites:   { get: () => favorites,   configurable: true },
 recent:      { get: () => recent,       configurable: true },
 });
 });
-// ── 离线状态提示 ──
 window.addEventListener('online',  () => showToast(t('toast_online'), 'success'));
 window.addEventListener('offline', () => showToast(t('toast_offline'), 'warn'));
-// ── SW 更新提示 ──
 if ('serviceWorker' in navigator) {
 navigator.serviceWorker.addEventListener('message', e => {
 if (e.data === 'sw-updated') showToast(t('toast_sw_update'), 'info', 8000, () => location.reload());

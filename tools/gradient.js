@@ -145,10 +145,12 @@ const preview = document.getElementById('gradPreview');
 const code    = document.getElementById('gradCode');
 if (preview) preview.style.background = grad;
 if (code) code.textContent = `background: ${grad};\nbackground-image: ${grad};`;
+// update color hex displays
 _gradStops.forEach((s,i) => {
 const el = document.getElementById('gsc'+i);
 if (el) el.textContent = s.color.toUpperCase();
 });
+// Tailwind output
 const tl = window._gradTl || function(k){ return k; };
 const twEl = document.getElementById('gradTailwind');
 if (twEl) {

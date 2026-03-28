@@ -702,36 +702,27 @@ html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
 return '<pre><code class="lang-' + (lang||'text') + '">' + code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code></pre>';
 });
 html = html.replace(/`([^`]+)`/g, (_, code) => '<code>' + code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code>');
-// Escape remaining HTML (but not our tags)
 const parts = html.split(/(<\/?(?:pre|code|strong|em|a|ul|ol|li|h[1-3]|blockquote|table|thead|tbody|tr|th|td|br)[^>]*>)/);
 html = parts.map((p, i) => i % 2 === 0 ? p.replace(/&(?!amp;|lt;|gt;)/g, '&amp;').replace(/<(?!\/?(?:pre|code|strong|em|a|ul|ol|li|h[1-3]|blockquote|table|thead|tbody|tr|th|td|br))/g, '&lt;') : p).join('');
-// Headers (### > ## > #)
 html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
 html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
 html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-// Bold & italic
 html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-// Links (reject javascript: and data: schemes to prevent XSS)
 html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
 if (/^\s*(?:javascript|data|vbscript):/i.test(url)) return text;
 return '<a href="' + url + '" target="_blank" rel="noopener">' + text + '</a>';
 });
-// Blockquotes
 html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
-// Unordered lists
 html = html.replace(/(?:^|\n)((?:- .+\n?)+)/g, (_, list) => {
 const items = list.trim().split('\n').map(l => '<li>' + l.replace(/^- /, '') + '</li>').join('');
 return '<ul>' + items + '</ul>';
 });
-// Ordered lists
 html = html.replace(/(?:^|\n)((?:\d+\. .+\n?)+)/g, (_, list) => {
 const items = list.trim().split('\n').map(l => '<li>' + l.replace(/^\d+\. /, '') + '</li>').join('');
 return '<ol>' + items + '</ol>';
 });
-// Line breaks (but not inside pre/code)
 html = html.replace(/\n/g, '<br>');
-// Clean up br inside block elements
 html = html.replace(/<br>(<\/?(?:pre|ul|ol|li|h[1-3]|blockquote|table))/g, '$1');
 html = html.replace(/(<\/(?:pre|ul|ol|li|h[1-3]|blockquote|table)>)<br>/g, '$1');
 return html;
@@ -740,14 +731,10 @@ function scrollBottom() {
 const el = document.getElementById('agMessages');
 if (el) el.scrollTop = el.scrollHeight;
 }
-// ── State (shared with agent-ui-part2.js via window) ────────────
-// Using var instead of let so they are accessible across script files
-// (let/const at top-level in 'use strict' non-module scripts are script-scoped, not global)
 var _session = null;
 var _thinkingEl = null;
-var _cardMap = {}; // tc.id => card element
+var _cardMap = {}; 
 var _busy = false;
-// ── Panel builder ───────────────────────────────────────────────
 function buildPanel() {
 const { AG, SKINS, applySkin } = window.AgentConfig;
 const cfg = AG.load();
@@ -776,7 +763,6 @@ panel.innerHTML = [
 '</div>',
 ].join('');
 document.body.appendChild(panel);
-// Welcome message
 const welcomeEl = document.createElement('div');
 welcomeEl.className = 'ag-bubble assistant';
 const isEn = (window._i18n?.lang || 'zh') === 'en';
@@ -795,9 +781,7 @@ isEn ? ['Generate password', '生成密码'] : ['生成密码', '生成密码'],
 ].map(([label, msg]) => `<span class="ag-welcome-chip" onclick="window._agChipSend && window._agChipSend(this,'${msg}')">${label}</span>`).join('') +
 '</div>';
 document.getElementById('agMessages').appendChild(welcomeEl);
-// Apply skin variables
 applySkin(cfg.skin);
-// ── Drag to move ────────────────────────────────────────────
 (function initDrag() {
 const header = panel.querySelector('.ag-header');
 let dragging = false, ox = 0, oy = 0;
@@ -826,7 +810,6 @@ dragging = false;
 header.style.cursor = 'grab';
 });
 })();
-// Wire close / clear / config
 document.getElementById('agCloseBtn').onclick = () => { panel.style.display = 'none'; };
 document.getElementById('agClearBtn').onclick = () => {
 if (_session) _session.clearHistory();
@@ -837,7 +820,6 @@ document.getElementById('agConfigBtn').onclick = () => openConfig();
 const input   = document.getElementById('agInput');
 const sendBtn = document.getElementById('agSendBtn');
 input.addEventListener('keydown', e => {
-// 补全浮层键盘导航
 const sug = document.getElementById('agCmdSuggest');
 if (sug) {
 const items = sug.querySelectorAll('.ag-sug-item');
@@ -855,7 +837,6 @@ if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); _h
 input.addEventListener('input', () => {
 input.style.height = 'auto';
 input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-// 斜杠命令补全
 const val = input.value;
 if (val.startsWith('/') && !val.includes(' ') && window.CmdParser) {
 const sugs = window.CmdParser.getSuggestions(val);
@@ -872,7 +853,6 @@ setBusy(false);
 stopBtn.classList.remove('visible');
 };
 }
-// Exported entry points for agent-loader
 var _sugIdx = -1;
 function _sugHighlight(items) {
 items.forEach((el,i) => el.classList.toggle('active', i === _sugIdx));
@@ -902,13 +882,11 @@ if (panel) panel.appendChild(box);
 window._agInjectCSS  = injectCSS;
 window._agBuildPanel = buildPanel;
 window._agMdToHtml   = mdToHtml;
-// Chip quick-send: clicking a hint chip fills and sends the input
 window._agChipSend = function(btn, text) {
 const input = document.getElementById('agInput');
 if (!input) return;
 input.value = text;
 input.style.height = 'auto';
 input.style.height = Math.min(input.scrollHeight, 120) + 'px';
-// Trigger send via part2
 window._agDoSend && window._agDoSend();
 };

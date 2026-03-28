@@ -187,7 +187,7 @@ window._b64LastOp = 'encode';
 const val = document.getElementById('b64Input').value;
 try {
 let result = btoa(unescape(encodeURIComponent(val)));
-if (_isUrlSafe()) result = result.replace(/\+/g,'-').replace(/\
+if (_isUrlSafe()) result = result.replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
 _b64Show(result, T('encode_ok'), true);
 } catch { _b64Show(T('encode_fail'), T('error'), false); }
 }

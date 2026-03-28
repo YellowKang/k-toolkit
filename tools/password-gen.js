@@ -329,7 +329,6 @@ return `<div class="result-row" style="margin-bottom:8px;display:flex;align-item
 </div>`;
 }).join('');
 panel._pwds = pwds;
-// update strength panel with first password
 _pwdUpdateStrengthPanel(pwds[0], chars);
 }
 function pwdCopyAll() {

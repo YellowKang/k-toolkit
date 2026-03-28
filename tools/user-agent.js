@@ -23,7 +23,7 @@ _renderUAGrid(navigator.userAgent, 'uaInfoPanel', '当前环境信息');
 }
 function _parseUAInfo(ua) {
 return [
-['浏览器引擎', /Gecko\
+['浏览器引擎', /Gecko\//.test(ua)?'Gecko':/WebKit\//.test(ua)?'WebKit':'未知'],
 ['操作系统', /Windows NT (\S+)/.exec(ua)?.[1]?'Windows '+ /Windows NT (\S+)/.exec(ua)[1]:/Mac OS X ([\d_]+)/.exec(ua)?.[1]?'macOS '+/Mac OS X ([\d_]+)/.exec(ua)[1].replace(/_/g,'.'):/Android ([\d.]+)/.exec(ua)?.[1]?'Android '+/Android ([\d.]+)/.exec(ua)[1]:/Linux/.test(ua)?'Linux':/iPhone OS ([\d_]+)/.exec(ua)?.[1]?'iOS '+/iPhone OS ([\d_]+)/.exec(ua)[1].replace(/_/g,'.'):'未知'],
 ['设备类型', /Mobile|Android|iPhone/.test(ua)?'移动端':/iPad/.test(ua)?'平板':'桌面端'],
 ['Chrome', ua.match(/Chrome\/([\d.]+)/)?.[1]||'-'],

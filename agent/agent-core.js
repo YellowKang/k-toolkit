@@ -162,7 +162,7 @@ let resp;
 try {
 let safeBaseUrl = this.config.baseUrl || '';
 if (safeBaseUrl && location.protocol === 'https:' && safeBaseUrl.startsWith('http://')) {
-safeBaseUrl = safeBaseUrl.replace(/^http:\/\
+safeBaseUrl = safeBaseUrl.replace(/^http:\/\//, 'https://');
 if (!this._mixedContentWarned) {
 this._mixedContentWarned = true;
 const msg = (this.config.lang || 'zh') === 'en'

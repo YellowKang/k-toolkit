@@ -123,7 +123,6 @@ _ucNfRow('科学计数法', n.toExponential()),
 _ucNfRow('百分比', fmt(n/100,'zh-CN',{style:'percent',minimumFractionDigits:2})),
 _ucNfRow('整数部分', fmt(Math.trunc(n),'zh-CN')),
 ];
-// Byte friendly format
 if (n >= 0) {
 const byteUnits = [['B',1],['KB',1024],['MB',1024**2],['GB',1024**3],['TB',1024**4]];
 const best = byteUnits.filter(([,d]) => n/d >= 1).pop() || byteUnits[0];

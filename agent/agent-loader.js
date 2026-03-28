@@ -268,6 +268,7 @@ welcomeEl.className = 'ag-mini-welcome';
 welcomeEl.innerHTML = `<span class="ag-mini-welcome-text">${isEn ? '👋 Hi! Try a quick command:' : '👋 你好！试试快捷指令：'}</span>
 <div class="ag-mini-chips">${welcomeChips.map(c => `<span class="ag-mini-chip">${c}</span>`).join('')}</div>`;
 messages.appendChild(welcomeEl);
+// Chip click handler
 welcomeEl.querySelectorAll('.ag-mini-chip').forEach(chip => {
 chip.addEventListener('click', () => {
 input.value = chip.textContent;
@@ -275,14 +276,19 @@ _miniSend();
 });
 });
 }
+// Focus
 setTimeout(() => input.focus(), 50);
+// Close on overlay click
 overlay.addEventListener('click', e => { if (e.target === overlay) closeMini(); });
+// Header button handlers
 document.getElementById('agMiniCloseBtn').onclick = closeMini;
 document.getElementById('agMiniExpandBtn').onclick = () => {
 closeMini();
 openAgent();
 };
+// Create a lightweight session for mini mode (fresh each time)
 if (_miniSession) {
+// Clear old event handlers to avoid duplicates
 _miniSession._handlers = {};
 _miniSession.clearHistory();
 }
@@ -295,8 +301,10 @@ adapter,
 config: { ...cfg, apiKey: AG.getKey(cfg.adapter), max_tokens: 1000 },
 });
 }
+// Refresh session config each time (in case API key/model changed)
 _miniSession.adapter = adapter;
 _miniSession.config = { ...cfg, apiKey: AG.getKey(cfg.adapter), max_tokens: 1000 };
+// Wire mini events — append to message list
 _miniSession.on('thinking', () => {
 _miniRemoveThinking();
 _miniThinkingEl = _miniAppendBubble('thinking', '<div class="ag-thinking-dots"><span></span><span></span><span></span></div> <span class="ag-mini-thinking-text">thinking...</span>');

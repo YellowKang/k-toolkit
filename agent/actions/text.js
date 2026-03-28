@@ -80,7 +80,7 @@ required: ['text'],
 },
 execute({ text, urlSafe = false }) {
 let result = btoa(unescape(encodeURIComponent(text)));
-if (urlSafe) result = result.replace(/\+/g, '-').replace(/\
+if (urlSafe) result = result.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 return { success: true, data: { result }, display: `Base64 编码完成（${result.length} 字符）` };
 },
 },
