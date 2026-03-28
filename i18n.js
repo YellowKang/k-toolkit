@@ -41,6 +41,11 @@ related_tools: '你可能还需要',
 nav_home:      '工具首页',
 nav_favs:      '我的收藏',
 nav_recent:    '最近使用',
+nav_ai_chat:   'AI 对话',
+bottom_home:   '首页',
+bottom_favs:   '收藏',
+bottom_recent: '最近',
+bottom_ai:     'AI 对话',
 cmd_placeholder:'搜索工具或操作...',
 cmd_toggle_theme:'切换主题',
 cmd_theme_sub:  '深色 / 浅色',
@@ -111,6 +116,11 @@ related_tools: 'You might also need',
 nav_home:      'All Tools',
 nav_favs:      'Favorites',
 nav_recent:    'Recent',
+nav_ai_chat:   'AI Chat',
+bottom_home:   'Home',
+bottom_favs:   'Favorites',
+bottom_recent: 'Recent',
+bottom_ai:     'AI Chat',
 cmd_placeholder:'Search tools or actions...',
 cmd_toggle_theme:'Toggle theme',
 cmd_theme_sub:  'Dark / Light',
@@ -281,6 +291,10 @@ if (typeof window._chatRefreshI18n === 'function' && document.getElementById('_c
 window._chatRefreshI18n();
 }
 if (typeof window._agRefreshI18n === 'function') window._agRefreshI18n();
+document.querySelectorAll('[data-i18n]').forEach(el => {
+const key = el.dataset.i18n;
+if (key) el.textContent = t(key);
+});
 }
 let _ltCache = null;
 let _ltCacheLang = '';
