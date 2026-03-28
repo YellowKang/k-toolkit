@@ -1,6 +1,9 @@
 'use strict';
 const AG_SCRIPT_GROUPS = [
 [
+'agent/adapters/stream-utils.js',
+],
+[
 'agent/adapters/claude.js',
 'agent/adapters/openai-chat.js',
 'agent/adapters/openai-response.js',
@@ -8,6 +11,7 @@ const AG_SCRIPT_GROUPS = [
 'agent/adapters/custom.js',
 'agent/actions/text.js',
 'agent/actions/dev.js',
+'agent/agent-i18n.js',
 'agent/actions/calc.js',
 'agent/actions/nav.js',
 'agent/actions/composite.js',
@@ -209,18 +213,26 @@ async function openMini() {
 if (document.getElementById('agMiniOverlay')) { closeMini(); return; }
 if (!await ensureLoaded()) return;
 window._agInjectCSS && window._agInjectCSS();
-const isEn = (window._i18n?.lang || 'zh') === 'en';
+const _t = window.AgentI18n?.t || (k => k);
 const overlay = document.createElement('div');
 overlay.id = 'agMiniOverlay';
 const box = document.createElement('div');
 box.id = 'agMiniBox';
+const _panel = document.getElementById('agentPanel');
+if (_panel) {
+const ps = _panel.style;
+for (let i = 0; i < ps.length; i++) {
+const prop = ps[i];
+if (prop.startsWith('--ag-')) box.style.setProperty(prop, ps.getPropertyValue(prop));
+}
+}
 const header = document.createElement('div');
 header.className = 'ag-mini-header';
 header.innerHTML = `
 <span class="ag-mini-header-title">🤖 K Assistant</span>
 <div class="ag-mini-header-actions">
-<button class="ag-mini-hdr-btn" id="agMiniExpandBtn" title="${isEn ? 'Open full panel' : '展开完整面板'}">⤢</button>
-<button class="ag-mini-hdr-btn" id="agMiniCloseBtn" title="${isEn ? 'Close' : '关闭'}">✕</button>
+<button class="ag-mini-hdr-btn" id="agMiniExpandBtn" title="${_t('mini_expand')}">⤢</button>
+<button class="ag-mini-hdr-btn" id="agMiniCloseBtn" title="${_t('close')}">✕</button>
 </div>
 `;
 const messages = document.createElement('div');
@@ -230,12 +242,12 @@ inputRow.className = 'ag-mini-input-row';
 const input = document.createElement('input');
 input.id = 'agMiniInput';
 input.type = 'text';
-input.placeholder = isEn ? 'Ask AI anything... (Enter to send)' : '问我任何事... (Enter 发送)';
+input.placeholder = _t('mini_ph');
 input.autocomplete = 'off';
 const sendBtn = document.createElement('button');
 sendBtn.id = 'agMiniSendBtn';
 sendBtn.innerHTML = '↑';
-sendBtn.title = isEn ? 'Send' : '发送';
+sendBtn.title = _t('cfg_sc_send');
 inputRow.appendChild(input);
 inputRow.appendChild(sendBtn);
 const footer = document.createElement('div');
@@ -258,14 +270,14 @@ messages.innerHTML = _miniMessagesHtml;
 messages.querySelectorAll('.ag-mini-bubble.thinking').forEach(el => el.remove());
 } else {
 const welcomeChips = [
-isEn ? 'Generate UUID' : '生成 UUID',
-isEn ? 'Format JSON' : '格式化 JSON',
-isEn ? 'Hash text' : '算哈希',
-isEn ? 'Convert time' : '时间转换',
+_t('chip_uuid'),
+_t('chip_json'),
+_t('chip_hash'),
+_t('chip_time'),
 ];
 const welcomeEl = document.createElement('div');
 welcomeEl.className = 'ag-mini-welcome';
-welcomeEl.innerHTML = `<span class="ag-mini-welcome-text">${isEn ? '👋 Hi! Try a quick command:' : '👋 你好！试试快捷指令：'}</span>
+welcomeEl.innerHTML = `<span class="ag-mini-welcome-text">${_t('mini_welcome')}</span>
 <div class="ag-mini-chips">${welcomeChips.map(c => `<span class="ag-mini-chip">${c}</span>`).join('')}</div>`;
 messages.appendChild(welcomeEl);
 // Chip click handler

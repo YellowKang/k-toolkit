@@ -271,12 +271,16 @@ if (inp) inp.placeholder = t('search_placeholder');
 if (typeof renderHomePage === 'function') renderHomePage(typeof currentPage !== 'undefined' ? currentPage : 'home');
 if (typeof buildSidebarNav === 'function') buildSidebarNav();
 if (typeof applyTheme === 'function') applyTheme();
-if (typeof currentPage !== 'undefined' && !['home','favorites','recent'].includes(currentPage)) {
+if (typeof currentPage !== 'undefined' && !['home','favorites','recent','ai-chat'].includes(currentPage)) {
 if (typeof TOOLS !== 'undefined' && typeof renderToolPageFull === 'function') {
 const tool = TOOLS.find(t => t.id === currentPage);
 if (tool) renderToolPageFull(tool);
 }
 }
+if (typeof window._chatRefreshI18n === 'function' && document.getElementById('_chatPageRoot')) {
+window._chatRefreshI18n();
+}
+if (typeof window._agRefreshI18n === 'function') window._agRefreshI18n();
 }
 let _ltCache = null;
 let _ltCacheLang = '';

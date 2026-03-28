@@ -11,5 +11,12 @@ return window.OpenAIChatAdapter.chat.call(
 { messages, tools, model, max_tokens, temperature, baseUrl, apiKey, signal }
 );
 },
+async *chatStream({ messages, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
+if (!baseUrl) throw new Error('Custom adapter requires a Base URL');
+yield* window.OpenAIChatAdapter.chatStream.call(
+{ ...window.OpenAIChatAdapter, defaultModel: model || 'gpt-4o' },
+{ messages, model, max_tokens, temperature, baseUrl, apiKey, signal }
+);
+},
 };
 window.CustomAdapter = CustomAdapter;

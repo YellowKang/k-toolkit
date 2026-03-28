@@ -35,7 +35,7 @@ if (!msgs) return null;
 _thinkingStartMs = Date.now();
 const el = document.createElement('div');
 el.className = 'ag-thinking';
-const label = actionName || (((window._i18n?.lang || 'zh') === 'en') ? 'Thinking' : '思考中');
+const label = actionName || _agT('thinking');
 el.innerHTML = '<span class="ag-thinking-label">' + escHtml(label) + '</span>' +
 '<div class="ag-thinking-dots"><span></span><span></span><span></span></div>' +
 '<span class="ag-thinking-timer" id="agThinkTimer">0.0s</span>';
@@ -64,7 +64,7 @@ if (onRetry) {
 const btn = document.createElement('button');
 btn.className = 'ag-btn';
 btn.style.marginTop = '6px';
-btn.textContent = '重试';
+btn.textContent = _agT('retry');
 btn.onclick = onRetry;
 el.appendChild(btn);
 }
@@ -107,22 +107,22 @@ status.className = 'ag-card-status ' + (result.success ? 'ok' : 'fail');
 status.textContent = (result.success ? '\u2713 ' : '\u2717 ') + elapsed;
 const body = card.querySelector('.ag-card-body');
 body.style.display = 'block';
-const display = result.display || (result.success ? '完成' : (result.error || '失败'));
+const display = result.display || (result.success ? _agT('done') : (result.error || 'Failed'));
 const detailId = 'ag-detail-' + tc.id;
 let copyBtn = null;
 if (result.success && result.data) {
 copyBtn = document.createElement('button');
 copyBtn.className = 'ag-btn';
-copyBtn.textContent = '复制';
+copyBtn.textContent = _agT('copy');
 copyBtn.addEventListener('click', () => {
 const txt = typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2);
-navigator.clipboard.writeText(txt).then(() => { window.showToast && window.showToast('已复制'); });
+navigator.clipboard.writeText(txt).then(() => { window.showToast && window.showToast(_agT('copied')); });
 });
 }
 body.innerHTML = `
 <div class="ag-card-display">${escHtml(display)}</div>
 <div class="ag-card-actions" id="ag-actions-${detailId}">
-<button class="ag-btn" onclick="document.getElementById('${detailId}').classList.toggle('open')">详情 ▾</button>
+<button class="ag-btn" onclick="document.getElementById('${detailId}').classList.toggle('open')">${_agT('details')}</button>
 </div>
 <div class="ag-card-detail" id="${detailId}">
 <pre>${escHtml(JSON.stringify(result.data || result, null, 2))}</pre>
@@ -160,7 +160,7 @@ _handleMetaCmd(parsed.cmd, parsed.args);
 return;
 }
 if (parsed.type === 'unknown_cmd') {
-appendBubble('assistant', '未知命令 `/' + parsed.cmd + '`，输入 `/help` 查看可用命令。');
+appendBubble('assistant', _agT('unknown_cmd').replace('{cmd}', parsed.cmd));
 return;
 }
 if (parsed.type === 'action') {
@@ -174,11 +174,11 @@ Promise.resolve(action.execute(parsed.params)).then(result => {
 appendBubble('assistant', result.display || JSON.stringify(result.data));
 setBusy(false);
 }).catch(e => {
-appendBubble('assistant', '执行失败：' + e.message);
+appendBubble('assistant', _agT('exec_fail') + e.message);
 setBusy(false);
 });
 } else {
-appendBubble('assistant', '命令对应的 action 未找到：' + parsed.action);
+appendBubble('assistant', _agT('action_missing') + parsed.action);
 }
 return;
 }
@@ -194,7 +194,7 @@ case 'clear':
 if (_session) _session.clearHistory();
 const msgs = document.getElementById('agMessages');
 if (msgs) msgs.innerHTML = '';
-appendBubble('assistant', '对话历史已清空。');
+appendBubble('assistant', _agT('history_cleared'));
 break;
 case 'config':
 window._agOpenConfig && window._agOpenConfig();
@@ -209,7 +209,7 @@ case 'copy': {
 const bubbles = document.querySelectorAll('#agMessages .ag-bubble.assistant');
 if (bubbles.length) {
 navigator.clipboard.writeText(bubbles[bubbles.length-1].innerText);
-window.showToast && window.showToast('已复制');
+window.showToast && window.showToast(_agT('copied'));
 }
 break;
 }
@@ -219,18 +219,14 @@ break;
 case 'model':
 if (args[0] && _session) {
 _session.config.model = args[0];
-appendBubble('assistant', '模型已切换为：' + args[0]);
+appendBubble('assistant', _agT('model_switched') + args[0]);
 }
 break;
 case 'skin':
-if (args[0] && window.AgentConfig) {
-window.AgentConfig.applySkin(args[0]);
-window.AgentConfig.AG.set('skin', args[0]);
-appendBubble('assistant', '皮肤已切换为：' + args[0]);
-}
+appendBubble('assistant', _agT('skin_follows'));
 break;
 default:
-appendBubble('assistant', '未知元命令：/' + cmd);
+appendBubble('assistant', _agT('unknown_meta') + cmd);
 }
 }
 function setBusy(v) {
@@ -247,7 +243,7 @@ const msgs = document.getElementById('agMessages');
 if (!msgs) return;
 const el = document.createElement('div');
 el.className = 'ag-skill-tag';
-el.textContent = icon + ' ' + skill + ' skill 已激活';
+el.textContent = icon + ' ' + skill + ' ' + _agT('skill_active');
 msgs.appendChild(el);
 });
 session.on('thinking', () => {

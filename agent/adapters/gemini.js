@@ -51,5 +51,12 @@ usage: { input: raw.usage?.prompt_tokens || 0, output: raw.usage?.completion_tok
 raw,
 };
 },
+async *chatStream({ messages, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
+const base = baseUrl || 'https://generativelanguage.googleapis.com/v1beta/openai';
+yield* window.OpenAIChatAdapter.chatStream.call(
+{ ...window.OpenAIChatAdapter, defaultModel: this.defaultModel },
+{ messages, model: model || this.defaultModel, max_tokens, temperature, baseUrl: base, apiKey, signal }
+);
+},
 };
 window.GeminiAdapter = GeminiAdapter;

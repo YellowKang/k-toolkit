@@ -82,5 +82,44 @@ raw,
 _responseId: raw.id,
 };
 },
+async *chatStream({ messages, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
+const base = baseUrl || 'https://api.openai.com';
+const url = `${base}/v1/responses`;
+const sysMsg = messages.find(m => m.role === 'system');
+const inputMsgs = messages.filter(m => m.role !== 'system').map(m => {
+return { role: m.role, content: m.content };
+});
+const body = {
+model: model || this.defaultModel,
+max_output_tokens: max_tokens || 2000,
+temperature: temperature ?? 0.7,
+input: inputMsgs,
+stream: true,
+};
+if (sysMsg) body.instructions = sysMsg.content;
+const resp = await fetch(url, {
+method: 'POST',
+signal,
+headers: {
+'Content-Type': 'application/json',
+'Authorization': `Bearer ${apiKey || ''}`,
+},
+body: JSON.stringify(body),
+});
+if (!resp.ok) {
+const err = await resp.text();
+throw new Error(`OpenAI Responses API error ${resp.status}: ${err}`);
+}
+let usage = { input: 0, output: 0 };
+for await (const evt of parseSSEStream(resp, signal)) {
+if (evt.type === 'response.output_text.delta') {
+if (evt.delta) yield { type: 'delta', text: evt.delta };
+} else if (evt.type === 'response.completed') {
+const u = evt.response?.usage;
+if (u) usage = { input: u.input_tokens || 0, output: u.output_tokens || 0 };
+yield { type: 'done', usage };
+}
+}
+},
 };
 window.OpenAIResponseAdapter = OpenAIResponseAdapter;
