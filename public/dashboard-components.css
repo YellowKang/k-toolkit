@@ -279,6 +279,8 @@ select.tool-input { cursor: pointer; }
   .menu-btn { display: flex; }
   .main { width: 100%; }
   .bottom-nav { display: flex; }
+  /* AI 对话全屏时隐藏底部导航，避免遮挡对话输入框 */
+  .app:has(.chat-page-mode) .bottom-nav { display: none !important; }
   .topbar-clock { display: none; }
   /* Mobile: reset collapsed state so sidebar opens full-width */
   .app.sidebar-collapsed .sidebar { transform: translateX(-100%); width: 256px; overflow: visible; }
