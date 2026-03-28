@@ -1177,6 +1177,36 @@ textarea[readonly] {
 
 /* section-header */
 
+/* ── 工具页移动端适配 ── */
+@media (max-width: 640px) {
+  .tool-page { max-width: 100%; }
+  .tool-card-panel { padding: 14px 12px; }
+  /* result-row label 不固定宽度 */
+  .result-row span:first-child { flex-shrink: 1; min-width: 0; }
+  /* result-row 值：缩小字号 */
+  .result-row span:nth-child(2) { font-size: 12px; }
+  /* uuid list */
+  #uuidList .result-row { font-size: 11px; }
+  /* flex-preview 缩小 */
+  .flex-preview { min-height: 100px; padding: 10px; }
+  /* 计算器：科学模式按钮缩小 */
+  #calcSciRow1 button, #calcSciRow2 button { font-size: 10px !important; padding: 6px 2px !important; }
+  #calcBtns button { font-size: 14px !important; }
+}
+
+@media (max-width: 480px) {
+  .tool-card-panel { padding: 12px 10px; margin-bottom: 10px; }
+  .panel-label { font-size: 10px; margin-bottom: 8px; }
+  .result-box { font-size: 11px; padding: 10px 12px; }
+  .result-row { padding: 8px 10px; gap: 6px; }
+  /* 工具页最大宽度 */
+  .tool-page { padding-bottom: 100px; }
+  /* flex-item 不固定宽 */
+  .flex-item { min-width: 0; }
+  /* 计算器全宽 */
+  #calcSciRow1, #calcSciRow2 { grid-template-columns: repeat(6, 1fr) !important; gap: 4px !important; }
+}
+
 /* ── prefers-reduced-motion 无障碍：关闭动画和 backdrop-filter ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

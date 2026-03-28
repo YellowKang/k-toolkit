@@ -994,6 +994,46 @@ select.tool-input { cursor: pointer; }
   .result-box { font-size: 11px; padding: 10px; }
   /* 相关工具 section */
   .related-tools .tools-grid { grid-template-columns: repeat(2, 1fr); }
+  /* 多列 grid 全部转单列 */
+  .tool-card-panel [style*="grid-template-columns:1fr 2fr"],
+  .tool-card-panel [style*="grid-template-columns: 1fr 2fr"],
+  .tool-card-panel [style*="grid-template-columns:repeat(2"],
+  .tool-card-panel [style*="grid-template-columns: repeat(2"],
+  .tool-card-panel [style*="grid-template-columns:repeat(3"],
+  .tool-card-panel [style*="grid-template-columns: repeat(3"],
+  .tool-card-panel [style*="grid-template-columns:repeat(4"],
+  .tool-card-panel [style*="grid-template-columns: repeat(4"],
+  .tool-card-panel [style*="grid-template-columns:repeat(6"],
+  .tool-card-panel [style*="grid-template-columns: repeat(6"],
+  .tool-card-panel [style*="grid-template-columns:1fr auto"],
+  .tool-card-panel [style*="grid-template-columns: 1fr auto"],
+  .tool-card-panel [style*="grid-template-columns:auto repeat"],
+  .tool-card-panel [style*="grid-template-columns: auto repeat"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* flex 子项：防止 min-width 撑破布局 */
+  .tool-card-panel [style*="min-width:"] {
+    min-width: 0 !important;
+    flex-shrink: 1 !important;
+  }
+  /* flex 行自动换行 */
+  .tool-card-panel [style*="display:flex"],
+  .tool-card-panel [style*="display: flex"] {
+    flex-wrap: wrap;
+  }
+  /* 固定宽度输入框：不超容器 */
+  .tool-card-panel input[style*="width:"],
+  .tool-card-panel select[style*="width:"] {
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+  /* result-row label：不固定宽度 */
+  .tool-card-panel .result-row span[style*="min-width:"],
+  .tool-card-panel .result-row span[style*="width:"] {
+    min-width: 0 !important;
+    width: auto !important;
+    flex-shrink: 1;
+  }
 }
 
 /* ── Topbar 时钟 ── */
@@ -1089,4 +1129,91 @@ select.tool-input { cursor: pointer; }
 /* ── home-hero 布局：纵向 ── */
 .home-hero-top {
   margin-bottom: 16px;
+}
+
+/* ══════════════════════════════════
+   工具面板全方位移动端适配
+   ══════════════════════════════════ */
+
+/* 工具面板：防止内容撑破容器 */
+.tool-card-panel {
+  overflow-x: hidden;
+  word-break: break-word;
+}
+
+/* result-row label 宽度在小屏下不固定 */
+.result-row {
+  min-width: 0;
+}
+
+/* 表格自动横滑 */
+.tool-card-panel table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.tool-card-panel .table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 输入框不超出容器 */
+.tool-input, .tool-textarea {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── 工具面板 480px 极小屏适配 ── */
+@media (max-width: 480px) {
+  .tool-card-panel { padding: 12px 10px; }
+  /* 所有内联 grid 强制单列 */
+  .tool-card-panel [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* minmax auto-fill: 缩小最小值防止溢出 */
+  .tool-card-panel [style*="minmax(200px"],
+  .tool-card-panel [style*="minmax(180px"],
+  .tool-card-panel [style*="minmax(160px"],
+  .tool-card-panel [style*="minmax(140px"] {
+    grid-template-columns: 1fr !important;
+  }
+  /* 工具操作按钮组全换行 */
+  .tool-actions { flex-wrap: wrap; gap: 6px; }
+  .tool-actions .btn { flex: 1 1 auto; min-width: 80px; }
+  /* tab 按钮换行 */
+  .tab-group { flex-wrap: wrap; }
+  .tab-btn { flex: 1 1 auto; min-width: 60px; font-size: 11px; padding: 5px 8px; }
+  /* result-row 竖排 */
+  .result-row {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .result-row .copy-inline { margin-left: auto; }
+  /* copy-inline 按钮不缩 */
+  .copy-inline { flex-shrink: 0; }
+  /* color picker 输入宽度限制 */
+  .tool-card-panel input[type="color"] {
+    width: 36px !important;
+    height: 32px !important;
+  }
+  /* monospace 结果文字缩小 */
+  .tool-card-panel [style*="font-family:monospace"],
+  .tool-card-panel [style*="font-family: monospace"] {
+    font-size: 11px;
+  }
+}
+
+/* ── 工具面板表格横滑 ── */
+@media (max-width: 768px) {
+  .tool-card-panel table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  /* 较宽的预设容器：允许横滑 */
+  .tool-card-panel [style*="overflow:hidden"] {
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    -webkit-overflow-scrolling: touch;
+  }
 }
