@@ -563,12 +563,12 @@ drop = document.createElement('div');
 drop.id = 'searchDropdown';
 drop.className = 'search-dropdown';
 document.querySelector('.search-wrap').appendChild(drop);
-document.addEventListener('mousedown', function _sdClose(e) {
+const _sdClose = e => {
 const wrap = document.querySelector('.search-wrap');
-if (wrap && !wrap.contains(e.target)) {
-hideSearchDropdown();
-}
-});
+if (wrap && !wrap.contains(e.target)) hideSearchDropdown();
+};
+document.addEventListener('mousedown', _sdClose);
+document.addEventListener('touchstart', _sdClose, { passive: true });
 }
 const tokens = q.toLowerCase().split(/[\s,，、]+/).filter(Boolean);
 const localTools = getLocalizedTools(TOOLS);
@@ -645,10 +645,12 @@ drop = document.createElement('div');
 drop.id = 'searchDropdown';
 drop.className = 'search-dropdown';
 document.querySelector('.search-wrap').appendChild(drop);
-document.addEventListener('mousedown', function _sdClose(e) {
+const _sdClose2 = e => {
 const wrap = document.querySelector('.search-wrap');
 if (wrap && !wrap.contains(e.target)) hideSearchDropdown();
-});
+};
+document.addEventListener('mousedown', _sdClose2);
+document.addEventListener('touchstart', _sdClose2, { passive: true });
 }
 const localTools = getLocalizedTools(TOOLS);
 const hotTools = Object.entries(usageCounts)
