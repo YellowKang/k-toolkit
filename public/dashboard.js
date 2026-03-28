@@ -663,12 +663,12 @@ function showSearchDropdown(q) {
     drop.className = 'search-dropdown';
     document.querySelector('.search-wrap').appendChild(drop);
     // close on outside click
-    document.addEventListener('mousedown', function _sdClose(e) {
+    const _sdClose = e => {
       const wrap = document.querySelector('.search-wrap');
-      if (wrap && !wrap.contains(e.target)) {
-        hideSearchDropdown();
-      }
-    });
+      if (wrap && !wrap.contains(e.target)) hideSearchDropdown();
+    };
+    document.addEventListener('mousedown', _sdClose);
+    document.addEventListener('touchstart', _sdClose, { passive: true });
   }
   // 拆分多关键词匹配 + 评分排序
   const tokens = q.toLowerCase().split(/[\s,，、]+/).filter(Boolean);
@@ -753,10 +753,12 @@ function _showSearchHistory() {
     drop.id = 'searchDropdown';
     drop.className = 'search-dropdown';
     document.querySelector('.search-wrap').appendChild(drop);
-    document.addEventListener('mousedown', function _sdClose(e) {
+    const _sdClose2 = e => {
       const wrap = document.querySelector('.search-wrap');
       if (wrap && !wrap.contains(e.target)) hideSearchDropdown();
-    });
+    };
+    document.addEventListener('mousedown', _sdClose2);
+    document.addEventListener('touchstart', _sdClose2, { passive: true });
   }
   const localTools = getLocalizedTools(TOOLS);
   // 热门工具（使用次数最多的5个）
