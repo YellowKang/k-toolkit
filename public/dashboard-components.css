@@ -279,6 +279,7 @@ select.tool-input { cursor: pointer; }
   .menu-btn { display: flex; }
   .main { width: 100%; }
   .bottom-nav { display: flex; }
+  .topbar-clock { display: none; }
   /* Mobile: reset collapsed state so sidebar opens full-width */
   .app.sidebar-collapsed .sidebar { transform: translateX(-100%); width: 256px; overflow: visible; }
   .app.sidebar-collapsed .sidebar.open { transform: translateX(0); }
@@ -964,6 +965,7 @@ select.tool-input { cursor: pointer; }
   .fav-btn span, .icon-btn span { display: none; }
   .search-wrap { flex: 1; }
   .topbar-actions .theme-btn { display: none; }
+  .topbar-clock { display: none; }
 }
 
 /* 工具面板内部响应式 */
