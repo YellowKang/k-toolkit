@@ -784,7 +784,8 @@ function _chatOpenSettings() {
     };
   }
   renderDialog();
-  document.body.appendChild(overlay);
+  const _chatRoot = document.getElementById('_chatPageRoot') || document.body;
+  _chatRoot.appendChild(overlay);
   overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
 }
 
@@ -803,7 +804,8 @@ function _chatEditSystemPrompt() {
       <button class="_chat-btn-primary" id="_chatSysSave">${_chatTl('save')}</button>
     </div>`;
   overlay.appendChild(dialog);
-  document.body.appendChild(overlay);
+  const _chatRoot2 = document.getElementById('_chatPageRoot') || document.body;
+  _chatRoot2.appendChild(overlay);
   overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
   dialog.querySelector('#_chatSysCancel').onclick = () => overlay.remove();
   dialog.querySelector('#_chatSysReset').onclick = () => {
@@ -968,9 +970,9 @@ function renderAiChat(container) {
   const style = document.createElement('style');
   style.textContent = `
     .content.chat-page-mode{padding:0!important;overflow:hidden!important;position:relative}
-    #_chatPageRoot{position:absolute;inset:0;display:flex;flex-direction:column}
+    #_chatPageRoot{position:absolute;inset:0;display:flex;flex-direction:column;isolation:isolate}
     ._chat-wrap{display:flex;flex-direction:column;flex:1;min-height:0;background:var(--bg,#09090f)}
-    ._chat-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 24px;border-bottom:1px solid var(--border,rgba(255,255,255,.08));background:var(--sidebar-bg,rgba(12,12,20,.95));flex-shrink:0;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+    ._chat-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 24px;padding-top:max(8px,env(safe-area-inset-top,8px));border-bottom:1px solid var(--border,rgba(255,255,255,.08));background:var(--sidebar-bg,rgba(12,12,20,.95));flex-shrink:0;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
     ._chat-toolbar label{font-size:10px;color:var(--text-muted,rgba(241,245,249,.5));white-space:nowrap;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
     ._chat-toolbar-sep{width:1px;height:18px;background:var(--border,rgba(255,255,255,.08));margin:0 2px;flex-shrink:0}
     ._chat-toolbar select,._chat-toolbar input[type="text"]{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:12px;outline:none;transition:border-color .15s}
@@ -1130,7 +1132,7 @@ function renderAiChat(container) {
     ._chat-suggests{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px}
     ._chat-suggest-btn{background:color-mix(in srgb,var(--accent) 8%,transparent);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);color:var(--accent3,var(--accent));padding:7px 14px;border-radius:20px;font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap}
     ._chat-suggest-btn:hover{background:color-mix(in srgb,var(--accent) 18%,transparent);border-color:var(--accent);transform:translateY(-1px)}
-    ._chat-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+    ._chat-overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
     ._chat-dialog{background:var(--sidebar-bg,rgba(18,18,30,.98));border:1px solid var(--border,rgba(255,255,255,.1));border-radius:20px;padding:24px;max-width:480px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,.5)}
     ._chat-dialog h3{font-size:16px;font-weight:600;margin-bottom:16px;color:var(--text,#f1f5f9)}
     ._chat-dialog textarea{width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;font-family:inherit;resize:vertical;outline:none}
