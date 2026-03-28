@@ -1,4 +1,4 @@
-const CACHE_VERSION = '08432e6a';
+const CACHE_VERSION = 'cfbe7ca1';
 const CACHE = 'dtb-' + CACHE_VERSION;
 const SHELL_FILES = [
 'dashboard.html',
