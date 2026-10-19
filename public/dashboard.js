@@ -558,7 +558,7 @@ function showSearchDropdown(q) {
         html += `</div>`;
       });
       if (tools.length > 3) {
-        html += `<div class="sdrop-more" onclick="sdropViewAll('${escHtml(q)}')">  ${t('search_view_all', tools.length)}</div>`;
+        html += `<div class="sdrop-more" data-q="${escHtml(q)}" onclick="sdropViewAll(this.dataset.q)">  ${t('search_view_all', tools.length)}</div>`;
       }
     });
     drop.innerHTML = html;
@@ -632,7 +632,7 @@ function _showSearchHistory() {
   if (searchHistory.length) {
     html += `<div class="sdrop-header"><span>${t('search_history')}</span><span class="sdrop-clear-all" onclick="_clearSearchHistory()" style="cursor:pointer;font-size:11px;color:var(--text-muted);padding:2px 6px;border-radius:4px;transition:color 0.15s" onmouseenter="this.style.color='var(--accent)'" onmouseleave="this.style.color='var(--text-muted)'">✕ 清除</span></div>`;
     searchHistory.forEach((h,i) => {
-      html += `<div class="sdrop-item" onclick="_useHistory('${escHtml(h)}')"><span style="color:var(--text-muted);font-size:12px;margin-right:8px">🕐</span><span style="flex:1">${escHtml(h)}</span><span onclick="event.stopPropagation();_removeSearchHistory(${i})" style="color:var(--text-muted);padding:2px 6px;border-radius:4px;font-size:12px;cursor:pointer" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--text-muted)'">✕</span></div>`;
+      html += `<div class="sdrop-item" data-q="${escHtml(h)}" onclick="_useHistory(this.dataset.q)"><span style="color:var(--text-muted);font-size:12px;margin-right:8px">🕐</span><span style="flex:1">${escHtml(h)}</span><span onclick="event.stopPropagation();_removeSearchHistory(${i})" style="color:var(--text-muted);padding:2px 6px;border-radius:4px;font-size:12px;cursor:pointer" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--text-muted)'">✕</span></div>`;
     });
     html += `<div style="height:1px;background:rgba(255,255,255,0.06);margin:6px 8px"></div>`;
   }
@@ -924,8 +924,9 @@ function shareTool(id) {
   }
 }
 
+// Shared by tools and the Agent; safe for text and quoted attribute values (not for inline JS strings).
 function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ── Command Palette (lazy-loaded via dashboard-cmd.js) ──

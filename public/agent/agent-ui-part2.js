@@ -30,9 +30,7 @@ function appendBubble(type, text) {
   return el;
 }
 
-function escHtml(t) {
-  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+// escHtml comes from dashboard.js (always loaded first); redefining it here would replace the global.
 
 let _thinkingStartMs = 0;
 let _thinkingTimer = null;

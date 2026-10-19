@@ -34,19 +34,44 @@ function lastToken(s) {
   return m ? m[1] : '';
 }
 
+// Index just past the string/template literal starting at `start`.
+// Template substitutions are scanned by brace depth so nested literals stay intact.
+function literalEnd(src, start) {
+  const q = src[start];
+  let i = start + 1;
+  while (i < src.length) {
+    if (src[i] === '\\') { i += 2; continue; }
+    if (src[i] === q) return i + 1;
+    if (q === '`' && src[i] === '$' && src[i+1] === '{') {
+      i += 2;
+      let depth = 1;
+      while (i < src.length && depth > 0) {
+        if (src[i] === '"' || src[i] === "'" || src[i] === '`') { i = literalEnd(src, i); continue; }
+        if (src[i] === '{') depth++;
+        else if (src[i] === '}') depth--;
+        i++;
+      }
+      continue;
+    }
+    i++;
+  }
+  return i;
+}
+
 function minifyJS(src) {
   let out = '';
   let i = 0;
   while (i < src.length) {
-    // String literals: skip to end
+    // String/template literals are copied verbatim: their whitespace is runtime data
     if (src[i] === '"' || src[i] === "'" || src[i] === '`') {
-      const q = src[i];
-      out += src[i++];
-      while (i < src.length) {
-        if (src[i] === '\\') { out += src[i] + src[i+1]; i += 2; continue; }
-        if (src[i] === q) { out += src[i++]; break; }
-        out += src[i++];
-      }
+      const end = literalEnd(src, i);
+      out += src.slice(i, end);
+      i = end;
+      continue;
+    }
+    // Drop indentation, blank lines and CRs in code only
+    if (src[i] === '\r' || (/\s/.test(src[i]) && (out === '' || out.endsWith('\n')))) {
+      i++;
       continue;
     }
     // Block comment
@@ -89,10 +114,7 @@ function minifyJS(src) {
     }
     out += src[i++];
   }
-  return out
-    .replace(/\n\s*\n/g, '\n')
-    .replace(/^\s+/gm, '')
-    .trim();
+  return out.trim();
 }
 
 function fmtKB(bytes) {
@@ -131,6 +153,10 @@ function processDir(srcDir, destDir, ext, processor) {
   }
   return count;
 }
+
+module.exports = { minifyJS, minifyCSS };
+// Required by tests: expose the transforms without running a build (CommonJS allows a top-level return).
+if (require.main !== module) return;
 
 // ── Clean dist ──
 if (fs.existsSync(DIST)) {

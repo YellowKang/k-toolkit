@@ -99,12 +99,11 @@ function ucConvert() {
 
 // ── 数字格式化（合入 number-format）──
 function _ucNfRow(label, value) {
-  const escaped = String(value).replace(/'/g, "\\'");
   return `<div class="result-row" style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:10px">
     <span style="color:var(--text-muted);font-size:13px">${label}</span>
     <div style="display:flex;align-items:center;gap:10px">
       <code style="font-family:monospace;font-size:14px;color:var(--neon)">${value}</code>
-      <button class="copy-inline" onclick="copyText('${escaped}',this)">复制</button>
+      <button class="copy-inline" data-copy="${escHtml(value)}" onclick="copyText(this.dataset.copy,this)">复制</button>
     </div>
   </div>`;
 }

@@ -245,7 +245,7 @@ function parseUrl() {
     <div class="result-row" style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
       <span style="color:var(--text-muted);width:72px;flex-shrink:0;font-size:12px">${f.label}</span>
       <span style="font-family:monospace;font-size:13px;flex:1;word-break:break-all">${escHtml(f.value)}</span>
-      <button class="copy-inline" onclick="copyText('${escHtml(f.value).replace(/'/g,"&#39;")}',this)">${tl('btn_copy')}</button>
+      <button class="copy-inline" data-copy="${escHtml(f.value)}" onclick="copyText(this.dataset.copy,this)">${tl('btn_copy')}</button>
     </div>`).join('');
   document.getElementById('urlResultPanel').style.display = '';
 
@@ -260,7 +260,7 @@ function parseUrl() {
         `<div style="display:grid;grid-template-columns:1fr 2fr auto;padding:9px 14px;gap:12px;align-items:center;${i%2?'background:rgba(255,255,255,0.015)':''};border-top:1px solid var(--glass-border)">
           <span style="color:var(--accent);font-family:monospace;font-size:13px;word-break:break-all">${escHtml(k)}</span>
           <span style="font-family:monospace;font-size:13px;word-break:break-all">${escHtml(v)}</span>
-          <button class="copy-inline" onclick="copyText('${escHtml(v).replace(/'/g,"&#39;")}',this)">${tl('btn_copy')}</button>
+          <button class="copy-inline" data-copy="${escHtml(v)}" onclick="copyText(this.dataset.copy,this)">${tl('btn_copy')}</button>
         </div>`).join('') + `</div>`;
     pp.style.display = '';
   } else { pp.style.display = 'none'; }

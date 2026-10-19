@@ -96,6 +96,18 @@ const express = require('express');
     await page.waitForFunction(() => document.querySelector('#svg-preview-box img')?.naturalWidth === 80);
     assert.equal(await page.evaluate(() => window.__svgProbe), undefined);
     assert.equal(await page.locator('#svg-preview-box svg').count(), 0);
+    // Quotes in user data must survive inline handlers, including after the Agent bundle loads.
+    await page.evaluate(() => loadAgentScripts());
+    assert.equal(await page.evaluate(() => escHtml(`<a href="x">it's</a>`)), '&lt;a href=&quot;x&quot;&gt;it&#39;s&lt;/a&gt;');
+    const tricky = `it's "quoted" </div>`;
+    await page.evaluate(q => { _addSearchHistory(q); _showSearchHistory(); }, tricky);
+    await page.locator('.sdrop-item', { hasText: tricky }).first().click();
+    assert.equal(await page.locator('#searchInput').inputValue(), tricky);
+    await route('url-parser', '#urlInput');
+    await page.locator('#urlInput').fill(`https://example.com/?q=it's%22x`);
+    await page.evaluate(() => parseUrl());
+    await page.locator('#urlParamsTable .copy-inline').click();
+    assert.equal(await page.evaluate(() => window.__copiedStatus), `it's"x`);
     await route('hmac-gen', '#hmacMsg');
     for (const width of [375, 768]) {
       await page.setViewportSize({ width, height: 850 });
