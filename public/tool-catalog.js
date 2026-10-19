@@ -85,7 +85,7 @@
   { id: 'matrix-rain',     render: 'renderMatrixRain',     icon: '💻', color: '#22c55e', name: '矩阵雨',           desc: 'Matrix 数字雨 canvas 动画，经典绿色字符瀑布',               category: '趣味工具', file: 'matrix-rain.js',     isNew: true, tags: ['matrix','rain','数字雨','动画','黑客','hacker'] },
   // 文本处理 - 新增
   { id: 'slug-gen',        render: 'renderSlugGen',        icon: '🔗', color: '#6366f1', name: 'Slug 生成器',      desc: '标题转 URL 友好 slug，支持横线/下划线/点分隔符',            category: '文本处理', file: 'slug-gen.js',        isNew: true, tags: ['slug','url','seo','permalink','friendly','链接'] },
-  { id: 'line-sort',       render: 'renderLineSort',       icon: '↕️', color: '#0ea5e9', name: '行排序去重',       desc: '多行文本升序/降序/随机打乱/去重/去空行/翻转',               category: '文本处理', file: 'line-sort.js',       isNew: true, tags: ['sort','排序','去重','dedup','unique','行','line'] },
+  { id: 'line-sort',       render: 'renderLineSort',       icon: '↕️', color: '#0ea5e9', name: '行排序去重',       desc: '多行文本排序、去重、去空行、首尾清理，支持组合清洗',               category: '文本处理', file: 'line-sort.js',       isNew: true, tags: ['sort','排序','去重','dedup','unique','行','line','trim','清洗'] },
   // 开发工具 - 新增
   { id: 'semver',          render: 'renderSemver',         icon: '🏷️', color: '#8b5cf6', name: 'Semver 比较',      desc: '语义化版本解析、大小比较，支持预发布版本',                   category: '开发工具', file: 'semver.js',          isNew: true, tags: ['semver','version','版本','semantic','比较','npm'] },
   { id: 'dns-lookup',      render: 'renderDnsLookup',      icon: '🌐', color: '#06b6d4', name: 'DNS 查询',         desc: '通过 DNS over HTTPS 查询 A/AAAA/MX/TXT/CNAME/NS 记录',     category: '网络工具', file: 'dns-lookup.js',      isNew: true, tags: ['dns','domain','域名','lookup','mx','cname','ns','resolve'] },

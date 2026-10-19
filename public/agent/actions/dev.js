@@ -9,11 +9,12 @@ const DevActions = [
       type: 'object',
       properties: {
         text: { type: 'string', description: '要哈希的文本' },
-        algo: { type: 'string', enum: ['SHA-1', 'SHA-256', 'SHA-384', 'SHA-512'], default: 'SHA-256' },
+        algo: { type: 'string', enum: ['MD5', 'SHA-1', 'SHA-256', 'SHA-384', 'SHA-512'], default: 'SHA-256' },
       },
       required: ['text'],
     },
     async execute({ text, algo = 'SHA-256' }) {
+      if (algo === 'MD5') { const hash = window._simpleMD5(text); return { success:true, data:{hash,algo}, display:algo+': '+hash }; }
       const buf = await crypto.subtle.digest(algo, new TextEncoder().encode(text));
       const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
       return { success: true, data: { hash, algo }, display: `${algo}: ${hash}` };

@@ -174,7 +174,7 @@ function _b64TryDecode(val) {
   let v = val.trim().replace(/\s/g,'');
   if (_isUrlSafe()) v = v.replace(/-/g,'+').replace(/_/g,'/');
   try {
-    const decoded = decodeURIComponent(escape(atob(v)));
+    const decoded = window.ToolCompute.base64Decode(v);
     _b64Show(decoded, T('decode_result'), true);
   } catch {
     encodeB64();
@@ -202,8 +202,7 @@ function encodeB64() {
   window._b64LastOp = 'encode';
   const val = document.getElementById('b64Input').value;
   try {
-    let result = btoa(unescape(encodeURIComponent(val)));
-    if (_isUrlSafe()) result = result.replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+    const result = window.ToolCompute.base64Encode(val, _isUrlSafe());
     _b64Show(result, T('encode_ok'), true);
   } catch { _b64Show(T('encode_fail'), T('error'), false); }
 }
@@ -213,7 +212,7 @@ function decodeB64() {
   window._b64LastOp = 'decode';
   let val = document.getElementById('b64Input').value.trim();
   if (_isUrlSafe()) val = val.replace(/-/g,'+').replace(/_/g,'/');
-  try { _b64Show(decodeURIComponent(escape(atob(val))), T('decode_ok'), true); }
+  try { _b64Show(window.ToolCompute.base64Decode(val), T('decode_ok'), true); }
   catch { _b64Show(T('decode_fail'), T('error'), false); }
 }
 
@@ -270,9 +269,9 @@ function _b64HandleFile(file) {
     // File info
     const sizeKB = (file.size / 1024).toFixed(2);
     document.getElementById('b64FileInfo').innerHTML =
-      `<div>${T('file_name')}: <strong>${file.name}</strong></div>
+      `<div>${T('file_name')}: <strong>${escHtml(file.name)}</strong></div>
        <div>${T('file_size')}: <strong>${sizeKB} KB</strong></div>
-       <div>${T('file_type')}: <strong>${file.type || 'unknown'}</strong></div>
+       <div>${T('file_type')}: <strong>${escHtml(file.type || 'unknown')}</strong></div>
        <div>${T('b64_length')}: <strong>${dataUrl.length}</strong> ${T('chars', '')}</div>`;
 
     document.getElementById('b64FileDataUrl').value = dataUrl;
@@ -332,10 +331,11 @@ function _b64RestoreFile() {
 
   // If it's an image, show preview
   if (mime.startsWith('image/')) {
-    previewDiv.innerHTML = `
-      <div class="panel-label" style="margin-bottom:8px">${T('preview')}</div>
-      <img src="${val}" style="max-width:100%;max-height:300px;border-radius:10px;border:1px solid var(--glass-border);display:block"
-           onerror="this.style.display='none'">`;
+    previewDiv.replaceChildren();
+    const label = document.createElement('div'); label.className = 'panel-label'; label.textContent = T('preview');
+    const image = document.createElement('img'); image.src = val;
+    image.style.cssText = 'max-width:100%;max-height:300px;border-radius:10px;display:block';
+    image.addEventListener('error', () => image.remove()); previewDiv.append(label, image);
   } else {
     previewDiv.innerHTML = '';
   }

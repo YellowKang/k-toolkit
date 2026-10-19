@@ -11,8 +11,12 @@ const _agLang = () => {
 };
 
 const _agDict = {
+  cmd_workflows: { zh: '列出本地工作流模板，无需模型', en: 'List local workflow templates; no model required' },
+  cmd_workflow: { zh: '在本地运行模板，支持多行输入', en: 'Run a local template with multiline input' },
+  workflow_step: { zh: '步骤', en: 'Step' },
   // ── 通用 ──
   close:          { zh: '关闭', en: 'Close' },
+  cancelled: { zh: '已停止', en: 'Cancelled' },
   cancel:         { zh: '取消', en: 'Cancel' },
   save:           { zh: '保存', en: 'Save' },
   saved:          { zh: '设置已保存', en: 'Settings saved' },
@@ -35,6 +39,9 @@ const _agDict = {
   welcome_hint:   { zh: '{mod}+J 快速提问 · Alt+A 完整面板', en: '{mod}+J Quick ask · Alt+A Full panel' },
 
   // ── 欢迎芯片 ──
+  chip_workflows: { zh: '本地工作流', en: 'Local workflows' },
+  workflow_result: { zh: '最终结果预览', en: 'Final result preview' },
+  workflow_use: { zh: '使用模板', en: 'Use template' },
   chip_uuid:      { zh: '生成 UUID', en: 'Generate UUID' },
   chip_hash:      { zh: '帮我算哈希', en: 'Hash text' },
   chip_json:      { zh: '格式化 JSON', en: 'Format JSON' },

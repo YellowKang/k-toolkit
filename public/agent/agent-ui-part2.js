@@ -88,8 +88,8 @@ function createCard(tc) {
   const msgs = document.getElementById('agMessages');
   if (!msgs) return null;
 
-  const paramsStr = Object.entries(JSON.parse(tc.function.arguments || '{}')).slice(0,3)
-    .map(([k,v]) => `${k}=${JSON.stringify(v)}`).join(' ');
+  let paramsStr = '';
+  try { paramsStr = JSON.stringify(JSON.parse(tc.function.arguments || '{}'), (key, value) => /^(key|password|token|secret)$/i.test(key) ? '[redacted]' : value).slice(0, 180); } catch { paramsStr = 'Invalid JSON'; }
 
   const card = document.createElement('div');
   card.className = 'ag-card';
@@ -99,7 +99,7 @@ function createCard(tc) {
       <span class="ag-card-icon ag-spin">⚙️</span>
       <span class="ag-card-name">${escHtml(tc.function.name)}</span>
       <span class="ag-card-params">${escHtml(paramsStr)}</span>
-      <span class="ag-card-status">...</span>
+      <span class="ag-card-status" role="status" aria-live="polite">...</span>
     </div>
     <div class="ag-card-body" style="display:none"></div>
   `;
@@ -129,7 +129,7 @@ function finishCard(tc, result) {
   body.style.display = 'block';
 
   const display = result.display || (result.success ? _agT('done') : (result.error || 'Failed'));
-  const detailId = 'ag-detail-' + tc.id;
+  const detailId = 'ag-detail-' + Date.now() + '-' + Math.random().toString(36).slice(2);
 
   let copyBtn = null;
   if (result.success && result.data) {
@@ -137,7 +137,9 @@ function finishCard(tc, result) {
     copyBtn.className = 'ag-btn';
     copyBtn.textContent = _agT('copy');
     copyBtn.addEventListener('click', () => {
-      const txt = typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2);
+      const data = result.data.steps && result.success ? result.data.result : result.data;
+      const value = data?.result ?? data?.hash ?? data;
+      const txt = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
       navigator.clipboard.writeText(txt).then(() => { window.showToast && window.showToast(_agT('copied')); });
     });
   }
@@ -145,12 +147,36 @@ function finishCard(tc, result) {
   body.innerHTML = `
     <div class="ag-card-display">${escHtml(display)}</div>
     <div class="ag-card-actions" id="ag-actions-${detailId}">
-      <button class="ag-btn" onclick="document.getElementById('${detailId}').classList.toggle('open')">${_agT('details')}</button>
+      <button type="button" class="ag-btn" data-details>${_agT('details')}</button>
     </div>
     <div class="ag-card-detail" id="${detailId}">
       <pre>${escHtml(JSON.stringify(result.data || result, null, 2))}</pre>
     </div>
   `;
+  body.querySelector('[data-details]').addEventListener('click', () => body.querySelector('.ag-card-detail').classList.toggle('open'));
+  if (result.data?.steps) {
+    const trace = document.createElement('ol');
+    for (const step of result.data.steps) { const li = document.createElement('li'); li.textContent = (step.id || step.step) + (step.action ? ': ' + step.action : '') + ' ' + (step.success === false || step.ok === false ? '✗' : '✓') + (step.durationMs !== undefined ? ' (' + step.durationMs + 'ms)' : ''); trace.appendChild(li); }
+    if (result.data.failedStep) { const failed = document.createElement('li'); failed.textContent = result.data.failedStep + ' ✗ ' + (result.error || ''); trace.appendChild(failed); }
+    body.querySelector('.ag-card-display').after(trace);
+    if (result.success) {
+      const output = result.data.result;
+      const value = output?.result ?? output?.hash ?? output;
+      const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+      const preview = document.createElement('pre'); preview.className = 'ag-workflow-preview';
+      preview.setAttribute('aria-label', _agT('workflow_result'));
+      preview.textContent = text.length > 800 ? text.slice(0, 800) + '…' : text;
+      trace.after(preview);
+    }
+  }
+  if (tc.name === 'list_workflows' || tc.function?.name === 'list_workflows') {
+    for (const template of result.data?.templates || []) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'ag-btn';
+      button.textContent = _agT('workflow_use') + ': ' + template.id;
+      button.addEventListener('click', () => { const input = document.getElementById('agInput'); input.value = '/workflow ' + template.id + ' '; input.focus(); });
+      body.querySelector('.ag-card-actions').appendChild(button);
+    }
+  }
   if (copyBtn) {
     document.getElementById('ag-actions-' + detailId).prepend(copyBtn);
   }
@@ -166,8 +192,8 @@ function doSend() {
   if (_busy) return;
   const input = document.getElementById('agInput');
   if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
+  const text = input.value.trimStart();
+  if (!text.trim()) return;
   input.value = '';
   input.style.height = 'auto';
 
@@ -201,13 +227,11 @@ function doSend() {
           : (window._AGENT_ACTIONS || []).find(a => a.name === parsed.action);
         if (action) {
           setBusy(true);
-          Promise.resolve(action.execute(parsed.params)).then(result => {
-            appendBubble('assistant', result.display || JSON.stringify(result.data));
-            setBusy(false);
+          _session.executeLocal(parsed.action, parsed.params).then(result => {
+            if (!window.AgentConfig.AG.load().show_cards) appendBubble('assistant', result.display || result.error || JSON.stringify(result.data));
           }).catch(e => {
             appendBubble('assistant', _agT('exec_fail') + e.message);
-            setBusy(false);
-          });
+          }).finally(() => setBusy(false));
         } else {
           appendBubble('assistant', _agT('action_missing') + parsed.action);
         }
@@ -290,11 +314,18 @@ function wireSession(session) {
   });
   session.on('tool_start', ({ tool_calls }) => {
     removeThinking();
+    document.getElementById('agStopBtn')?.classList.add('visible');
     const names = tool_calls.map(tc => tc.function.name).join(', ');
     if (window.AgentConfig.AG.load().show_cards) {
       tool_calls.forEach(tc => createCard(tc));
     }
     _thinkingEl = appendThinking(names);
+  });
+  session.on('tool_progress', progress => {
+    const card = _cardMap[progress.id];
+    if (!card) return;
+    const status = card.querySelector('.ag-card-status');
+    status.textContent = _agT('workflow_step') + ' ' + progress.completed + '/' + progress.total;
   });
   session.on('tool_done', ({ results }) => {
     removeThinking();
@@ -312,8 +343,11 @@ function wireSession(session) {
     const stopBtn = document.getElementById('agStopBtn');
     if (stopBtn) stopBtn.classList.remove('visible');
   });
-  session.on('done', () => {
+  session.on('done', ({ aborted } = {}) => {
     removeThinking();
+    if (aborted) for (const [id, card] of Object.entries(_cardMap)) {
+      if (card.querySelector('.ag-spin')) finishCard({ id }, { success:false, error:_agT('cancelled') });
+    }
     setBusy(false);
     const stopBtn = document.getElementById('agStopBtn');
     if (stopBtn) stopBtn.classList.remove('visible');

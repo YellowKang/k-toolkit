@@ -15,6 +15,8 @@ const AG_SCRIPT_GROUPS = [
     'agent/adapters/gemini.js',
     'agent/adapters/custom.js',
     'agent/actions/text.js',
+    'agent/actions/data.js',
+    'agent/agent-workflow.js',
     'agent/actions/dev.js',
     'agent/agent-i18n.js',
     'agent/actions/calc.js',

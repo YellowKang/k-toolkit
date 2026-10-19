@@ -52,6 +52,7 @@ const AG_CSS = `
 
 .ag-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 12px;
   display: flex;
@@ -59,6 +60,7 @@ const AG_CSS = `
   gap: 10px;
   scroll-behavior: smooth;
 }
+.ag-messages > * { flex-shrink: 0; }
 .ag-messages::-webkit-scrollbar { width: 4px; }
 .ag-messages::-webkit-scrollbar-thumb { background: var(--ag-border,rgba(255,255,255,0.12)); border-radius: 2px; }
 
@@ -161,11 +163,11 @@ const AG_CSS = `
 .ag-card-name { font-weight: 500; color: var(--ag-text,#e2e8f0); }
 .ag-card-params { color: var(--ag-text2,#94a3b8); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex:1; }
 .ag-card-body { padding: 4px 12px 10px; }
-.ag-card-display { color: var(--ag-text,#e2e8f0); margin-bottom: 6px; }
+.ag-card-display { overflow-wrap: anywhere; color: var(--ag-text,#e2e8f0); margin-bottom: 6px; }
 .ag-card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .ag-card-detail { display: none; margin-top: 6px; }
 .ag-card-detail.open { display: block; }
-.ag-card-detail pre {
+.ag-workflow-preview, .ag-card-detail pre {
   background: color-mix(in srgb,var(--ag-bg,#000) 70%,transparent);
   border-radius: 6px;
   padding: 8px;
@@ -729,25 +731,21 @@ function injectCSS() {
 
 function mdToHtml(text) {
   // Normalize line endings
-  let html = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  let html = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
   // Code blocks (```lang\n...\n```) — extract first to protect from other transforms
   const codeBlocks = [];
   html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
     const idx = codeBlocks.length;
-    const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const escaped = code;
     const langLabel = lang ? '<span class="md-code-lang">' + lang + '</span>' : '';
     codeBlocks.push('<pre class="md-pre">' + langLabel + '<code class="lang-' + (lang||'text') + '">' + escaped + '</code></pre>');
     return '\x00CB' + idx + '\x00';
   });
 
   // Inline code
-  html = html.replace(/`([^`]+)`/g, (_, code) => '<code class="md-inline-code">' + code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code>');
-
-  // Escape remaining HTML (but not our tags)
-  const allowedTags = 'pre|code|strong|em|del|a|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tr|th|td|br|hr|span|p';
-  const parts = html.split(new RegExp('(<\\/?(?:' + allowedTags + ')[^>]*>)'));
-  html = parts.map((p, i) => i % 2 === 0 ? p.replace(/&(?!amp;|lt;|gt;)/g, '&amp;').replace(new RegExp('<(?!\\/?(?:' + allowedTags + '))','g'), '&lt;') : p).join('');
+  html = html.replace(/`([^`]+)`/g, (_, code) => '<code class="md-inline-code">' + code + '</code>');
 
   // Tables (| col | col | ... with |---|---| separator)
   html = html.replace(/(?:^|\n)((?:\|.+\|\n?)+)/g, (match, block) => {
@@ -793,13 +791,13 @@ function mdToHtml(text) {
 
   // Links (reject javascript: and data: schemes to prevent XSS)
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
-    if (/^\s*(?:javascript|data|vbscript):/i.test(url)) return text;
-    return '<a href="' + url + '" target="_blank" rel="noopener">' + text + '</a>';
+    if (!/^(https?:\/\/|mailto:)/i.test(url)) return text;
+    return '<a href="' + url.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '" target="_blank" rel="noopener">' + text + '</a>';
   });
 
   // Blockquotes (multi-line merge)
-  html = html.replace(/((?:^> .+\n?)+)/gm, (_, block) => {
-    const content = block.replace(/^> /gm, '').trim();
+  html = html.replace(/((?:^&gt; .+\n?)+)/gm, (_, block) => {
+    const content = block.replace(/^&gt; /gm, '').trim();
     return '<blockquote class="md-blockquote">' + content + '</blockquote>';
   });
 
@@ -880,15 +878,15 @@ function buildPanel() {
   welcomeEl.className = 'ag-bubble assistant';
   const kbdMod = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl';
   welcomeEl.id = 'agWelcome';
-  const chipKeys = ['chip_uuid','chip_hash','chip_json','chip_time','chip_b64','chip_pw'];
+  const chipKeys = ['chip_uuid','chip_hash','chip_json','chip_time','chip_b64','chip_pw','chip_workflows'];
   function renderWelcome() {
     const _t = window.AgentI18n?.t || (k => k);
     welcomeEl.innerHTML = `${_t('welcome')}<br><span style="font-size:11px;opacity:0.5">${_t('welcome_hint').replace('{mod}', kbdMod)}</span>` +
       '<div class="ag-welcome-chips">' +
-      chipKeys.map(k => `<span class="ag-welcome-chip" data-chip="${k}">${_t(k)}</span>`).join('') +
+      chipKeys.map(k => `<button type="button" class="ag-welcome-chip" data-chip="${k}">${_t(k)}</button>`).join('') +
       '</div>';
     welcomeEl.querySelectorAll('[data-chip]').forEach(chip => {
-      chip.onclick = () => window._agChipSend && window._agChipSend(chip, chip.textContent);
+      chip.onclick = () => window._agChipSend && window._agChipSend(chip, chip.dataset.chip === 'chip_workflows' ? '/workflows' : chip.textContent);
     });
   }
   renderWelcome();

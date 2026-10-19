@@ -76,29 +76,8 @@ const _ccFormats = [
   { key: 'sentence', label: 'Sentence case' },
 ];
 
-function _ccWords(text) {
-  return text
-    .replace(/([a-z])([A-Z])/g,'$1 $2')
-    .replace(/([A-Z]+)([A-Z][a-z])/g,'$1 $2')
-    .replace(/[-_./\\]+/g,' ')
-    .trim().split(/\s+/).filter(Boolean);
-}
-
-function _ccApplyFormat(words, fmt) {
-  switch(fmt) {
-    case 'camel':    return words.map((w,i) => i===0?w.toLowerCase():w[0].toUpperCase()+w.slice(1).toLowerCase()).join('');
-    case 'pascal':   return words.map(w => w[0].toUpperCase()+w.slice(1).toLowerCase()).join('');
-    case 'snake':    return words.map(w => w.toLowerCase()).join('_');
-    case 'kebab':    return words.map(w => w.toLowerCase()).join('-');
-    case 'upper':    return words.map(w => w.toUpperCase()).join('_');
-    case 'lower':    return words.map(w => w.toLowerCase()).join(' ');
-    case 'title':    return words.map(w => w[0].toUpperCase()+w.slice(1).toLowerCase()).join(' ');
-    case 'dot':      return words.map(w => w.toLowerCase()).join('.');
-    case 'path':     return words.map(w => w.toLowerCase()).join('/');
-    case 'sentence': return words.map((w,i) => i===0?w[0].toUpperCase()+w.slice(1).toLowerCase():w.toLowerCase()).join(' ');
-    default: return '';
-  }
-}
+function _ccWords(text) { return window.ToolCompute.words(text); }
+function _ccApplyFormat(words, fmt) { return window.ToolCompute.formatWords(words, fmt); }
 
 function ccShowAll() {
   const tl = window._ccTl || function(k){ return k; };
@@ -123,12 +102,18 @@ function ccShowAll() {
     value: _ccApplyFormat(words, f.key)
   }));
 
-  rowsEl.innerHTML = results.map(row => `
-    <div class="result-row" id="ccRow_${row.key}" style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-      <span style="color:var(--text-muted);width:90px;flex-shrink:0;font-size:12px">${row.label}</span>
-      <span style="font-family:monospace;font-size:13px;flex:1;word-break:break-all">${row.value}</span>
-      <button class="copy-inline" onclick="copyText('${row.value.replace(/'/g,"&#39;")}',this)">${tl('copy')}</button>
-    </div>`).join('');
+  rowsEl.replaceChildren();
+  for (const row of results) {
+    const el = document.createElement('div'); el.className = 'result-row'; el.id = 'ccRow_' + row.key;
+    el.style.cssText = 'display:flex;align-items:center;gap:10px;margin-bottom:6px';
+    const label = document.createElement('span'); label.textContent = row.label;
+    label.style.cssText = 'color:var(--text-muted);width:90px;flex-shrink:0;font-size:12px';
+    const value = document.createElement('span'); value.textContent = row.value;
+    value.style.cssText = 'font-family:monospace;font-size:13px;flex:1;word-break:break-all';
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'copy-inline'; button.textContent = tl('copy');
+    button.addEventListener('click', () => copyText(row.value, button));
+    el.append(label, value, button); rowsEl.appendChild(el);
+  }
 
   document.getElementById('ccAllStatus').textContent = `${results.length} ${tl('formats_count')}`;
   allPanel.style.display = '';

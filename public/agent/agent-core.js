@@ -8,6 +8,7 @@ class AgentSession {
     this.pageContext = {};
     this.iterations = 0;
     this.MAX_ITER = 8;
+    this.MAX_TOOL_CALLS = 32;
     this._handlers = {};
     this.abortController = null;
     this._responseId = null;
@@ -55,13 +56,29 @@ class AgentSession {
     }
 
     this.messages.push({ role: 'user', content: finalText });
-    const run = { controller: new AbortController(), checkpoint: this.messages.length, responseId: this._responseId };
+    const run = { controller: new AbortController(), checkpoint: this.messages.length, responseId: this._responseId, toolCalls: 0 };
     this._run = run;
     this.abortController = run.controller;
     this.emit('user', { content: userText });
     this.iterations = 0;
     try { await this._loop(run); }
     finally { if (this._run === run) this._run = null; }
+  }
+
+  // Slash commands share validation, cancellation, timeout and cards without a model call.
+  async executeLocal(name, params) {
+    if (this._run) return { success: false, error: 'A task is already running.' };
+    const run = { controller: new AbortController(), checkpoint: this.messages.length, responseId: this._responseId, toolCalls: 0 };
+    this._run = run; this.abortController = run.controller;
+    const tc = { id: 'local-' + Date.now(), function: { name, arguments: JSON.stringify(params) } };
+    this.emit('tool_start', { tool_calls: [tc] });
+    try {
+      const completed = await this._exec(tc, run);
+      if (this._run === run && !run.controller.signal.aborted) this.emit('tool_done', { results: [completed] });
+      return completed.result;
+    } finally {
+      if (this._run === run) { this._run = null; this.emit('done', {}); }
+    }
   }
 
   abort() {
@@ -107,6 +124,7 @@ class AgentSession {
       '- Convert: yaml_to_json/json_to_yaml, toml_to_json/json_to_toml, xml_format/xml_to_json, sql_format, json_diff, morse_encode/decode, aes_encrypt/decrypt',
       '- CSS: gradient_generate, shadow_generate, flexbox_generate, css_unit_convert, color_contrast_check, palette_generate',
       '### Composite tools',
+      '- Workflows: run_workflow, list_workflows, run_workflow_template; data: json_extract, text_lines, hmac_generate.',
       '- hash_all: all hashes at once | text_pipeline: chain steps | batch_convert: batch ops | format_and_validate: JSON format+check',
       '### Navigation & page interaction (side effects)',
       '- navigate_to_tool, fill_and_run_tool, read_tool_output, search_tools, get_current_context',
@@ -117,9 +135,9 @@ class AgentSession {
       '',
       '## Rules',
       '1. **Search first, always**: ALWAYS call search_tools FIRST before any navigate_to_tool. Use the real tool ID returned by search_tools. Never guess a tool ID.',
-      '2. **Use declared capabilities**: For matching page tools with autoRun:true, navigate then fill/run/read. For autoRun:false, open the tool and explain the returned reason; never attempt generic form filling. File tools require the user to select or reuse a staged local file. Do not claim a manual operation has completed.',
-      '3. Use atomic/composite actions when no page tool can automatically perform the requested computation, then show the verified result.',
-      '4. Pick optimal tool: hash_all for multiple hashes, text_pipeline for chained ops, batch_convert for bulk.',
+      '2. Prefer discovered local actions for computation: return real data without navigating or reading DOM. Navigate only when the user asks to open a tool, or for file/manual tools. Never claim manual work completed.',
+      '3. For dependent operations, search workflow and the needed actions, then run_workflow. Pass previous outputs as {$ref: stepId.data.result} (hash uses data.hash); do not retype or infer intermediate values. Use only actions with workflow:true. Failure stops subsequent steps.',
+      '4. Pick optimal tool: hash_all for multiple hashes, run_workflow for typed dependencies, text_pipeline for simple text steps, batch_convert for bulk.',
       '5. If forceTool is set, search_tools with that name first, then navigate.',
       '6. Multi-step tasks: execute all steps then reply. No intermediate confirmations.',
       '7. NEVER fabricate tool results. Report errors honestly.',
@@ -136,6 +154,7 @@ class AgentSession {
       '- 转换：yaml_to_json/json_to_yaml, toml_to_json/json_to_toml, xml_format/xml_to_json, sql_format, json_diff, morse_encode/decode, aes_encrypt/decrypt',
       '- CSS：gradient_generate, shadow_generate, flexbox_generate, css_unit_convert, color_contrast_check, palette_generate',
       '### 组合工具',
+      '- 工作流：run_workflow、list_workflows、run_workflow_template；数据处理：json_extract、text_lines、hmac_generate。',
       '- hash_all：全部哈希 | text_pipeline：串联处理 | batch_convert：批量 | format_and_validate：JSON格式化+校验',
       '### 导航 & 页面交互（有副作用）',
       '- navigate_to_tool, fill_and_run_tool, read_tool_output, search_tools, get_current_context',
@@ -146,9 +165,9 @@ class AgentSession {
       '',
       '## 行为规则',
       '1. 【先搜索，必须】任何操作前必须先调 search_tools，用返回的真实 toolId，绝不猜测工具 ID。',
-      '2. 【遵守能力标注】autoRun:true 才能导航后自动填入、执行并读取结果；autoRun:false 时打开工具并说明 reason，不尝试猜测表单。文件工具需用户选择或复用本地暂存图片，不得声称手动操作已经完成。',
-      '3. 【计算兜底】没有能自动完成该计算的页面工具时，可使用已发现的原子/组合 action 并展示真实结果。',
-      '4. 【选最优工具】多哈希用 hash_all；多步用 text_pipeline；批量用 batch_convert。',
+      '2. 【计算优先】优先调用已发现的本地 action 获取真实结果，避免为纯计算导航、填表和读 DOM。用户要求打开页面、或文件/手动工具时再导航，遵守 autoRun/reason，不假称手动操作已完成。',
+      '3. 【结果引用】有依赖的多步任务先搜索 workflow 和所需动作，再用 run_workflow。params 可用 {$ref: stepId.data.result} 引用前一步结果（哈希是 data.hash），不要自己复述或猜中间值。只串联 workflow:true 动作，失败立即停止。',
+      '4. 【选最优工具】多哈希用 hash_all；有参数依赖用 run_workflow；简单文本步骤用 text_pipeline；批量用 batch_convert。',
       '5. 【@mention 优先】forceTool 存在时先 search_tools 该名称再导航。',
       '6. 【多步串联】自动执行完再回复，无需逐步确认。',
       '7. 【严禁幻觉】不得伪造工具执行结果。工具失败如实报告。',
@@ -161,15 +180,16 @@ class AgentSession {
   // 从历史消息中提取 search_tools 发现的 action schemas
   _extractDiscoveredSchemas() {
     const schemas = new Map();
-    for (const msg of this.messages) {
+    for (const msg of [...this.messages].reverse()) {
       if (msg.role !== 'tool' || msg.name !== 'search_tools') continue;
       try {
         const result = JSON.parse(msg.content);
         const actions = result.data && result.data.actions;
         if (Array.isArray(actions)) {
           for (const a of actions) {
-            if (a.schema && a.schema.name && !schemas.has(a.schema.name)) {
-              schemas.set(a.schema.name, a.schema);
+            const registered = window._AGENT_ALL_ACTIONS?.get(a.id || a.schema?.name);
+            if (registered && !schemas.has(registered.name)) {
+              schemas.set(registered.name, { name: registered.name, description: registered.description, parameters: registered.parameters });
             }
           }
         }
@@ -234,6 +254,10 @@ class AgentSession {
     }
 
     if (resp.stop_reason === 'tool_use') {
+      if (!Array.isArray(resp.message?.tool_calls) || !resp.message.tool_calls.length || resp.message.tool_calls.length > this.MAX_TOOL_CALLS) {
+        this.emit('error', { reason: 'invalid_tool_calls', message: 'Invalid tool calls or call limit exceeded.' });
+        return;
+      }
       this.messages.push(resp.message);
       this.emit('tool_start', { tool_calls: resp.message.tool_calls });
 
@@ -254,6 +278,10 @@ class AgentSession {
         });
       }
       this.emit('tool_done', { results });
+      if (run.toolCalls >= this.MAX_TOOL_CALLS) {
+        this.emit('error', { reason: 'tool_budget', message: 'Tool call limit reached (' + this.MAX_TOOL_CALLS + ').' });
+        return;
+      }
       await this._loop(run);
 
     } else if (resp.stop_reason === 'end') {
@@ -288,6 +316,8 @@ class AgentSession {
     else parentSignal?.addEventListener('abort', cancel, { once: true });
     try {
       if (controller.signal.aborted) throw new Error('Task cancelled');
+      if (run && ++run.toolCalls > this.MAX_TOOL_CALLS) throw new Error('Tool call limit exceeded');
+      if ((tc.function.arguments || '').length > 65536) throw new Error('Action input exceeds 65536 characters');
       params = JSON.parse(tc.function.arguments || '{}');
       const action = window._AGENT_ALL_ACTIONS
         ? window._AGENT_ALL_ACTIONS.get(name)
@@ -297,9 +327,15 @@ class AgentSession {
       result = await this._wait(
         Promise.resolve().then(() => {
           if (controller.signal.aborted) throw new Error('Task cancelled');
-          return action.execute(params, { signal: controller.signal });
+          return action.execute(params, {
+            signal: controller.signal,
+            onProgress: progress => {
+              if (this._run === run && !controller.signal.aborted) this.emit('tool_progress', { id: tc.id, ...progress });
+            },
+          });
         }), controller.signal, 15000
       );
+      if (JSON.stringify(result)?.length > 131072) throw new Error('Action output exceeds 131072 characters; use a smaller input');
     } catch (error) {
       if (error.name === 'TimeoutError') controller.abort();
       result = { success: false, error: error.message };

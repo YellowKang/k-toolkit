@@ -10,6 +10,13 @@ const CmdParser = (() => {
 
   // 斜杠命令定义（desc 使用 key，getSuggestions/getHelpText 调用时动态翻译）
   const SLASH_CMDS = {
+    workflows: { descKey: 'cmd_workflows', usage: '/workflows', parse: () => ({ action: 'list_workflows', params: {} }) },
+    workflow: { descKey: 'cmd_workflow', usage: '/workflow <decode-json|clean-base64|json-sha256> <input>',
+      parse: (args, raw) => {
+        const match = raw.match(/^(\S+)(?:[ \t]|\r?\n)?([\s\S]*)$/);
+        return { action:'run_workflow_template', params:{template:match?.[1] || '', input:match?.[2] || ''} };
+      }
+    },
     uuid:   { descKey: 'cmd_uuid', usage: '/uuid [数量] [format]',
       parse: (args) => ({ action: 'uuid_generate', params: { count: parseInt(args[0])||1, format: args[1]||'standard' } }) },
     hash:   { descKey: 'cmd_hash', usage: '/hash <文本> [md5|sha1|sha256|sha512]',
@@ -63,13 +70,14 @@ const CmdParser = (() => {
   const META_CMDS = new Set(['clear','config','retry','copy','help','?','model','skin']);
 
   function parseSlash(text) {
+    const raw = text.slice(1).match(/^(\S+)(?:[ \t]|\r?\n)?([\s\S]*)$/);
     const parts = text.slice(1).trim().split(/\s+/);
     const cmd = parts[0].toLowerCase();
     const args = parts.slice(1);
 
     if (META_CMDS.has(cmd)) return { type: 'meta', cmd, args };
     const handler = SLASH_CMDS[cmd];
-    if (handler) return { type: 'action', ...handler.parse(args), cmd };
+    if (handler) return { type: 'action', ...handler.parse(args, raw?.[2] || ''), cmd };
     return { type: 'unknown_cmd', cmd };
   }
 
@@ -80,8 +88,8 @@ const CmdParser = (() => {
   }
 
   function parse(text) {
-    text = text.trim();
-    if (!text) return null;
+    text = text.trimStart();
+    if (!text.trim()) return null;
     if (text.startsWith('/')) return parseSlash(text);
     if (text.startsWith('@')) return parseMention(text);
     return null; // 自然语言，走 LLM

@@ -36,6 +36,8 @@
 
 工具脚本按需加载，同一页面会话内只执行一次。Agent 对工具参数做校验，按顺序执行操作，支持任务取消、工具超时和迭代上限。取消会阻止后续步骤；已完成的页面操作不会被撤销，执行中的工具需要配合取消信号才能中止。
 
+无需模型也能串联工具：打开助手点“本地工作流”，或输入 `/workflows` 查看模板。支持 Base64 解码后格式化 JSON、行清洗后编码、JSON 压缩后 SHA-256。自然语言模式可用 `run_workflow` 引用前一步结果，失败即停止；新增 JSON 字段提取、行清洗和 HMAC 调用。详见[工作流使用与后续规划](docs/agent-workflows.md)。
+
 ## 本地开发与验证
 
 开发和测试使用 Node.js 20.13 或更新版本，CI 使用 Node.js 24。开发服务使用 Node.js 自带的文件监听。
@@ -52,7 +54,7 @@ TEST_BROWSER=firefox TEST_BUILD=1 npm run test:browser
 npm run build
 ```
 
-`npm test` 检查 Agent 行为、工具目录、构建、CSS 和缓存版本。浏览器回归检查图片选择/处理/下载、分类、工作台、旧链接、收藏、脚本重复加载和 SVG 预览隔离。测试自动启动本地服务，生成测试图片，不连接模型服务。
+`npm test` 检查 Agent 行为、工具目录、构建、CSS 和缓存版本。浏览器回归检查图片选择/处理/下载、分类、工作台、旧链接、收藏、脚本重复加载、SVG 预览隔离、Agent 工作流与版本更新。测试自动启动本地服务，生成测试图片，不连接模型服务。
 
 可用 `TEST_BROWSER_CHANNEL=chrome` 使用已安装的 Chrome。375px / 768px 检查是桌面浏览器视口模拟，不代替手机真机测试。
 
@@ -84,6 +86,7 @@ Docker 使用 Nginx 提供构建后的静态文件。
 ```text
 public/
   tool-catalog.js     工具元数据、分类和工作台
+  tool-compute.js     页面与 Agent 共享的文本计算
   dashboard.js        路由、导航和页面渲染
   i18n.js             双语标签
   tools/             按需加载的工具
@@ -104,6 +107,8 @@ K Toolkit is a static developer toolbox with an AI assistant, bilingual UI, them
 Ten categories organize the tools. Five workbenches group image compression/conversion, hashes/HMAC, QR generation/decoding, time zones/world clocks and HTTP tools. Existing child URLs and favorites remain valid; compression, WebP and Base64 can explicitly reuse files staged in the current tab’s memory. See the generated [tool catalog](docs/tool-catalog.md) for the current inventory.
 
 Local tools process inputs in the browser. Network tools contact external services, and AI requests send conversation context and tool results to the configured model provider. Some libraries load from CDNs. API keys are currently stored in browser storage; a separate backend is needed to keep service credentials off the client.
+
+Use `/workflows` in the assistant for local templates that require no model or API key. Typed result references chain validated actions, stop on errors, and keep intermediate data in the browser. See [workflow usage and roadmap](docs/agent-workflows.md).
 
 Use Node.js 20.13+ and `npm ci`, then `npm run dev`. Run `npm test` for unit/build/catalog checks. Install Playwright browsers with `npx playwright install chromium firefox`, then run `TEST_BUILD=1 npm run test:browser`; set `TEST_BROWSER=firefox` for Firefox. `npm run build` writes the static site to `dist/`.
 

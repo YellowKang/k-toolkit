@@ -33,7 +33,7 @@ const TOOL_CAPS = {
   'git-commit':   { autoRun: true,  inputs: ['text'], actions: ['generate'], desc: '生成 Git commit message' },
   'http-tester':  { autoRun: true,  inputs: ['url','text'], actions: ['send','exportCurl'], desc: 'HTTP 请求测试，支持请求历史和 cURL 导出' },
   'ip-calc':      { autoRun: true,  inputs: ['ip','cidr'], actions: ['calc'], desc: 'IP/CIDR 子网计算，ip 为 IP 地址如 192.168.1.1，cidr 为前缀长度如 24' },
-  'line-sort':    { autoRun: true,  inputs: ['text'], actions: ['asc','desc','shuffle','dedup','reverse'], desc: '行排序/去重，action 指定操作类型' },
+  'line-sort':    { autoRun: true,  inputs: ['text'], actions: ['asc','desc','shuffle','dedup','noempty','reverse','clean'], desc: '行排序/去重，action 指定操作类型' },
   'markdown':     { autoRun: true,  inputs: ['text'], actions: ['render','toc'], desc: 'Markdown 预览，支持 TOC 生成和快捷键' },
   'morse':        { autoRun: true,  inputs: ['text'], actions: ['encode','decode'], desc: '摩斯电码编解码' },
   'nginx-gen':    { autoRun: true,  inputs: ['domain','scene','root','upstream','port','ssl','gzip','cache','accessLog'], actions: ['static','spa','proxy','https','loadbalance'], desc: 'Nginx 配置生成。scene: static/spa/proxy/https/loadbalance；upstream 为代理后端地址如 http://127.0.0.1:3000；ssl/gzip/cache 为 boolean' },
@@ -346,6 +346,8 @@ const TOOL_RUNNERS = {
       desc:    () => window.doLineSort && window.doLineSort('desc'),
       shuffle: () => window.doLineSort && window.doLineSort('shuffle'),
       dedup:   () => window.doLineSort && window.doLineSort('dedup'),
+      noempty: () => window.doLineSort && window.doLineSort('noempty'),
+      clean:   () => window.doLineSort && window.doLineSort('clean'),
       reverse: () => window.doLineSort && window.doLineSort('reverse'),
     },
     trigger: () => window.doLineSort && window.doLineSort('asc'),
@@ -908,6 +910,8 @@ const NavActions = [
             name: a.name,
             desc: a.description || '',
             tier: (a.meta && a.meta.tier) || 'standard',
+            workflow: Object.prototype.hasOwnProperty.call(window.AgentWorkflow?.outputs || {}, a.name),
+            outputs: window.AgentWorkflow?.outputs[a.name] || [],
             schema: { name: a.name, description: a.description, parameters: a.parameters },
           });
         }
@@ -1037,7 +1041,7 @@ const NavActions = [
       let resultText = '';
       if (runner.outputSelector) {
         const outEl = document.querySelector(runner.outputSelector);
-        resultText = outEl ? (outEl.textContent || outEl.innerText || '').trim() : '';
+        resultText = outEl ? (outEl.value ?? outEl.textContent ?? '').trim() : '';
       }
 
       return {
@@ -1175,7 +1179,7 @@ const NavActions = [
         return { success: false, data: { error: '无输出选择器配置' }, display: '该工具暂不支持读取输出' };
       }
       const el = document.querySelector(runner.outputSelector);
-      const text = el ? (el.textContent || el.innerText || '').trim() : '';
+      const text = el ? (el.value ?? el.textContent ?? '').trim() : '';
       return {
         success: true,
         data: { toolId, result: text.slice(0, 2000) },

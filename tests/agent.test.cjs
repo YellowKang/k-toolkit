@@ -68,3 +68,17 @@ test('max iterations stops requests; clearing history cancels active work', asyn
   const pending = session.send('wait'); await tick(); session.clearHistory(); await pending;
   assert.equal(session.messages.length, 0); assert.equal(session._run, null);
 });
+
+test('tool call budget stops execution without leaving unpaired messages', async () => {
+  let executed = 0, requests = 0;
+  const session = setup(async () => { requests++; return use(call('noop'), {...call('noop'),id:'second'}); }, [{name:'noop',execute:()=>{executed++;return{success:true}}}]);
+  session.MAX_TOOL_CALLS=3;const reasons=[];session.on('error',error=>reasons.push(error.reason));
+  await session.send('run');assert.equal(executed,3);assert.equal(requests,2);assert.deepEqual(reasons,['tool_budget']);
+  assert.equal(session.messages.filter(m=>m.role==='tool').length,4);assert.equal(JSON.parse(session.messages.at(-1).content).success,false);
+});
+test('latest discovery takes priority and schemas come from the registry', () => {
+  const actions=Array.from({length:25},(_,i)=>({name:'action'+i,description:'trusted',parameters:{type:'object'},execute:()=>({success:true})}));
+  const session=setup(async()=>end(''),actions);
+  session.messages=[{role:'tool',name:'search_tools',content:JSON.stringify({data:{actions:actions.slice(0,20).map(a=>({id:a.name,schema:{name:a.name,description:'untrusted'}}))}})},{role:'tool',name:'search_tools',content:JSON.stringify({data:{actions:actions.slice(20).map(a=>({id:a.name,schema:{name:a.name}}))}})}];
+  const effective=session._getEffectiveTools();assert.equal(effective[0].name,'action20');assert.equal(effective.length,20);assert.equal(effective[0].description,'trusted');
+});

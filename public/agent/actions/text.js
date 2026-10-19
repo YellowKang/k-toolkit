@@ -80,8 +80,7 @@ const TextActions = [
       required: ['text'],
     },
     execute({ text, urlSafe = false }) {
-      let result = btoa(unescape(encodeURIComponent(text)));
-      if (urlSafe) result = result.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      const result = window.ToolCompute.base64Encode(text, urlSafe);
       return { success: true, data: { result }, display: `Base64 编码完成（${result.length} 字符）` };
     },
   },
@@ -96,7 +95,7 @@ const TextActions = [
     },
     execute({ encoded }) {
       try {
-        const result = decodeURIComponent(escape(atob(encoded.replace(/-/g, '+').replace(/_/g, '/'))));
+        const result = window.ToolCompute.base64Decode(encoded);
         return { success: true, data: { result }, display: `Base64 解码完成（${result.length} 字符）` };
       } catch (e) {
         return { success: false, data: { error: e.message }, display: `解码失败: ${e.message}` };
@@ -135,18 +134,7 @@ const TextActions = [
       required: ['text', 'style'],
     },
     execute({ text, style }) {
-      const words = text.replace(/([a-z])([A-Z])/g, '$1 $2')
-        .replace(/[_\-]+/g, ' ').trim().split(/\s+/);
-      let result;
-      switch (style) {
-        case 'camel':  result = words.map((w,i) => i===0 ? w.toLowerCase() : w[0].toUpperCase()+w.slice(1).toLowerCase()).join(''); break;
-        case 'pascal': result = words.map(w => w[0].toUpperCase()+w.slice(1).toLowerCase()).join(''); break;
-        case 'snake':  result = words.map(w => w.toLowerCase()).join('_'); break;
-        case 'kebab':  result = words.map(w => w.toLowerCase()).join('-'); break;
-        case 'upper':  result = text.toUpperCase(); break;
-        case 'lower':  result = text.toLowerCase(); break;
-        default:       result = text;
-      }
+      const result = window.ToolCompute.caseConvert(text, style);
       return { success: true, data: { result }, display: `已转换为 ${style}: ${result}` };
     },
   },

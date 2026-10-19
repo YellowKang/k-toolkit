@@ -38,7 +38,7 @@ function simpleMD5(str) {
     t[i>>2]|=0x80<<((i%4)<<3);if(i>55){cyc(st,t);for(i=0;i<16;i++)t[i]=0;}
     t[14]=n*8;cyc(st,t);return st;
   }
-  function hex(x){let o='';for(let i=0;i<x.length;i++)o+=(x[i]>>>4&0xf).toString(16)+(x[i]&0xf).toString(16);return o;}
+  function hex(words){return words.map(word => [0,8,16,24].map(shift => ((word >>> shift) & 255).toString(16).padStart(2,'0')).join('')).join('');}
   let s=str;try{s=unescape(encodeURIComponent(str));}catch(e){}
   return hex(md51(s));
 }
@@ -78,33 +78,33 @@ async function applyStep(cur, step) {
   const enc = new TextEncoder();
   const digest = async (a,t) => { const b=await crypto.subtle.digest(a,enc.encode(t)); return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join(''); };
   switch(step) {
-    case 'base64_encode': return btoa(unescape(encodeURIComponent(cur)));
-    case 'base64_decode': return decodeURIComponent(escape(atob(cur)));
+    case 'base64_encode': return window.ToolCompute.base64Encode(cur);
+    case 'base64_decode': return window.ToolCompute.base64Decode(cur);
     case 'url_encode':    return encodeURIComponent(cur);
     case 'url_decode':    return decodeURIComponent(cur);
     case 'to_upper':      return cur.toUpperCase();
     case 'to_lower':      return cur.toLowerCase();
     case 'trim':          return cur.trim();
-    case 'reverse':       return cur.split('').reverse().join('');
-    case 'to_snake':      return cur.replace(/([A-Z])/g,m=>'_'+m.toLowerCase()).replace(/[s-]+/g,'_').replace(/^_/,'');
-    case 'to_camel':      return cur.replace(/[-_s]+(.)/g,(_,c)=>c.toUpperCase());
-    case 'to_kebab':      return cur.replace(/([A-Z])/g,m=>'-'+m.toLowerCase()).replace(/[s_]+/g,'-').replace(/^-/,'');
-    case 'to_pascal':     return cur.replace(/[-_s]+(.)/g,(_,c)=>c.toUpperCase()).replace(/^./,c=>c.toUpperCase());
+    case 'reverse':       return Array.from(cur).reverse().join('');
+    case 'to_snake': return window.ToolCompute.caseConvert(cur, 'snake');
+    case 'to_camel': return window.ToolCompute.caseConvert(cur, 'camel');
+    case 'to_kebab': return window.ToolCompute.caseConvert(cur, 'kebab');
+    case 'to_pascal': return window.ToolCompute.caseConvert(cur, 'pascal');
     case 'json_format':   return JSON.stringify(JSON.parse(cur),null,2);
     case 'json_minify':   return JSON.stringify(JSON.parse(cur));
     case 'html_encode':   return cur.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    case 'html_decode':   { const d=document.createElement('div');d.innerHTML=cur;return d.textContent||''; }
+    case 'html_decode':   { const d=document.createElement('textarea');d.innerHTML=cur.replace(/</g,'&lt;');return d.value; }
     case 'hash_sha256':   return digest('SHA-256',cur);
     case 'hash_sha512':   return digest('SHA-512',cur);
     case 'hash_sha1':     return digest('SHA-1',cur);
     case 'hash_md5':      return window._simpleMD5(cur);
     case 'json_escape':   return JSON.stringify(cur).slice(1,-1);
-    case 'json_unescape': return cur.replace(/\\"/g,'"').replace(/\\\\/g,'\\').replace(/\\n/g,'\n').replace(/\\t/g,'\t');
-    case 'sql_format':    { const a = window.ConvertActions?.find(a=>a.name==='sql_format'); return a ? (a.execute({input:cur}).data?.result||cur) : cur; }
-    case 'xml_format':    { const a = window.ConvertActions?.find(a=>a.name==='xml_format'); return a ? (a.execute({input:cur}).data?.result||cur) : cur; }
-    case 'morse_encode':  { const a = window.ConvertActions?.find(a=>a.name==='morse_encode'); return a ? (a.execute({text:cur}).data?.result||cur) : cur; }
-    case 'morse_decode':  { const a = window.ConvertActions?.find(a=>a.name==='morse_decode'); return a ? (a.execute({morse:cur}).data?.result||cur) : cur; }
-    default: return cur;
+    case 'json_unescape': return JSON.parse('"' + cur + '"');
+    case 'sql_format': { const action = window.ConvertActions?.find(a => a.name === 'sql_format'); if (!action) throw new Error('Action unavailable'); const out = await action.execute({input:cur}); if (out.success !== true || typeof out.data?.result !== 'string') throw new Error(out.error || out.data?.error || out.display || 'Conversion failed'); return out.data.result; }
+    case 'xml_format': { const action = window.ConvertActions?.find(a => a.name === 'xml_format'); if (!action) throw new Error('Action unavailable'); const out = await action.execute({input:cur}); if (out.success !== true || typeof out.data?.result !== 'string') throw new Error(out.error || out.data?.error || out.display || 'Conversion failed'); return out.data.result; }
+    case 'morse_encode': { const action = window.ConvertActions?.find(a => a.name === 'morse_encode'); if (!action) throw new Error('Action unavailable'); const out = await action.execute({text:cur}); if (out.success !== true || typeof out.data?.result !== 'string') throw new Error(out.error || out.data?.error || out.display || 'Conversion failed'); return out.data.result; }
+    case 'morse_decode': { const action = window.ConvertActions?.find(a => a.name === 'morse_decode'); if (!action) throw new Error('Action unavailable'); const out = await action.execute({morse:cur}); if (out.success !== true || typeof out.data?.result !== 'string') throw new Error(out.error || out.data?.error || out.display || 'Conversion failed'); return out.data.result; }
+    default: throw new Error('Unknown pipeline step: ' + step);
   }
 }
 
@@ -114,21 +114,30 @@ const TextPipelineAction = {
   parameters: {
     type: 'object',
     properties: {
-      input: { type: 'string' },
-      steps: { type: 'array', items: { type: 'string', enum: STEPS } }
+      input: { type: 'string', maxLength: 65536 },
+      steps: { type: 'array', minItems: 1, maxItems: 12, items: { type: 'string', enum: STEPS } }
     },
     required: ['input','steps']
   },
   meta: { tier: 'standard', category: 'composite', icon: '⛓', sideEffect: false },
-  async execute({ input, steps }) {
+  async execute({ input, steps }, { signal, onProgress } = {}) {
     let cur = input;
     const log = [];
-    for (const step of (steps||[])) {
-      const prev = cur;
-      try { cur = await applyStep(cur, step); log.push({ step, ok:true, out:cur.slice(0,80) }); }
-      catch(e) { log.push({ step, ok:false, error:e.message }); cur = prev; }
-    }
-    return { success:true, data:{result:cur,steps:log}, display:steps.length+' 步完成\n结果: '+cur.slice(0,200) };
+    try {
+      if (typeof input !== 'string' || input.length > 65536 || !Array.isArray(steps) || !steps.length || steps.length > 12 || steps.some(step => !STEPS.includes(step))) throw new Error('Invalid pipeline input or steps');
+      for (const step of steps) {
+        if (signal?.aborted) throw new Error('Task cancelled');
+        try {
+          cur = await applyStep(cur, step);
+          if (cur.length > 65536) throw new Error('Result exceeds 65536 characters');
+          if (signal?.aborted) throw new Error('Task cancelled');
+          log.push({ step, ok:true, out:cur.slice(0,80) });
+          onProgress?.({ step, state:'completed', completed:log.length, total:steps.length });
+          await new Promise(resolve => setTimeout(resolve, 0));
+        } catch(error) { log.push({ step, ok:false, error:error.message }); throw error; }
+      }
+      return { success:true, data:{result:cur,steps:log}, display:steps.length+' / '+steps.length+' ✓' };
+    } catch(error) { return { success:false, error:error.message, data:{steps:log}, display:error.message }; }
   }
 };
 
@@ -142,19 +151,21 @@ const BatchConvertAction = {
   parameters: {
     type: 'object',
     properties: {
-      inputs: { type: 'array', items: { type: 'string' }, description: '输入值列表最多50条' },
+      inputs: { type: 'array', minItems: 1, maxItems: 50, items: { type: 'string', maxLength: 65536 }, description: '输入值列表最多50条' },
       operation: { type: 'string', enum: STEPS, description: '要执行的操作' }
     },
     required: ['inputs','operation']
   },
   meta: { tier: 'standard', category: 'composite', icon: '📦', sideEffect: false },
-  async execute({ inputs, operation }) {
+  async execute({ inputs, operation }, { signal } = {}) {
+    if (!Array.isArray(inputs) || !inputs.length || inputs.length > 50 || JSON.stringify(inputs).length > 65536 || !STEPS.includes(operation)) return { success:false, error:'Invalid batch or limit exceeded' };
     const results = [];
-    for (const item of (inputs||[]).slice(0,50)) {
-      try { const r = await applyStep(item, operation); results.push({ input:item, result:r, ok:true }); }
+    for (const item of inputs) {
+      if (signal?.aborted) return { success:false, error:'Task cancelled', data:{results,operation} };
+      try { const r = await applyStep(item, operation); if (r.length > 65536) throw new Error('Result exceeds limit'); results.push({ input:item, result:r, ok:true }); }
       catch(e) { results.push({ input:item, result:null, ok:false, error:e.message }); }
     }
-    return { success:true, data:{results,operation}, display:results.map(r=>r.ok?(r.input+' -> '+r.result):(r.input+' -> [error:'+r.error+']')).join('\n') };
+    return { success:results.every(r=>r.ok), data:{results,operation}, display:results.map(r=>r.ok?(r.input+' -> '+r.result):(r.input+' -> [error:'+r.error+']')).join('\n') };
   }
 };
 

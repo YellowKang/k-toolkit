@@ -3,6 +3,8 @@
 // 汇总所有 action 并建立分层注册表
 function registerActions() {
   const all = [
+    ...(window.DataActions || []),
+    ...(window.WorkflowActions || []),
     ...(window.TextActions      || []),
     ...(window.DevActions       || []),
     ...(window.CalcActions      || []),
