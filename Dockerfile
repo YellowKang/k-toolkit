@@ -1,10 +1,9 @@
 # ── Stage 1: Build ──
-FROM node:18-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
-COPY . .
-RUN npm run build
+COPY public/ ./public/
+COPY scripts/build.js ./scripts/build.js
+RUN node scripts/build.js
 
 # ── Stage 2: Serve ──
 FROM nginx:alpine

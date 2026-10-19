@@ -1,7 +1,7 @@
 {
   "name": "k-toolkit",
   "version": "2.0.0",
-  "description": "Agentic 智能体开发者工具箱 - 82 个精选工具 · AI Agent 助手 · 纯前端，无需登录",
+  "description": "在线开发者工具箱 · 本地工具与 AI 助手 · 静态部署，无需登录",
   "main": "server.js",
   "repository": {
     "type": "git",
@@ -14,16 +14,24 @@
   "license": "MIT",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
+    "dev": "node --watch server.js",
     "build": "node scripts/build.js",
-    "test": "node --test tests/build.test.cjs",
-    "test:images": "node tests/image-tools.cjs"
+    "test": "node --test tests/*.test.cjs && node scripts/catalog-docs.js --check",
+    "test:images": "node tests/image-tools.cjs",
+    "test:catalog": "node tests/catalog-browser.cjs",
+    "test:browser": "npm run test:images && npm run test:catalog",
+    "docs:catalog": "node scripts/catalog-docs.js"
   },
   "dependencies": {
     "express": "^4.18.3"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14",
     "playwright": "^1.62.1"
+  },
+  "engines": {
+    "node": ">=20.13"
+  },
+  "overrides": {
+    "qs": "^6.16.1"
   }
 }

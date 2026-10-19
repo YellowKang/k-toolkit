@@ -1,0 +1,9 @@
+*
+!Dockerfile
+!nginx.conf
+!public/
+!public/**
+!scripts/
+!scripts/build.js
+**/.env*
+**/node_modules
