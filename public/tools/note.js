@@ -24,7 +24,10 @@ window.renderNote = function(el) {
       if (saved) saved.textContent = '已保存 ' + new Date().toLocaleTimeString();
     }, 500);
   });
-  window._noteSaveTimer = _t;
+  window._activeCleanup = function() {
+    clearTimeout(_t);
+    try { localStorage.setItem('dtb_note', area.value); } catch {}
+  };
 };
 
 function updateNoteStats() {
@@ -42,7 +45,3 @@ function clearNote() {
   const saved = document.getElementById('noteSaved');
   if (saved) saved.textContent = '已清空';
 }
-
-window._activeCleanup = function() {
-  clearTimeout(window._noteSaveTimer);
-};

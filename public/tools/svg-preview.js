@@ -73,8 +73,18 @@ function renderSvgPreview(container) {
     const wrapper = document.createElement('div');
     wrapper.style.transform = `scale(${scale})`;
     wrapper.style.transformOrigin = 'center center';
-    wrapper.innerHTML = code;
-    const svgEl = wrapper.querySelector('svg');
+    const parsed = new DOMParser().parseFromString(code, 'image/svg+xml');
+    const svgEl = parsed.documentElement;
+    if (parsed.querySelector('parsererror') || svgEl.localName !== 'svg') {
+      preview.textContent = typeof getCurrentLang === 'function' && getCurrentLang() === 'en' ? 'Invalid SVG' : 'SVG 格式无效';
+      info.textContent = '';
+      return;
+    }
+    // SVG loaded as an image cannot execute its embedded event handlers in this page.
+    const image = new Image();
+    image.alt = 'SVG';
+    image.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(code);
+    wrapper.appendChild(image);
     if (svgEl) {
       const w = svgEl.getAttribute('width') || svgEl.viewBox?.baseVal?.width || '?';
       const h = svgEl.getAttribute('height') || svgEl.viewBox?.baseVal?.height || '?';

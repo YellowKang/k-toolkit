@@ -860,6 +860,9 @@ const NavActions = [
           inputs: caps ? (caps.inputs || []) : [],
           actions: caps ? (caps.actions || []) : [],
           capsDesc: caps ? caps.desc : '',
+          workbenchId: t.workbenchId || null,
+          execution: t.execution || 'local',
+          requiresFile: !!t.requiresFile,
         };
       });
 

@@ -63,6 +63,7 @@ const _hashI18nDict = {
 let _hashT = null;
 
 function renderHash(el) {
+  window._activeCleanup = () => { clearTimeout(_hashTimer); clearTimeout(_hmacTimer); };
   _hashT = makeToolI18n(_hashI18nDict);
   const T = _hashT;
 
@@ -156,7 +157,7 @@ async function calcHash() {
   const hashes = await Promise.all(algos.map(async a => ({
     name: a, hex: bufToHex(await crypto.subtle.digest(a, enc))
   })));
-  _showHashResults(hashes);
+  if (document.getElementById('hashInput')) _showHashResults(hashes);
 }
 
 function _showHashResults(hashes) {
@@ -253,7 +254,9 @@ async function calcHmac() {
   const sig = await crypto.subtle.sign('HMAC', cryptoKey, enc.encode(msg));
   const hex = bufToHex(sig);
 
-  document.getElementById('hmacResultHex').textContent = hex;
+  const output = document.getElementById('hmacResultHex');
+  if (!output) return;
+  output.textContent = hex;
   document.getElementById('hmacResultPanel').style.display = '';
 }
 

@@ -7,7 +7,11 @@ const LANG_ZH = {
   greet_afternoon:'下午好',
   greet_evening: '晚上好',
   hero_sub:      (total) => `${total} 个工具 · AI 智能体助手 · 按 / 搜索 · Alt+A 唤起 AI`,
-  stat_tools:    '工具',
+  stat_tools:    '工具能力',
+  execution_local: '本地处理',
+  execution_network: '联网请求',
+  execution_model: '模型服务',
+  'execution_optional-network': '可选联网',
   stat_favs:     '收藏',
   stat_recent:   '最近',
   stat_ai_chat:  'AI 对话',
@@ -78,12 +82,16 @@ const LANG_ZH = {
 };
 
 const LANG_EN = {
+  execution_local: 'Local processing',
+  execution_network: 'Network request',
+  execution_model: 'Model service',
+  'execution_optional-network': 'Optional network',
   greet_late:    'Good night',
   greet_morning: 'Good morning',
   greet_afternoon:'Good afternoon',
   greet_evening: 'Good evening',
   hero_sub:      (total) => `${total} tools · AI Agent assistant · Press / to search · Alt+A for AI`,
-  stat_tools:    'Tools',
+  stat_tools:    'Capabilities',
   stat_favs:     'Favorites',
   stat_recent:   'Recent',
   stat_ai_chat:  'AI Chat',
@@ -343,14 +351,14 @@ let _ltCacheSrc = null;
 function getLocalizedTools(tools) {
   if (_currentLang === 'zh') return tools;
   if (_ltCache && _ltCacheLang === _currentLang && _ltCacheSrc === tools) return _ltCache;
-  _ltCache = tools.map(t => {
-    const en = TOOLS_EN[t.id];
-    if (!en) return t;
-    return Object.assign({}, t, {
-      name: en.name,
-      desc: en.desc,
-      category: en.category,
-    });
+  _ltCache = tools.map(tool => {
+    const en = TOOLS_EN[tool.id] || {};
+    const group = tool.catalogEntry ? window.ToolCatalog?.groupFor(tool.id) : null;
+    return { ...tool,
+      name: group?.name.en || en.name || tool.name,
+      desc: group?.desc.en || en.desc || tool.desc,
+      category: window.ToolCatalog?.categoryName(tool.category, 'en') || CAT_NAME_EN[tool.category] || tool.category,
+    };
   });
   _ltCacheLang = _currentLang;
   _ltCacheSrc = tools;
@@ -362,7 +370,7 @@ function getLocalizedCatIcons(catIcons) {
   if (_currentLang === 'zh') return catIcons;
   const result = {};
   for (const [zh, icon] of Object.entries(catIcons)) {
-    const en = CAT_NAME_EN[zh] || zh;
+    const en = window.ToolCatalog?.categoryName(zh, 'en') || CAT_NAME_EN[zh] || zh;
     result[en] = icon;
   }
   return result;

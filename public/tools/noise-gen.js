@@ -1,4 +1,5 @@
 window.renderNoiseGen = function(el) {
+  window._activeCleanup = ngStop;
   el.innerHTML = `
     <div class="tool-card-panel">
       <div class="panel-label">白噪音生成器</div>
@@ -76,6 +77,7 @@ function ngPlay() {
 
 function ngStop() {
   const ng = window._ng;
+  if (!ng) return;
   if (ng.source) { try { ng.source.stop(); } catch {} ng.source = null; }
   if (ng.ctx) { ng.ctx.close(); ng.ctx = null; }
   ng.playing = false;
@@ -88,5 +90,3 @@ function ngStop() {
 function ngToggle() {
   if (window._ng.playing) ngStop(); else ngPlay();
 }
-
-window._activeCleanup = function() { ngStop(); };

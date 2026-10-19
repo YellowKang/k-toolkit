@@ -1,6 +1,6 @@
 /* ── HMAC Generator — Web Crypto API ── */
 
-let _hmacTimer = null;
+let _hmacGenTimer = null;
 
 const _hmacI18nDict = {
   zh: {
@@ -40,6 +40,7 @@ const _hmacI18nDict = {
 let _hmacT = null;
 
 function renderHmacGen(el) {
+  window._activeCleanup = () => clearTimeout(_hmacGenTimer);
   _hmacT = makeToolI18n(_hmacI18nDict);
   const T = _hmacT;
 
@@ -92,8 +93,8 @@ function _hmacSetFmt(fmt) {
 }
 
 function _hmacAutoCalc() {
-  clearTimeout(_hmacTimer);
-  _hmacTimer = setTimeout(() => _hmacGenerate(true), 300);
+  clearTimeout(_hmacGenTimer);
+  _hmacGenTimer = setTimeout(() => _hmacGenerate(true), 300);
 }
 
 async function _hmacGenerate(silent) {
@@ -112,7 +113,9 @@ async function _hmacGenerate(silent) {
     const out = fmt === 'base64'
       ? btoa(String.fromCharCode(...new Uint8Array(buf)))
       : Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    document.getElementById('hmacResult').textContent = out;
+    const result = document.getElementById('hmacResult');
+    if (!result) return;
+    result.textContent = out;
     document.getElementById('hmacResultPanel').style.display = '';
   } catch (e) {
     if (!silent) showToast(T('error') + e.message, 'error');
@@ -137,5 +140,5 @@ function _hmacClear() {
   document.getElementById('hmacMsg').value = '';
   document.getElementById('hmacKey').value = '';
   document.getElementById('hmacResultPanel').style.display = 'none';
-  clearTimeout(_hmacTimer);
+  clearTimeout(_hmacGenTimer);
 }

@@ -7,6 +7,7 @@ const CACHE = 'dtb-' + CACHE_VERSION;
 const SHELL_FILES = [
   'dashboard.html',
   'dashboard.js',
+  'tool-catalog.js',
   'dashboard-cmd.js',
   'i18n.js',
   'dashboard-base.css',

@@ -176,7 +176,7 @@ for (const name of cssFiles) {
 }
 
 // ── Minify core JS ──
-const jsFiles = ['dashboard.js', 'dashboard-cmd.js', 'i18n.js'];
+const jsFiles = ['tool-catalog.js', 'dashboard.js', 'dashboard-cmd.js', 'i18n.js'];
 console.log('\nJS Minification:');
 let totalSavedJS = 0;
 for (const name of jsFiles) {

@@ -1,4 +1,7 @@
 function renderMorse(el) {
+  window._activeCleanup = function() {
+    if (window._morseAudioCtx) { try { window._morseAudioCtx.close(); } catch {} }
+  };
   const MAP = {A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..',0:'-----',1:'.----',2:'..---',3:'...--',4:'....-',5:'.....',6:'-....',7:'--...',8:'---..',9:'----.','.':'.-.-.-',',':'--..--','?':'..--..','/':'-..-.','-':'-....-','(':'-.--.',')':'-.--.-'};
   const REV = Object.fromEntries(Object.entries(MAP).map(([k,v])=>[v,k]));
   el.innerHTML = `
@@ -92,7 +95,3 @@ function playMorse() {
     if (playBtn) { playBtn.disabled = false; playBtn.textContent = '▶ 播放音频'; }
   }, (t - ctx.currentTime) * 1000 + 200);
 }
-
-window._activeCleanup = function() {
-  if (window._morseAudioCtx) { try { window._morseAudioCtx.close(); } catch {} }
-};

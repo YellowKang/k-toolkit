@@ -38,8 +38,6 @@ function renderHttpStatus(el) {
     catEl.appendChild(btn);
   });
 
-  hsFilter('');
-
   window.hsFilter = function(q) {
     const cat = window._hsCat;
     const query = q.toLowerCase();
@@ -54,7 +52,7 @@ function renderHttpStatus(el) {
       const g = String(code)[0];
       const color = COLORS[g] || 'var(--text-muted)';
       const desc = DESCS[code] || '';
-      return `<div style="padding:14px 16px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);border-radius:12px;cursor:pointer;transition:all 0.2s" onclick="hsCopy(${code},'${name}',this)" onmouseenter="this.style.borderColor='${color}'" onmouseleave="this.style.borderColor='rgba(255,255,255,0.08)'">
+      return `<div style="padding:14px 16px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);border-radius:12px;cursor:pointer;transition:all 0.2s" onclick="hsCopy(${code})" onmouseenter="this.style.borderColor='${color}'" onmouseleave="this.style.borderColor='rgba(255,255,255,0.08)'">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
           <span style="font-family:monospace;font-size:18px;font-weight:800;color:${color}">${code}</span>
           <span style="font-size:12px;color:var(--text-muted)">${name}</span>
@@ -64,7 +62,9 @@ function renderHttpStatus(el) {
     }).join('');
   };
 
-  window.hsCopy = function(code, name, el) {
+  window.hsCopy = function(code) {
+    const name = STATUS.find(item => item[0] === code)?.[1] || '';
     navigator.clipboard.writeText(String(code)).then(() => showToast(`已复制 ${code} ${name}`));
   };
+  hsFilter('');
 }

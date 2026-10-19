@@ -11,6 +11,7 @@ class AgentSession {
     this._handlers = {};
     this.abortController = null;
     this._responseId = null;
+    this._run = null;
   }
 
   on(event, fn) {
@@ -29,6 +30,11 @@ class AgentSession {
   }
 
   async send(userText) {
+    if (this._run) {
+      this.emit('error', { reason: 'busy', message: 'A task is already running.' });
+      return;
+    }
+    if (typeof userText !== 'string' || !userText.trim()) return;
     // @mention：提取强制工具提示
     const mentionMatch = userText.match(/^@([\w-]+)\s*(.*)$/s);
     if (mentionMatch) {
@@ -49,17 +55,28 @@ class AgentSession {
     }
 
     this.messages.push({ role: 'user', content: finalText });
-    this.emit('user', { content: userText }); // UI 显示原始文本
+    const run = { controller: new AbortController(), checkpoint: this.messages.length, responseId: this._responseId };
+    this._run = run;
+    this.abortController = run.controller;
+    this.emit('user', { content: userText });
     this.iterations = 0;
-    await this._loop();
+    try { await this._loop(run); }
+    finally { if (this._run === run) this._run = null; }
   }
 
   abort() {
-    this.abortController?.abort();
+    const run = this._run;
+    if (!run) return;
+    run.controller.abort();
+    // Discard partial assistant/tool pairs so the next request has valid history.
+    this.messages = this.messages.slice(0, run.checkpoint);
+    this._responseId = run.responseId;
+    this._run = null;
     this.emit('done', { aborted: true });
   }
 
   clearHistory() {
+    this.abort();
     this.messages = [];
     this._responseId = null;
   }
@@ -170,13 +187,13 @@ class AgentSession {
     return [...core, ...extra];
   }
 
-  async _loop() {
+  async _loop(run) {
+    if (this._run !== run || run.controller.signal.aborted) return;
     if (this.iterations >= this.MAX_ITER) {
       this.emit('error', { reason: 'max_iterations', message: `已达最大迭代次数 ${this.MAX_ITER}` });
       return;
     }
     this.iterations++;
-    this.abortController = new AbortController();
     this.emit('thinking', {});
 
     let resp;
@@ -201,15 +218,17 @@ class AgentSession {
         temperature: this.config.temperature ?? 0.7,
         baseUrl:     safeBaseUrl,
         apiKey:      this.config.apiKey || window.AgentConfig.AG.getKey(this.adapter.id),
-        signal:      this.abortController.signal,
+        signal:      run.controller.signal,
       };
       if (this.adapter.id === 'openai-response' && this._responseId) {
         chatParams._responseId = this._responseId;
       }
-      resp = await this.adapter.chat(chatParams);
+      if (run.controller.signal.aborted) return;
+      resp = await this._wait(this.adapter.chat(chatParams), run.controller.signal);
+      if (this._run !== run || run.controller.signal.aborted) return;
       if (resp._responseId) this._responseId = resp._responseId;
     } catch (e) {
-      if (e.name === 'AbortError') return;
+      if (e.name === 'AbortError' || this._run !== run) return;
       this.emit('error', { reason: 'network', message: e.message });
       return;
     }
@@ -218,9 +237,13 @@ class AgentSession {
       this.messages.push(resp.message);
       this.emit('tool_start', { tool_calls: resp.message.tool_calls });
 
-      const results = await Promise.all(
-        resp.message.tool_calls.map(tc => this._exec(tc))
-      );
+      // Page navigation, form filling and result reading have ordering dependencies.
+      const results = [];
+      for (const tc of resp.message.tool_calls) {
+        if (this._run !== run || run.controller.signal.aborted) return;
+        results.push(await this._exec(tc, run));
+      }
+      if (this._run !== run || run.controller.signal.aborted) return;
 
       for (const r of results) {
         this.messages.push({
@@ -231,7 +254,7 @@ class AgentSession {
         });
       }
       this.emit('tool_done', { results });
-      await this._loop();
+      await this._loop(run);
 
     } else if (resp.stop_reason === 'end') {
       this.messages.push(resp.message);
@@ -243,28 +266,80 @@ class AgentSession {
     }
   }
 
-  async _exec(tc) {
-    const name = tc.function.name;
-    let params;
-    try { params = JSON.parse(tc.function.arguments || '{}'); }
-    catch { params = {}; }
+  async _wait(operation, signal, timeoutMs = 0) {
+    let timer, cancel;
+    const cancelled = new Promise((_, reject) => {
+      cancel = () => reject(Object.assign(new Error('Task cancelled'), { name: 'AbortError' }));
+      if (signal.aborted) cancel();
+      else signal.addEventListener('abort', cancel, { once: true });
+      if (timeoutMs) timer = setTimeout(() => reject(Object.assign(new Error('Action timed out'), { name: 'TimeoutError' })), timeoutMs);
+    });
+    try { return await Promise.race([operation, cancelled]); }
+    finally { clearTimeout(timer); signal.removeEventListener('abort', cancel); }
+  }
 
-    const action = window._AGENT_ALL_ACTIONS
-      ? window._AGENT_ALL_ACTIONS.get(name)
-      : (window._AGENT_ACTIONS || []).find(a => a.name === name);
-    let result;
+  async _exec(tc, run = this._run) {
+    const name = tc?.function?.name;
+    let params, result;
+    const controller = new AbortController();
+    const cancel = () => controller.abort();
+    const parentSignal = run?.controller.signal;
+    if (parentSignal?.aborted) controller.abort();
+    else parentSignal?.addEventListener('abort', cancel, { once: true });
     try {
-      if (!action) {
-        result = { success: false, error: `未知 action: ${name}` };
-      } else {
-        const timeout = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Action 执行超时 (15s)')), 15000));
-        result = await Promise.race([action.execute(params), timeout]);
-      }
-    } catch (e) {
-      result = { success: false, error: e.message };
+      if (controller.signal.aborted) throw new Error('Task cancelled');
+      params = JSON.parse(tc.function.arguments || '{}');
+      const action = window._AGENT_ALL_ACTIONS
+        ? window._AGENT_ALL_ACTIONS.get(name)
+        : (window._AGENT_ACTIONS || []).find(a => a.name === name);
+      if (!action) throw new Error('Unknown action: ' + name);
+      validateAgentInput(params, action.parameters || { type: 'object' });
+      result = await this._wait(
+        Promise.resolve().then(() => {
+          if (controller.signal.aborted) throw new Error('Task cancelled');
+          return action.execute(params, { signal: controller.signal });
+        }), controller.signal, 15000
+      );
+    } catch (error) {
+      if (error.name === 'TimeoutError') controller.abort();
+      result = { success: false, error: error.message };
+    } finally {
+      parentSignal?.removeEventListener('abort', cancel);
     }
-    return { id: tc.id, name, params, result };
+    return { id: tc?.id, name, params, result };
+  }
+}
+
+// Validate the schema vocabulary used by built-in tools before invoking any code.
+function validateAgentInput(value, schema, path = 'input') {
+  const fail = message => { throw new Error(path + ': ' + message); };
+  const types = schema.type ? (Array.isArray(schema.type) ? schema.type : [schema.type]) : [];
+  const matches = type => type === 'array' ? Array.isArray(value)
+    : type === 'object' ? value !== null && typeof value === 'object' && !Array.isArray(value)
+    : type === 'null' ? value === null
+    : type === 'integer' ? Number.isInteger(value)
+    : type === 'number' ? typeof value === 'number' && Number.isFinite(value)
+    : typeof value === type;
+  if (types.length && !types.some(matches)) fail('expected ' + types.join(' or '));
+  if (schema.enum && !schema.enum.includes(value)) fail('unsupported value');
+  if (typeof value === 'number') {
+    if (schema.minimum !== undefined && value < schema.minimum) fail('below minimum');
+    if (schema.maximum !== undefined && value > schema.maximum) fail('above maximum');
+  }
+  if (typeof value === 'string') {
+    if (schema.minLength !== undefined && value.length < schema.minLength) fail('too short');
+    if (schema.maxLength !== undefined && value.length > schema.maxLength) fail('too long');
+  }
+  if (Array.isArray(value)) {
+    if (schema.minItems !== undefined && value.length < schema.minItems) fail('too few items');
+    if (schema.maxItems !== undefined && value.length > schema.maxItems) fail('too many items');
+    if (schema.items) value.forEach((item, index) => validateAgentInput(item, schema.items, path + '[' + index + ']'));
+  } else if (value !== null && typeof value === 'object') {
+    for (const key of schema.required || []) if (!Object.prototype.hasOwnProperty.call(value, key)) fail('missing ' + key);
+    for (const [key, item] of Object.entries(value)) {
+      if (schema.properties?.[key]) validateAgentInput(item, schema.properties[key], path + '.' + key);
+      else if (schema.additionalProperties === false) fail('unknown field ' + key);
+    }
   }
 }
 

@@ -1,4 +1,5 @@
 window.renderSpeedTest = function(el) {
+  window._activeCleanup = stStop;
   el.innerHTML = `
     <div class="tool-card-panel">
       <div style="text-align:center;padding:24px 0 16px">
@@ -217,5 +218,3 @@ function _stStatus(msg) {
 }
 
 function _stSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-window._activeCleanup = function() { stStop(); };
