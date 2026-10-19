@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="toolkit-version" content="dev">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>K Toolkit - Agentic Developer Toolbox</title>
     <meta name="description" content="Agentic 智能体开发者工具箱 — 开发者工具 + AI Agent 助手，支持多模型，纯前端无需登录">
@@ -49,6 +50,7 @@
                     <div class="search-kbd-hint" id="searchKbdHint"><kbd class="search-kbd">/</kbd></div>
                 </div>
                 <div class="topbar-actions">
+                    <button type="button" class="update-trigger" id="appUpdateButton" aria-label="检查更新" title="检查更新">↻<span class="update-dot" hidden></span></button>
                     <button class="theme-btn" id="langBtn" onclick="setLang(getCurrentLang()==='zh'?'en':'zh')" style="display:inline-flex;align-items:center;font-size:12px;font-weight:600;min-width:36px;justify-content:center">EN</button>
                     <button class="theme-btn" id="themeBtn" onclick="openThemePicker()" title="切换主题" style="display:inline-flex;align-items:center;justify-content:center;padding:6px"></button>
                 </div>
@@ -83,15 +85,9 @@
 
     <script src="i18n.js"></script>
     <script src="tool-catalog.js"></script>
+    <script src="image-session.js"></script>
     <script src="dashboard.js"></script>
     <script src="agent/agent-loader.js"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          const swPath = (location.pathname.replace(/\/[^/]*$/, '') || '') + '/sw.js';
-          navigator.serviceWorker.register(swPath, { scope: swPath.replace('/sw.js', '/') }).catch(() => {});
-        });
-      }
-    </script>
+    <script src="app-updates.js"></script>
 </body>
 </html>

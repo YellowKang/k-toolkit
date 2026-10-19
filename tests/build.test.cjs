@@ -16,6 +16,13 @@ test('build preserves CSS math, emits valid JS and versions every source categor
       return fs.readFileSync(path.join(temp, 'dist/sw.js'), 'utf8');
     };
     let previous = build();
+    const version = JSON.parse(fs.readFileSync(path.join(temp, 'dist/version.json'), 'utf8')).version;
+    assert.match(version, /^[a-f0-9]{8}$/);
+    const html = fs.readFileSync(path.join(temp, 'dist/dashboard.html'), 'utf8');
+    assert.ok(html.includes('name="toolkit-version" content="' + version + '"'));
+    assert.ok(html.includes('app-updates.js?v=' + version));
+    assert.ok(html.includes('image-session.js?v=' + version));
+    assert.ok(fs.existsSync(path.join(temp, 'dist/.nojekyll')));
     assert.match(fs.readFileSync(path.join(temp, 'dist/dashboard-components.css'), 'utf8'), /calc\(100% \+ 8px\)/);
     const checkJs = dir => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

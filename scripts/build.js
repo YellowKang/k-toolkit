@@ -176,7 +176,7 @@ for (const name of cssFiles) {
 }
 
 // ── Minify core JS ──
-const jsFiles = ['tool-catalog.js', 'dashboard.js', 'dashboard-cmd.js', 'i18n.js'];
+const jsFiles = ['app-updates.js', 'image-session.js', 'tool-catalog.js', 'dashboard.js', 'dashboard-cmd.js', 'i18n.js'];
 console.log('\nJS Minification:');
 let totalSavedJS = 0;
 for (const name of jsFiles) {
@@ -188,27 +188,15 @@ for (const name of jsFiles) {
   console.log(`  ${name}: ${fmtKB(before)} → ${fmtKB(after)} (-${pct}%)`);
 }
 
-// ── Process SW: inject version ──
-console.log('\nService Worker:');
-const swSrc = path.join(PUB, 'sw.js');
-if (fs.existsSync(swSrc)) {
-  let swContent = fs.readFileSync(swSrc, 'utf8');
-  swContent = swContent.replace(
-    "self.__SW_VERSION__ || 'dev'",
-    `'${BUILD_VERSION}'`
-  );
-  const minified = minifyJS(swContent);
-  fs.writeFileSync(path.join(DIST, 'sw.js'), minified, 'utf8');
-  console.log(`  sw.js (version: ${BUILD_VERSION})`);
-}
-
 // ── Copy HTML ──
 const htmlFiles = ['dashboard.html', 'index.html'];
 console.log('\nCopying HTML:');
 for (const name of htmlFiles) {
   const src = path.join(PUB, name);
   if (!fs.existsSync(src)) continue;
-  copyFile(src, path.join(DIST, name));
+  let html = fs.readFileSync(src, 'utf8').replace('name="toolkit-version" content="dev"', `name="toolkit-version" content="${BUILD_VERSION}"`);
+  html = html.replace(/((?:src|href)="(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_.-]+\.(?:js|css))"/g, `$1?v=${BUILD_VERSION}"`);
+  fs.writeFileSync(path.join(DIST, name), html);
   console.log(`  ${name}`);
 }
 
@@ -235,6 +223,23 @@ const agentCount = processDir(path.join(PUB, 'agent'), path.join(DIST, 'agent'),
   minifyAndWrite(s, d);
 });
 console.log(`  ${agentCount} files`);
+
+// ── Publish version metadata and a digest-verified release manifest ──
+const precache = [];
+function inventory(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const file = path.join(dir, entry.name);
+    if (entry.isDirectory()) inventory(file);
+    else precache.push({ path: path.relative(DIST, file).split(path.sep).join('/'), sha256: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') });
+  }
+}
+inventory(DIST);
+let swContent = fs.readFileSync(path.join(PUB, 'sw.js'), 'utf8')
+  .replace("self.__SW_VERSION__ || 'dev'", JSON.stringify(BUILD_VERSION))
+  .replace('self.__PRECACHE__ || []', JSON.stringify(precache));
+fs.writeFileSync(path.join(DIST, 'sw.js'), minifyJS(swContent));
+fs.writeFileSync(path.join(DIST, 'version.json'), JSON.stringify({ version: BUILD_VERSION }) + '\n');
+fs.writeFileSync(path.join(DIST, '.nojekyll'), '');
 
 // ── Summary ──
 const totalSaved = totalSavedCSS + totalSavedJS;

@@ -4,8 +4,8 @@
     en: { title: 'Image → Base64', choose: 'Choose an image or drop it here', local: 'PNG / JPG / GIF / WebP / SVG · Processed locally', invalid: 'Choose an image file', reading: 'Reading…', failed: 'Unable to read the image. Please select it again.', name: 'File name', size: 'Size', type: 'Type', length: 'Base64 length', copy: 'Copy Base64', html: 'Copy HTML img tag', previewTitle: 'Base64 → image preview', placeholder: 'Paste an image Data URL or raw Base64…', preview: 'Preview image', previewError: 'Unable to preview: invalid Base64 image', image: 'Image preview' },
   });
   window.renderImgBase64 = function (el) {
-    let reader = null, revision = 0, disposed = false;
-    window._activeCleanup = () => { disposed = true; revision++; reader?.abort(); };
+    let reader = null, revision = 0, disposed = false, shared;
+    window._activeCleanup = () => { disposed = true; revision++; reader?.abort(); shared?.dispose(); };
     el.innerHTML = `
       <div class="tool-card-panel"><div class="panel-label">${tl('title')}</div>
         <button type="button" id="imgDropZone" style="display:block;width:100%;border:2px dashed var(--glass-border);border-radius:12px;padding:32px 16px;text-align:center;cursor:pointer;background:transparent;color:var(--text)">
@@ -30,11 +30,12 @@
     const find = selector => el.querySelector(selector);
     const zone = find('#imgDropZone'), input = find('#imgFile'), status = find('#imgB64Status');
     const panel = find('#imgResultPanel');
-    const choose = file => {
+    const choose = (file, remember = true) => {
       if (!file) return;
       revision++; reader?.abort(); panel.hidden = true;
       find('#imgB64Output').value = ''; find('#imgPreview').removeAttribute('src');
       if (!file.type.startsWith('image/')) { status.textContent = tl('invalid'); return; }
+      if (remember) shared.remember([file]);
       const ticket = revision;
       reader = new FileReader(); status.textContent = tl('reading');
       reader.onload = event => {
@@ -48,6 +49,7 @@
       reader.onerror = () => { if (!disposed && ticket === revision) status.textContent = tl('failed'); };
       reader.readAsDataURL(file);
     };
+    shared = ImageSession.mount(el, { onUse: files => choose(files[0], false) });
     zone.addEventListener('click', () => input.click());
     input.addEventListener('change', () => { choose(input.files[0]); input.value = ''; });
     zone.addEventListener('dragover', event => { event.preventDefault(); zone.style.borderColor = 'var(--accent)'; });

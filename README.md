@@ -21,7 +21,7 @@
 | 时区与世界时钟 | 时区转换、多个地区时钟 |
 | HTTP 请求工具 | 请求测试、cURL 生成、状态码查询 |
 
-工作台统一导航；各子工具仍保留独立链接、收藏和输入界面，暂不跨页共享输入。目录由 `public/tool-catalog.js` 生成，工具数量、分类和处理方式见[完整目录](docs/tool-catalog.md)。
+工作台统一导航；各子工具仍保留独立链接、收藏和输入界面，图片压缩、WebP 和 Base64 可通过“图片暂存”显式复用文件；其他工具的输入独立。目录由 `public/tool-catalog.js` 生成，工具数量、分类和处理方式见[完整目录](docs/tool-catalog.md)。
 
 图片工具支持文件选择和拖放；图片压缩、Base64 转换及 WebP 转换在浏览器内处理。工具卡片会标注本地处理、联网、可选联网或 AI 模型调用。
 
@@ -56,7 +56,19 @@ npm run build
 
 可用 `TEST_BROWSER_CHANNEL=chrome` 使用已安装的 Chrome。375px / 768px 检查是桌面浏览器视口模拟，不代替手机真机测试。
 
-构建结果在 `dist/`。PR 执行 Chromium 与 Firefox 检查；`master` 推送通过检查后发布到 `gh-pages` 分支。GitHub Pages 应配置为从该分支发布。
+构建结果在 `dist/`。PR 执行 Chromium 与 Firefox 检查；`master` 推送通过检查后使用 GitHub 官方 Pages artifact 工作流部署。仓库 **Settings → Pages → Build and deployment → Source** 必须设置为 **GitHub Actions**，并允许 `github-pages` 环境从 `master` 部署。代码未推送、工作流未成功执行或仓库设置未完成时，线上不会更新。见 [GitHub 官方说明](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
+
+## 版本更新与刷新
+
+顶部 **↻** 打开版本面板，可查看当前/线上版本、手动检查和刷新。有新版本时按钮出现提示点；只有完整下载并校验成功后才允许“更新并刷新”。不会自动刷新正在工作的页面。
+
+页面打开、恢复联网时自动检查；返回前台时检查有一分钟节流，前台每五分钟检查一次。版本来自构建内容哈希，无需手动改版本号。GitHub 构建、部署和 CDN 传播存在延迟，不保证推送后即时可用。
+
+刷新会结束任务、清除未保存输入、图片暂存和未下载结果；收藏及设置保留。图片暂存仅在当前标签页内存中，最多 20 张、共 100 MB，可把处理结果继续暂存复用。
+
+首次成功安装会缓存站点自有静态文件，工具代码仍按需执行。缓存按项目路径隔离，并保留当前及前两个版本；其他打开的标签页不会被强制刷新。模型服务及外部 CDN 依赖仍需要网络。从旧机制首次迁移时，若仍显示旧页面，请关闭此站点的所有标签页后重新打开，让等待中的新 Worker 接管；之后即可使用新的更新按钮。直接运行 `public/` 显示开发版；完整更新测试需 `npm run build` 后托管 `dist/`。
+
+`npm run test:updates` 使用真实 Service Worker 模拟三个发布版本，验证手动更新、多标签页、离线、缺失/错版资源与缓存隔离。
 
 ## Docker
 
@@ -89,13 +101,13 @@ docs/                工具目录与架构说明
 
 K Toolkit is a static developer toolbox with an AI assistant, bilingual UI, themes, search, favorites and recent tools. [Try it online](https://yellowkang.github.io/k-toolkit/).
 
-Ten categories organize the tools. Five workbenches group image compression/conversion, hashes/HMAC, QR generation/decoding, time zones/world clocks and HTTP tools. Existing child URLs and favorites remain valid; inputs are not yet shared between child pages. See the generated [tool catalog](docs/tool-catalog.md) for the current inventory.
+Ten categories organize the tools. Five workbenches group image compression/conversion, hashes/HMAC, QR generation/decoding, time zones/world clocks and HTTP tools. Existing child URLs and favorites remain valid; compression, WebP and Base64 can explicitly reuse files staged in the current tab’s memory. See the generated [tool catalog](docs/tool-catalog.md) for the current inventory.
 
 Local tools process inputs in the browser. Network tools contact external services, and AI requests send conversation context and tool results to the configured model provider. Some libraries load from CDNs. API keys are currently stored in browser storage; a separate backend is needed to keep service credentials off the client.
 
 Use Node.js 20.13+ and `npm ci`, then `npm run dev`. Run `npm test` for unit/build/catalog checks. Install Playwright browsers with `npx playwright install chromium firefox`, then run `TEST_BUILD=1 npm run test:browser`; set `TEST_BROWSER=firefox` for Firefox. `npm run build` writes the static site to `dist/`.
 
-Pull requests run Chromium and Firefox checks. Successful pushes to `master` publish to the `gh-pages` branch. To host locally with Docker, run `docker compose up -d --build` and open port 8080.
+Pull requests run Chromium and Firefox checks. Successful pushes to `master` deploy through the official Pages artifact workflow. Set the repository’s Pages Source to **GitHub Actions**. The ↻ button checks for updates and refreshes only when requested; deployment/CDN propagation is not instantaneous. To host locally with Docker, run `docker compose up -d --build` and open port 8080.
 
 ## License
 

@@ -307,9 +307,13 @@ function makeToolI18n(dict) {
 }
 
 function setLang(lang) {
+  if (window.currentPage !== 'ai-chat' && window._activeCleanup) {
+    window._activeCleanup(); window._activeCleanup = null;
+  }
   _currentLang = lang;
   _ltCache = null; // invalidate localized tools cache
   localStorage.setItem('dtb_lang', lang);
+  window.dispatchEvent(new Event('toolkit-language-change'));
   // 更新语言按钮文字
   const btn = document.getElementById('langBtn');
   if (btn) btn.textContent = t('lang_btn');

@@ -25,11 +25,11 @@
   const size = bytes => bytes < 1024 ? bytes + ' B' : bytes < 1048576 ? (bytes / 1024).toFixed(1) + ' KB' : (bytes / 1048576).toFixed(2) + ' MB';
 
   window.renderImgCompress = function (el) {
-    let file = null, revision = 0, disposed = false;
+    let file = null, revision = 0, disposed = false, shared;
     const urls = new Set();
     const release = () => { urls.forEach(url => URL.revokeObjectURL(url)); urls.clear(); };
     const objectUrl = blob => { const url = URL.createObjectURL(blob); urls.add(url); return url; };
-    window._activeCleanup = () => { disposed = true; revision++; release(); };
+    window._activeCleanup = () => { disposed = true; revision++; release(); shared?.dispose(); };
 
     el.innerHTML = `
       <div class="tool-card-panel">
@@ -60,14 +60,16 @@
       revision++; release(); result.replaceChildren(); result.hidden = true;
       run.disabled = false; run.textContent = tl('run'); status.textContent = '';
     };
-    const choose = selected => {
+    const choose = (selected, remember = true) => {
       if (!selected) return;
       reset(); file = null;
       find('#imgSelectedName').textContent = tl('choose');
       if (!selected.type.startsWith('image/')) { status.textContent = tl('invalid'); return; }
       file = selected;
+      if (remember) shared.remember([selected]);
       find('#imgSelectedName').textContent = file.name + ' · ' + size(file.size);
     };
+    shared = ImageSession.mount(el, { onUse: files => choose(files[0], false) });
     zone.addEventListener('click', () => input.click());
     input.addEventListener('change', () => { choose(input.files[0]); input.value = ''; });
     zone.addEventListener('dragover', event => { event.preventDefault(); zone.style.borderColor = 'var(--accent)'; });
@@ -118,6 +120,7 @@
         const download = result.querySelector('[data-download]');
         download.href = outputUrl;
         download.download = (selected.name.replace(/\.[^.]+$/, '') || 'image') + '-compressed.' + (format === 'image/jpeg' ? 'jpg' : format.split('/')[1]);
+        download.parentElement.appendChild(shared.resultButton(blob, download.download));
         result.hidden = false; status.textContent = '';
       } catch (error) {
         if (current()) { release(); status.textContent = error.message || tl('readError'); }

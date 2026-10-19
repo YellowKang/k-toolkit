@@ -85,7 +85,7 @@ const express = require('express');
       await loadTool('gradient');
       if (window._activeCleanup !== cleanup) throw new Error('Preloading a tool replaced the active page cleanup');
     });
-    assert.equal(await page.locator('script[src="tools/gradient.js"]').count(), 1);
+    assert.equal(await page.locator('script[src^="tools/gradient.js?v="]').count(), 1);
     assert.deepEqual(errors, []);
     await route('gradient', '#toolBody'); assert.equal(await page.evaluate(() => typeof renderGradient), 'function');
     await route('note', '#noteArea'); await page.locator('#noteArea').fill('Saved when leaving immediately');

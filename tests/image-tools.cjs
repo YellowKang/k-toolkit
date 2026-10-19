@@ -27,6 +27,15 @@ async function run(kind){
   await chooser.setFiles(fixture);await compress();
   assert.equal((await getDownload('[data-download]')).subarray(0,2).toString('hex'),'ffd8');
   assert.equal((await getDownload('[data-download]')).subarray(0,2).toString('hex'),'ffd8');
+  // Reuse the generated JPEG in Base64 without choosing/uploading another file.
+  await page.locator('[data-stage-result]').click();
+  await route('img-base64','#imgFile'); await page.locator('[data-reuse]').click();
+  await page.locator('#imgResultPanel').waitFor();
+  assert.equal(Buffer.from((await page.locator('#imgB64Output').inputValue()).split(',')[1],'base64').subarray(0,2).toString('hex'),'ffd8');
+  assert.match(await page.locator('#imgInfo').textContent(),/sample-compressed.jpg/);
+  await page.locator('[data-clear]').click(); assert.equal(await page.locator('[data-reuse]').isDisabled(),true);
+  assert.equal(await page.locator('#imgResultPanel').isVisible(),true,'clearing shared staging must not erase the current output');
+  await route('img-compress','#imgFileInput');
   await page.locator('#imgFileInput').setInputFiles(fixture);assert.equal(await page.locator('#imgCompressResult').isVisible(),false);await compress();
   await page.locator('#imgFileInput').setInputFiles({name:'bad.png',mimeType:'image/png',buffer:Buffer.from('not an image')});
   await page.locator('#imgCompressRun').click();await page.waitForFunction(()=>document.querySelector('#imgCompressStatus').textContent.includes('无法解码'));
@@ -47,12 +56,19 @@ async function run(kind){
   await route('img-webp','#iwFile');
   const [batchChooser]=await Promise.all([page.waitForEvent('filechooser'),page.locator('#iwDrop').click()]);
   await batchChooser.setFiles([fixture,{...fixture,name:'second.png'}]);
-  await page.waitForFunction(()=>document.querySelectorAll('#iwList button:not([hidden])').length===2);
+  await page.waitForFunction(()=>document.querySelectorAll('#iwList button[data-download]:not([hidden])').length===2);
   assert.equal(await page.locator('#iwList > div').count(),2);
-  const webp=await getDownload('#iwList > div:first-child button');assert.equal(webp.subarray(8,12).toString(),'WEBP');
-  assert.equal((await getDownload('#iwList > div:first-child button')).subarray(8,12).toString(),'WEBP');
+  const webp=await getDownload('#iwList > div:first-child button[data-download]');assert.equal(webp.subarray(8,12).toString(),'WEBP');
+  assert.equal((await getDownload('#iwList > div:first-child button[data-download]')).subarray(8,12).toString(),'WEBP');
   await page.locator('#iwFile').setInputFiles({name:'corrupt.png',mimeType:'image/png',buffer:Buffer.from('broken')});
   await page.waitForFunction(()=>[...document.querySelectorAll('#iwList [data-info]')].some(el=>el.textContent.includes('无法解码')));
+  await page.locator('#iwFile').setInputFiles([fixture,{...fixture,name:'reuse-second.png'}]);
+  await route('img-base64','#imgFile');
+  assert.match(await page.locator('[data-reuse]').textContent(),/第一张/);
+  await page.locator('[data-reuse]').click(); await page.locator('#imgResultPanel').waitFor();
+  assert.equal((await page.locator('#imgB64Output').inputValue()).split(',')[1],base64);
+  await route('img-webp','#iwFile'); await page.locator('[data-reuse]').click();
+  await page.waitForFunction(()=>document.querySelectorAll('#iwList button[data-download]:not([hidden])').length===2);
   await route('img-base64','#imgFile');await page.locator('#imgFile').setInputFiles(fixture);await page.locator('#imgResultPanel').waitFor();
   await route('img-compress','#imgFileInput');await page.locator('#imgFileInput').setInputFiles(fixture);await compress();
   for (const width of [375,768]) {await page.setViewportSize({width,height:850});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`horizontal overflow at ${width}`)}
@@ -63,6 +79,8 @@ async function run(kind){
   await page.evaluate(()=>{const original=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(...args){setTimeout(()=>original.apply(this,args),120)}});
   await page.locator('#imgCompressRun').click();await route('img-base64','#imgFile');
   await page.waitForTimeout(250);
+  await page.reload(); await page.locator('#imgFile').waitFor({state:'attached'});
+  assert.equal(await page.evaluate(()=>ImageSession.metadata().length),0,'refresh must clear in-memory files');
   assert.deepEqual(errors,[]);
   console.log(kind+': PASS chooser, keyboard, round-trip navigation, drag/drop, multi-file WebP, repeat download, corrupt/invalid files, literal filenames, safe preview, 375/768 layouts, English, disposal');
  }finally{await browser.close()}

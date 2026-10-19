@@ -6,11 +6,11 @@
   const size = bytes => bytes < 1024 ? bytes + ' B' : bytes < 1048576 ? (bytes / 1024).toFixed(1) + ' KB' : (bytes / 1048576).toFixed(2) + ' MB';
 
   window.renderImgWebp = function (el) {
-    let disposed = false, queue = Promise.resolve();
+    let disposed = false, queue = Promise.resolve(), shared;
     const urls = new Set(), downloads = [];
     const objectUrl = blob => { const url = URL.createObjectURL(blob); urls.add(url); return url; };
     const release = url => { URL.revokeObjectURL(url); urls.delete(url); };
-    window._activeCleanup = () => { disposed = true; urls.forEach(url => URL.revokeObjectURL(url)); urls.clear(); };
+    window._activeCleanup = () => { disposed = true; urls.forEach(url => URL.revokeObjectURL(url)); urls.clear(); shared?.dispose(); };
     el.innerHTML = `
       <div class="tool-card-panel"><div class="panel-label">${tl('title')}</div>
         <button type="button" id="iwDrop" style="display:block;width:100%;border:2px dashed var(--glass-border);border-radius:12px;padding:32px 16px;text-align:center;cursor:pointer;background:transparent;color:var(--text)">
@@ -69,8 +69,9 @@
         image.src = url; image.hidden = false;
         const entry = { url, name: (file.name.replace(/\.[^.]+$/, '') || 'image') + '.webp' };
         downloads.push(entry);
+        item.appendChild(shared.resultButton(blob, entry.name));
         info.textContent = `WebP: ${size(blob.size)} · ${tl(saved >= 0 ? 'saved' : 'increased')}: ${Math.abs(saved).toFixed(1)}% · ${width} × ${height}`;
-        const button = item.querySelector('button'); button.hidden = false;
+        const button = item.querySelector('button[data-download]'); button.hidden = false;
         button.addEventListener('click', () => download(entry)); downloadAll.hidden = false;
       } catch (error) {
         if (!disposed && el.isConnected) info.textContent = error.message || tl('decodeError');
@@ -78,8 +79,10 @@
         if (sourceUrl) release(sourceUrl);
       }
     };
-    const choose = files => {
+    const choose = (files, remember = true) => {
       find('#iwStatus').textContent = '';
+      const valid = files.filter(file => file.type.startsWith('image/'));
+      if (remember && valid.length) shared.remember(valid);
       const quality = Number(find('#iwQuality').value);
       for (const file of files) {
         if (!file.type.startsWith('image/')) { find('#iwStatus').textContent = tl('invalid'); continue; }
@@ -88,12 +91,13 @@
         item.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--glass-border);border-radius:12px;flex-wrap:wrap';
         item.innerHTML = `<img alt="${tl('image')}" hidden style="width:56px;height:56px;object-fit:cover;border-radius:8px">
           <div style="flex:1;min-width:0;overflow-wrap:anywhere"><strong data-name></strong><div style="font-size:12px;color:var(--text-muted)">${tl('original')}: ${size(file.size)}</div><div data-info role="status" style="font-size:12px">${tl('waiting')}</div></div>
-          <button type="button" class="btn btn-secondary" hidden>${tl('download')}</button>`;
+          <button type="button" class="btn btn-secondary" data-download hidden>${tl('download')}</button>`;
         item.querySelector('[data-name]').textContent = file.name;
         list.appendChild(item);
         queue = queue.then(() => convert(file, quality, item));
       }
     };
+    shared = ImageSession.mount(el, { multiple: true, onUse: files => choose(files, false) });
     zone.addEventListener('click', () => input.click());
     input.addEventListener('change', () => { choose(Array.from(input.files)); input.value = ''; });
     zone.addEventListener('dragover', event => { event.preventDefault(); zone.style.borderColor = 'var(--accent)'; });

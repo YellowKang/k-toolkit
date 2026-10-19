@@ -252,7 +252,7 @@ async function loadTool(id, showProgress = true) {
     if (showProgress) _progressStart();
     const pending = new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = 'tools/' + tool.file;
+      script.src = 'tools/' + tool.file + '?v=' + encodeURIComponent(document.querySelector('meta[name="toolkit-version"]')?.content || 'dev');
       script.onload = () => { if (showProgress) _progressDone(); resolve(); };
       script.onerror = () => {
         if (showProgress) _progressDone();
@@ -933,7 +933,7 @@ let _cmdLoaded = false;
 function _loadCmd(cb) {
   if (_cmdLoaded) { cb(); return; }
   const s = document.createElement('script');
-  s.src = 'dashboard-cmd.js';
+  s.src = 'dashboard-cmd.js?v=' + encodeURIComponent(document.querySelector('meta[name="toolkit-version"]')?.content || 'dev');
   s.onload = () => { _cmdLoaded = true; cb(); };
   document.head.appendChild(s);
 }
@@ -1031,10 +1031,3 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── 离线状态提示 ──
 window.addEventListener('online',  () => showToast(t('toast_online'), 'success'));
 window.addEventListener('offline', () => showToast(t('toast_offline'), 'warn'));
-
-// ── SW 更新提示 ──
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('message', e => {
-    if (e.data === 'sw-updated') showToast(t('toast_sw_update'), 'info', 8000, () => location.reload());
-  });
-}

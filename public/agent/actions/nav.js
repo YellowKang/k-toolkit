@@ -21,8 +21,8 @@ const TOOL_CAPS = {
   'sql-format':   { autoRun: true,  inputs: ['text'],                         actions: ['format','minify'],               desc: 'SQL 格式化/压缩' },
   'jwt':          { autoRun: true,  inputs: ['token','payload','secret'],     actions: ['decode','generate'],            desc: '解码 JWT 或生成 JWT Token，action=decode 时填 token，action=generate 时填 payload(JSON) 和 secret' },
   // autoRun:false 需要用户手动操作（文件上传、Canvas 交互类）
-  'img-compress': { autoRun: false, note: '需要上传图片文件，AI 无法自动填充' },
-  'img-webp':     { autoRun: false, note: '需要上传图片文件' },
+  'img-compress': { autoRun: false, note: '需要选择本地图片文件，或复用页面暂存图片' },
+  'img-webp':     { autoRun: false, note: '需要选择本地图片文件' },
   'color':        { autoRun: true,  inputs: ['text','fg','bg'], actions: ['convert','check'], desc: '颜色工具：拾色器（需手动）、格式转换（text 输入颜色值）、对比度检查（fg/bg 为 HEX）' },
   // 以下工具有 TOOL_RUNNERS 或 SPECIAL_RUNNERS 配置，autoRun:true
   'gradient':     { autoRun: true,  inputs: ['colors','positions','angle','type'], actions: ['generate'], desc: '生成 CSS 渐变，colors 为颜色数组如["#00c6ff","#0072ff"]，angle 为角度，type 为 linear/radial' },
@@ -74,9 +74,9 @@ const TOOL_CAPS = {
   'spinner':      { autoRun: true,  inputs: ['options'], actions: ['spin'], desc: '随机抽签，options 为换行分隔的名单' },
   'svg-preview':  { autoRun: true,  inputs: ['text'], actions: ['preview'], desc: 'SVG 代码预览' },
   // autoRun:false — 文件上传/实时交互/传感器类
-  'img-base64':   { autoRun: false, note: '需要上传图片文件，AI 无法自动填充' },
-  'qrcode-decode':{ autoRun: false, note: '需要上传图片识别二维码' },
-  'img-exif':     { autoRun: false, note: '需要上传图片读取 EXIF' },
+  'img-base64':   { autoRun: false, note: '需要选择本地图片文件，或复用页面暂存图片' },
+  'qrcode-decode':{ autoRun: false, note: '需要选择本地图片识别二维码' },
+  'img-exif':     { autoRun: false, note: '需要选择本地图片读取 EXIF' },
   'speed-test':   { autoRun: false, note: '网速测试需要实际网络请求' },
   'typing-speed': { autoRun: false, note: '打字速度测试需要用户实时输入' },
   'stopwatch':    { autoRun: false, note: '秒表需要用户手动操作' },
@@ -767,6 +767,17 @@ const SPECIAL_RUNNERS = {
   },
 };
 
+function getPageAutomation(id) {
+  const tool = (window.TOOLS || []).find(item => item.id === id);
+  const caps = TOOL_CAPS[id];
+  const hasRunner = !!(TOOL_RUNNERS[id] || SPECIAL_RUNNERS[id]);
+  const autoRun = !!tool && hasRunner && caps?.autoRun !== false;
+  return { autoRun,
+    automation: autoRun ? 'automatic' : tool?.requiresFile ? 'file-input' : 'manual',
+    reason: autoRun ? '' : caps?.note || '该工具尚未配置自动执行，请打开页面手动操作',
+  };
+}
+
 const NavActions = [
   {
     name: 'navigate_to_tool',
@@ -807,7 +818,7 @@ const NavActions = [
       if (!tokens.length) return { success: true, data: { tools: [], count: 0, actions: [] }, display: '请输入搜索关键词' };
 
       let tools = window.TOOLS || [];
-      if (category) tools = tools.filter(t => t.category === category);
+      if (category) tools = tools.filter(t => t.category === category || window.ToolCatalog?.categoryName(t.category, 'en').toLowerCase() === category.toLowerCase());
 
       // 对每个工具评分：匹配的 token 越多、匹配位置越重要，得分越高
       const scored = [];
@@ -850,13 +861,12 @@ const NavActions = [
       scored.sort((a, b) => b.score - a.score);
       const matched = scored.slice(0, 10).map(({ tool: t }) => {
         const caps = TOOL_CAPS[t.id];
-        const hasRunner = !!(TOOL_RUNNERS[t.id] || SPECIAL_RUNNERS[t.id]);
         return {
           id: t.id,
           name: t.name,
           desc: t.desc || t.description || '',
           category: t.category,
-          autoRun: caps ? caps.autoRun : hasRunner,
+          ...getPageAutomation(t.id),
           inputs: caps ? (caps.inputs || []) : [],
           actions: caps ? (caps.actions || []) : [],
           capsDesc: caps ? caps.desc : '',
@@ -923,6 +933,10 @@ const NavActions = [
       required: ['toolId', 'inputs'],
     },
     async execute({ toolId, inputs, action }) {
+      const capability = getPageAutomation(toolId);
+      if (!capability.autoRun) {
+        return { success: false, data: { code: 'MANUAL_INPUT_REQUIRED', ...capability }, display: capability.reason };
+      }
       // 等待页面切换完成（navigate_to_tool 走 hash 异步渲染）
       const deadline = Date.now() + 3000;
       while ((window.currentPage || '') !== toolId && Date.now() < deadline) {
@@ -943,24 +957,7 @@ const NavActions = [
       if (special) {
         return await special({ inputs, action });
       }
-      if (!runner) {
-        // 没有配置但工具存在，尝试通用填值（找页面上第一个 textarea/input）
-        const anyInput = document.querySelector('textarea, input[type="text"]');
-        if (anyInput && (inputs.text || inputs.value || inputs.payload)) {
-          const val = inputs.text || inputs.value || inputs.payload || '';
-          anyInput.value = val;
-          anyInput.dispatchEvent(new Event('input', { bubbles: true }));
-          await new Promise(r => setTimeout(r, 500));
-          const anyOut = document.querySelector('[id*="result"],[id*="output"],[id*="Output"],[id*="Result"]');
-          const resultText = anyOut ? (anyOut.textContent || '').trim() : '';
-          return { success: true, data: { toolId, result: resultText }, display: resultText || '已填入数据（请查看页面结果）' };
-        }
-        const caps = TOOL_CAPS[toolId];
-        if (caps && !caps.autoRun) {
-          return { success: false, data: { error: caps.note || '该工具不支持自动填充' }, display: caps.note || '该工具不支持自动填充' };
-        }
-        return { success: false, data: { error: `工具 ${toolId} 暂未配置自动执行` }, display: `工具 ${toolId} 暂未配置自动执行` };
-      }
+      if (!runner) return { success: false, display: '该工具尚未配置自动执行' };
 
       // ── beforeRun 钩子：在填值前执行（用于切换 tab 等前置操作）──
       if (runner.beforeRun) {

@@ -1,78 +1,63 @@
-/* DevToolbox Service Worker — Cache First + Stale While Revalidate */
-/* Version is injected by build.js; fallback for dev */
+/* Each release is installed atomically; activation is explicitly requested by the UI. */
 const CACHE_VERSION = self.__SW_VERSION__ || 'dev';
-const CACHE = 'dtb-' + CACHE_VERSION;
+const PRECACHE = self.__PRECACHE__ || [];
+const PREFIX = 'dtb-release:' + new URL(self.registration.scope).pathname + ':';
+const CACHE = PREFIX + CACHE_VERSION;
+const absolute = path => new URL(path, self.registration.scope).href;
+const assets = new Set(PRECACHE.map(asset => new URL(asset.path, self.registration.scope).pathname));
 
-// Use relative paths so SW works in subdirectory deployments (e.g. /k-toolkit/)
-const SHELL_FILES = [
-  'dashboard.html',
-  'dashboard.js',
-  'tool-catalog.js',
-  'dashboard-cmd.js',
-  'i18n.js',
-  'dashboard-base.css',
-  'dashboard-components.css',
-  'dashboard-theme.css'
-];
-
-// Resolve shell URLs relative to SW scope
-const SHELL = SHELL_FILES.map(f => new URL(f, self.registration.scope).pathname);
-
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE)
-      .then(c => Promise.allSettled(SHELL_FILES.map(f => c.add(new URL(f, self.registration.scope).href))))
-      .then(() => self.skipWaiting())
-  );
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    let next = 0;
+    try {
+      // Bound concurrent downloads; every file must match the build's digest.
+      await Promise.all(Array.from({ length: Math.min(8, PRECACHE.length) }, async () => {
+        while (next < PRECACHE.length) {
+          const asset = PRECACHE[next++];
+          const url = new URL(asset.path, self.registration.scope);
+          url.searchParams.set('v', CACHE_VERSION);
+          const response = await fetch(url, { cache: 'no-store' });
+          if (!response.ok) throw new Error('Release asset unavailable: ' + asset.path);
+          const digest = await crypto.subtle.digest('SHA-256', await response.clone().arrayBuffer());
+          const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+          if (hex !== asset.sha256) throw new Error('Release asset mismatch: ' + asset.path);
+          await cache.put(absolute(asset.path), response);
+        }
+      }));
+    } catch (error) {
+      await caches.delete(CACHE);
+      throw error;
+    }
+  })());
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE && k.startsWith('dtb-')).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim()).then(() => {
-      self.clients.matchAll({ type: 'window' }).then(clients =>
-        clients.forEach(c => c.postMessage('sw-updated'))
-      );
-    })
-  );
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    // Retain two previous releases for other tabs still executing their old code.
+    const previous = (await caches.keys()).filter(key => key.startsWith(PREFIX) && key !== CACHE);
+    await Promise.all(previous.slice(0, -2).map(key => caches.delete(key)));
+    await self.clients.claim();
+  })());
 });
 
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+self.addEventListener('message', event => {
+  if (event.data?.type === 'GET_VERSION') event.ports[0]?.postMessage({ version: CACHE_VERSION });
+  if (event.data?.type === 'ACTIVATE') event.waitUntil(self.skipWaiting());
+});
 
-  const path = url.pathname;
-
-  // Shell files — Cache First
-  if (SHELL.some(s => path === s) || path === self.registration.scope.replace(/\/$/, '') + '/') {
-    e.respondWith(
-      caches.match(e.request).then(cached =>
-        cached || fetch(e.request).then(res => {
-          if (!res.ok) return res;
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-          return res;
-        }).catch(() => caches.match(e.request))
-      )
-    );
-    return;
-  }
-
-  // tools/*.js + agent/**/*.js — Stale While Revalidate
-  if ((path.includes('/tools/') || path.includes('/agent/')) && path.endsWith('.js')) {
-    e.respondWith(
-      caches.open(CACHE).then(c =>
-        c.match(e.request).then(cached => {
-          const network = fetch(e.request).then(res => {
-            c.put(e.request, res.clone());
-            return res;
-          });
-          return cached || network;
-        })
-      )
-    );
-    return;
-  }
-  // Other requests — network only
+self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+  const scope = new URL(self.registration.scope);
+  if (event.request.method !== 'GET' || url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
+  const home = url.pathname === scope.pathname || url.pathname === new URL('index.html', scope).pathname;
+  const navigation = event.request.mode === 'navigate' && (home || url.pathname === new URL('dashboard.html', scope).pathname);
+  if (!navigation && !assets.has(url.pathname)) return;
+  event.respondWith((async () => {
+    const version = navigation ? CACHE_VERSION : url.searchParams.get('v') || CACHE_VERSION;
+    const key = navigation ? absolute('dashboard.html') : url.origin + url.pathname;
+    const response = await caches.match(key, { cacheName: PREFIX + version });
+    // Never mix a retired/incomplete release with files from the current network deployment.
+    return response || new Response('This release is unavailable. Check for updates and refresh.', { status: 503 });
+  })());
 });

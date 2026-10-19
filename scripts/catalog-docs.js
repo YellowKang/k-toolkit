@@ -12,7 +12,7 @@ const lines = [
   '# 工具目录 / Tool catalog', '',
   '> 由 `npm run docs:catalog` 从 `public/tool-catalog.js` 生成；请勿手工修改。', '',
   `${catalog.tools.length} 个能力入口；${catalog.entries.length - 1} 个分类导航入口 + 1 个 AI 入口；${Object.keys(catalog.categories).length} 个分类；${catalog.workbenches.length} 组工作台。`, '',
-  '工作台合并导航入口，各子工具仍使用原 ID。搜索、收藏、最近使用与 Agent 可以直接访问子工具。当前跨页切换不自动共享输入。', '',
+  '工作台合并导航入口，各子工具仍使用原 ID。搜索、收藏、最近使用与 Agent 可以直接访问子工具。图片压缩、WebP 和图片 Base64 支持显式复用当前标签页暂存文件；其他工具仍保留独立输入。', '',
   '## 工作台 / Workbenches', '', '| 工作台 | 能力 ID（首项为主入口） |', '| --- | --- |',
   ...catalog.workbenches.map(group => `| ${group.name.zh} / ${group.name.en} | ${group.tools.map(id => '`' + id + '`').join(' · ')} |`), '',
   '## 保持独立的能力', '',
