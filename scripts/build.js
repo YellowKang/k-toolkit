@@ -15,7 +15,7 @@ function ensureDir(dir) {
 function minifyCSS(src) {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, '')   // strip comments
-    .replace(/\s*([{};:,>~+])\s*/g, '$1') // remove spaces around punctuation
+    .replace(/\s*([{};:,>~])\s*/g, '$1') // preserve whitespace around + in calc()
     .replace(/\s+/g, ' ')                 // collapse whitespace
     .trim();
 }
@@ -138,13 +138,22 @@ if (fs.existsSync(DIST)) {
 }
 ensureDir(DIST);
 
-// ── Generate version hash from source files ──
+// ── Version the whole release, including HTML, tools, Agent and build transforms ──
 const hashSrc = crypto.createHash('md5');
-const coreFiles = ['dashboard.js', 'dashboard-cmd.js', 'i18n.js', 'dashboard-base.css', 'dashboard-components.css', 'dashboard-theme.css'];
-for (const f of coreFiles) {
-  const p = path.join(PUB, f);
-  if (fs.existsSync(p)) hashSrc.update(fs.readFileSync(p));
+hashSrc.update(fs.readFileSync(__filename));
+function hashDirectory(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
+    const file = path.join(dir, entry.name);
+    if (entry.isDirectory()) hashDirectory(file);
+    else if (entry.isFile()) {
+      hashSrc.update(path.relative(PUB, file).split(path.sep).join('/'));
+      hashSrc.update('\0');
+      hashSrc.update(fs.readFileSync(file));
+      hashSrc.update('\0');
+    }
+  }
 }
+hashDirectory(PUB);
 const BUILD_VERSION = hashSrc.digest('hex').slice(0, 8);
 console.log(`\nBuild version: ${BUILD_VERSION}`);
 

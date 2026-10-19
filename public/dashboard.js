@@ -34,7 +34,7 @@ const TOOLS = [
   { id: 'flexbox', render: 'renderFlexbox',       icon: '📐', color: '#0284c7', name: 'Flexbox 生成',  desc: '可视化配置 Flexbox 布局，自动生成 CSS', category: 'CSS 工具', file: 'flexbox.js', tags: ['flexbox','flex','布局','layout','css','弹性'] },
   // 图片工具
   { id: 'img-base64', render: 'renderImgBase64',    icon: '🖼️', color: '#0891b2', name: '图片 Base64',  desc: '图片与 Base64 字符串互转，支持预览', category: '图片工具', file: 'img-base64.js', tags: ['image','base64','图片','转换','data uri','img'] },
-  { id: 'img-compress', render: 'renderImgCompress',  icon: '🗜️', color: '#16a34a', name: '图片压缩',      desc: '本地压缩图片，调整质量和尺寸，支持批量', category: '图片工具', file: 'img-compress.js', tags: ['image','compress','图片','压缩','resize','缩小'] },
+  { id: 'img-compress', render: 'renderImgCompress',  icon: '🗜️', color: '#16a34a', name: '图片压缩',      desc: '本地压缩图片，调整质量并转换 JPEG / PNG / WebP', category: '图片工具', file: 'img-compress.js', tags: ['image','compress','图片','压缩','convert','格式转换'] },
   { id: 'qrcode', render: 'renderQrCode',        icon: '📱', color: '#0f172a', name: '二维码生成',    desc: '文本/URL 转二维码，自定义颜色和尺寸', category: '图片工具', file: 'qrcode.js', tags: ['qr','qrcode','二维码','扫码','generate'] },
   { id: 'qrcode-decode', render: 'renderQRCodeDecode', icon: '🔭', color: '#1d4ed8', name: '二维码解析',    desc: '上传图片识别二维码内容，支持拖拽', category: '图片工具', file: 'qrcode-decode.js', tags: ['qr','qrcode','二维码','解析','识别','scan','decode'] },
   // 编码与加密

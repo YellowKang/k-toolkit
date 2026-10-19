@@ -56,6 +56,22 @@ npm run dev
 # 访问 http://localhost:3000
 ```
 
+## 回归验证
+
+测试环境使用 Node.js 20 或更新版本。
+
+```bash
+npm ci
+npm test                    # 构建、CSS 与缓存版本回归
+npx playwright install chromium
+npm run test:images          # 图片选取、压缩、Base64、批量 WebP 与下载
+TEST_BUILD=1 npm run test:images # 同样验证构建产物及 /k-toolkit/ 子路径
+```
+
+浏览器测试使用自动启动的本地服务和生成的测试图片，不访问模型服务。可用
+`TEST_BROWSER=firefox` 切换 Firefox（先安装对应 Playwright 浏览器），或用
+`TEST_BROWSER_CHANNEL=chrome` 使用已安装的 Chrome。375px / 768px 检查是桌面浏览器视口模拟，不代替手机真机测试。
+
 ## Docker 部署
 
 ```bash
