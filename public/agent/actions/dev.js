@@ -167,19 +167,22 @@ const DevActions = [
     meta: { tier: 'standard', tags: ['cron', 'schedule', 'crontab'], category: 'dev' },
     parameters: {
       type: 'object',
-      properties: { expr: { type: 'string', description: 'Cron 表达式（5位）' } },
+      properties: {
+        expr: { type: 'string', description: 'Cron 表达式：5 位 Linux、6 位 Spring（秒在前）或 Quartz（支持 ? L W #）' },
+        dialect: { type: 'string', enum: ['auto', 'unix', 'spring', 'quartz'], default: 'auto', description: '格式，默认按字段数自动识别' },
+        count: { type: 'integer', minimum: 1, maximum: 20, default: 5, description: '返回的下次执行次数' },
+      },
       required: ['expr'],
     },
-    execute({ expr }) {
-      const parts = expr.trim().split(/\s+/);
-      if (parts.length !== 5) {
-        return { success: false, data: { valid: false }, display: '需要 5 位 Cron 表达式' };
-      }
-      const [min, hour, dom, mon, dow] = parts;
-      const desc = `分钟:${min} 小时:${hour} 日:${dom} 月:${mon} 周:${dow}`;
-      // Simple next-run approximation (not a full cron engine)
-      return { success: true, data: { valid: true, description: desc, nextRuns: ['(需完整 cron 引擎计算)'] },
-        display: `Cron 有效 — ${desc}` };
+    async execute({ expr, dialect = 'auto', count = 5 }) {
+      const cron = await ToolCompute.load('cron');
+      const parsed = cron.parse(expr, dialect);
+      if (!parsed.ok) return { success: false, data: { valid: false, field: parsed.field, error: parsed.error }, display: `Cron 无效：${parsed.error}` };
+      const lang = typeof getCurrentLang === 'function' && getCurrentLang() === 'en' ? 'en' : 'zh';
+      const description = cron.describe(parsed, lang);
+      const nextRuns = cron.next(parsed, new Date(), Math.min(Math.max(count, 1), 20)).map(d => `${ToolCompute.localDate(d)} ${d.toTimeString().slice(0, 8)}`);
+      return { success: true, data: { valid: true, dialect: parsed.dialect, description, nextRuns },
+        display: `${description}\n${nextRuns.join('\n') || '未来 30 年内不会触发'}` };
     },
   },
   {

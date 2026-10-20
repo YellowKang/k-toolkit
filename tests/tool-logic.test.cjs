@@ -13,6 +13,8 @@ function load(...files) {
   return context;
 }
 const local = (y, m, d) => new Date(y, m - 1, d);
+// Values created inside the vm realm compare structurally only after crossing back.
+const plain = value => JSON.parse(JSON.stringify(value));
 const ymd = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 test('financial uppercase follows the payment settlement writing rules', () => {
@@ -83,6 +85,77 @@ test('semver precedence follows the specification', () => {
   assert.equal(_svCmp('v1.2.3', '1.2.3+build.5'), 0);
   for (const bad of ['01.2.3', '1.2', '1.2.3-', '1.2.3-01', '1.2.3_beta']) assert.equal(_svParse(bad), null, bad);
   assert.equal(_svParse('1.2.3-x-y.7+sha.5114f85').pre, 'x-y.7');
+});
+
+test('cron supports Linux, Spring and Quartz syntax with correct day semantics', () => {
+  const { KCompute: { cron } } = load('compute/cron.js');
+  const from = new Date(2026, 9, 20, 20, 53, 10); // Tue 2026-10-20 20:53:10
+  const runs = (expr, n = 3, dialect) => plain(cron.next(cron.parse(expr, dialect), from, n).map(d => `${ymd(d)} ${d.toTimeString().slice(0, 8)}`));
+  assert.deepEqual(runs('*/15 * * * *'), ['2026-10-20 21:00:00', '2026-10-20 21:15:00', '2026-10-20 21:30:00']);
+  assert.deepEqual(runs('0 0 1 1 *'), ['2027-01-01 00:00:00', '2028-01-01 00:00:00', '2029-01-01 00:00:00']); // yearly works
+  assert.deepEqual(runs('0 0 1 * 1'), ['2026-10-26 00:00:00', '2026-11-01 00:00:00', '2026-11-02 00:00:00']); // Vixie OR
+  assert.deepEqual(runs('0 0 * * 7', 1), ['2026-10-25 00:00:00']); // 7 = Sunday
+  assert.deepEqual(runs('0 0 1-30/10 * *'), ['2026-10-21 00:00:00', '2026-11-01 00:00:00', '2026-11-11 00:00:00']);
+  assert.deepEqual(runs('*/5 * * * * *', 2), ['2026-10-20 20:53:15', '2026-10-20 20:53:20']); // Spring seconds
+  assert.deepEqual(runs('0 0 12 ? * 6L', 2, 'quartz'), ['2026-10-30 12:00:00', '2026-11-27 12:00:00']); // last Friday
+  assert.deepEqual(runs('0 0 9 ? * MON#2', 1, 'quartz'), ['2026-11-09 09:00:00']);
+  assert.deepEqual(runs('0 30 9 15W * ?', 1, 'quartz'), ['2026-11-16 09:30:00']); // Nov 15 is a Sunday
+  assert.deepEqual(runs('0 0 10 LW * ?', 2, 'quartz'), ['2026-10-30 10:00:00', '2026-11-30 10:00:00']);
+  assert.deepEqual(runs('0 0 30 2 *'), []);
+  assert.equal(cron.describe(cron.parse('0 9 * * 1-5'), 'zh'), '周一至周五 · 09:00');
+  assert.equal(cron.describe(cron.parse('*/15 * * * *'), 'en'), 'every 15 minutes');
+  for (const [expr, code] of [['99 * * * *', 'range'], ['0 9 * *', 'count'], ['0 0 12 1 * 1', 'quartz-both'], ['0 0 L * *', 'quartz-ext'], ['? * * * *', 'question'], ['*/0 * * * *', 'step']]) {
+    const parsed = cron.parse(expr, expr === '0 0 12 1 * 1' ? 'quartz' : 'auto');
+    assert.equal(parsed.ok, false, expr); assert.equal(parsed.code, code, expr);
+  }
+});
+
+test('CSV parsing and writing round-trip quotes, newlines, BOM and delimiters', () => {
+  const { KCompute: { csv } } = load('compute/csv.js');
+  const parsed = csv.parse('﻿name;note\r\n"Bob; Jr.";"line1\nline2"\r\nAnn;"say ""hi"""\r\n');
+  assert.equal(parsed.delimiter, ';');
+  assert.deepEqual(plain(parsed.rows), [['name', 'note'], ['Bob; Jr.', 'line1\nline2'], ['Ann', 'say "hi"']]);
+  assert.throws(() => csv.parse('a,"b\nc'), /Unterminated/);
+  const objects = csv.toObjects(csv.parse('id,id,,flag\n1,2,3,true\n007,x').rows, { infer: true });
+  assert.deepEqual(plain(objects), [{ id: 1, id_2: 2, column3: 3, flag: true }, { id: '007', id_2: 'x', column3: '', flag: '' }]);
+  const text = csv.stringify([{ a: 'x,y', b: { c: 1, d: [1, 2] } }, { a: ' pad', e: null }]);
+  assert.equal(text, 'a,b.c,b.d,e\n"x,y",1,"[1,2]",\n" pad",,,');
+  assert.equal(csv.stringify([{ b: { c: 1 } }], { flat: false }), 'b\n"{""c"":1}"');
+});
+
+test('number base conversion is exact beyond 2^53 and rejects stray characters', () => {
+  const { nbParse, nbFormat } = load('tools/number-base.js');
+  const max = nbParse('0xFFFF_FFFF_FFFF_FFFF', 'hex').value;
+  assert.equal(nbFormat(max, 10), '18446744073709551615');
+  assert.equal(nbFormat(nbParse('-255', 'dec').value, 16), '-FF');
+  assert.equal(nbParse('12a', 'dec').error, 'a');
+  assert.equal(nbParse('102', 'bin').error, '2');
+  assert.ok(nbParse('  ', 'oct').empty);
+});
+
+test('salary tax uses cumulative withholding and the separate bonus table', () => {
+  const { taxSchedule, taxBonus, taxAnnual } = load('tools/tax-calc.js');
+  const plan = taxSchedule({ salary: 20000, insurance: 3000, extra: 2000 });
+  assert.equal(plan.annualTax, 9480);
+  assert.deepEqual(plain(plan.months.slice(0, 4).map(m => m.tax)), [300, 300, 300, 580]);
+  assert.equal(plan.months.reduce((s, m) => s + m.tax, 0), 9480);
+  assert.equal(taxSchedule({ salary: 4000 }).annualTax, 0);
+  assert.equal(taxBonus(50000), 4790);
+  assert.equal(taxBonus(36000), 1080);
+  assert.equal(taxAnnual(960001), _round(960001 * 0.45 - 181920));
+  function _round(v) { return Math.round(v * 100) / 100; }
+});
+
+test('subnet math validates octets and labels special-purpose ranges', () => {
+  const { ipParse, ipSubnet, ipTypes, numToIp } = load('tools/ip-calc.js');
+  assert.equal(ipParse('999.1.1.1'), null);
+  assert.equal(ipParse('192.168.1.256'), null);
+  const s = ipSubnet(ipParse('192.168.1.100'), 26);
+  assert.deepEqual([numToIp(s.network), numToIp(s.broadcast), numToIp(s.mask), numToIp(s.wildcard), s.hosts], ['192.168.1.64', '192.168.1.127', '255.255.255.192', '0.0.0.63', 62]);
+  assert.equal(ipSubnet(ipParse('10.0.0.1'), 31).hosts, 2);
+  assert.deepEqual(plain(ipTypes(ipParse('100.70.1.1'))), ['cgnat']);
+  assert.deepEqual(plain(ipTypes(ipParse('8.8.8.8'))), ['public']);
+  assert.deepEqual(plain(ipTypes(ipParse('203.0.113.9'))), ['doc']);
 });
 
 test('unit conversions use exact definitions without floating-point noise', () => {

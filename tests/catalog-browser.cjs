@@ -115,6 +115,15 @@ const express = require('express');
     await route('number-chinese', '#ncInput');
     await page.locator('#ncInput').fill('16409.02');
     assert.equal(await page.locator('#ncOutput').textContent(), '壹万陆仟肆佰零玖元零贰分');
+    await route('cron', '#cronInput');
+    await page.locator('#cronInput').fill('0 0 1 1 *');
+    await page.waitForFunction(() => document.querySelectorAll('#cronNextList .result-row').length === 8);
+    assert.match(await page.locator('#cronNextList .result-row').first().textContent(), /-01-01 .* 00:00:00/);
+    await route('json-csv', '#jcInput');
+    await page.locator('#jcInput').fill('name,note\r\n"Bob, Jr.","a\nb"\r\n');
+    await page.evaluate(() => convertJsonCsv());
+    await page.waitForFunction(() => document.querySelector('#jcOutput').value.includes('Bob, Jr.'));
+    assert.deepEqual(JSON.parse(await page.locator('#jcOutput').inputValue()), [{ name: 'Bob, Jr.', note: 'a\nb' }]);
     await route('hmac-gen', '#hmacMsg');
     for (const width of [375, 768]) {
       await page.setViewportSize({ width, height: 850 });

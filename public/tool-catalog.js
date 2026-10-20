@@ -9,7 +9,7 @@
   { id: 'base64', render: 'renderBase64',        icon: '🔤', color: '#8b5cf6', name: 'Base64 编解码',  desc: '文本与 Base64 互转，支持 URL 安全模式', category: '编码加密', file: 'base64.js', tags: ['base64','encode','decode','编码','解码','b64'] },
   { id: 'wordcount', render: 'renderWordCount',     icon: '📝', color: '#10b981', name: '字数统计',      desc: '统计字符数、单词数、行数、段落数、中文字数', category: '文本处理', file: 'word-count.js', tags: ['word','count','字数','字符','统计','行数','words'] },
   { id: 'regex', render: 'renderRegex',         icon: '🔍', color: '#6366f1', name: '正则测试器',    desc: '实时高亮匹配，捕获组详情，多 flag 切换', category: '文本处理', file: 'regex.js', tags: ['regex','regexp','正则','匹配','pattern','regular expression'] },
-  { id: 'json-csv', render: 'renderJsonCsv',      icon: '🔄', color: '#0ea5e9', name: 'JSON/CSV 互转', desc: 'JSON 数组与 CSV 双向转换，支持下载文件', category: '数据格式', file: 'json-csv.js', tags: ['json','csv','转换','convert','表格','excel'] },
+  { id: 'json-csv', render: 'renderJsonCsv',      icon: '🔄', color: '#0ea5e9', name: 'JSON/CSV 互转', desc: 'JSON 与 CSV 双向转换，支持引号换行、分隔符识别与 Excel 下载', category: '数据格式', file: 'json-csv.js', tags: ['json','csv','转换','convert','表格','excel'] },
   { id: 'text-diff', render: 'renderTextDiff',     icon: '📊', color: '#f97316', name: '文本对比',      desc: '逐行对比两段文本，高亮差异内容', category: '文本处理', file: 'text-diff.js', tags: ['diff','compare','对比','比较','差异','文本'] },
   { id: 'markdown', render: 'renderMarkdown',      icon: '✍️',  color: '#14b8a6', name: 'Markdown 预览', desc: '实时渲染 Markdown，支持代码高亮', category: '文本处理', file: 'markdown.js', tags: ['markdown','md','预览','preview','渲染'] },
   { id: 'case-convert', render: 'renderCaseConvert',  icon: '🔡', color: '#64748b', name: '大小写转换',    desc: '驼峰、下划线、全大写等多种格式互转', category: '文本处理', file: 'case-convert.js', tags: ['case','camel','snake','kebab','pascal','大小写','驼峰','下划线','命名'] },
@@ -21,12 +21,12 @@
   { id: 'url-parser', render: 'renderUrlParser',    icon: '🔗', color: '#14b8a6', name: 'URL 工具箱',    desc: 'URL 解析、编解码、参数构建三合一', category: '网络工具', file: 'url-parser.js', tags: ['url','parse','链接','网址','参数','query','href','encode','decode','编码','解码'] },
   { id: 'hash', render: 'renderHash',          icon: '🔐', color: '#ec4899', name: '哈希生成器',    desc: 'SHA-1/256/384/512，支持文本和文件哈希校验', category: '编码加密', file: 'hash.js', tags: ['hash','sha','sha256','sha1','sha512','md5','摘要','digest','哈希','散列','校验'] },
   { id: 'jwt', render: 'renderJWT',           icon: '🎫', color: '#8b5cf6', name: 'JWT 工具',      desc: '解析/生成 JWT Token，支持 HS256 签名', category: '编码加密', file: 'jwt.js', tags: ['jwt','token','解码','decode','auth','认证','json web token','生成','generate','签名','sign','secret'] },
-  { id: 'number-base', render: 'renderNumberBase',   icon: '🔢', color: '#f97316', name: '进制转换',      desc: '二/八/十/十六进制互转，ASCII/Unicode 码点', category: '计算工具', file: 'number-base.js', tags: ['hex','binary','octal','decimal','进制','十六进制','二进制','八进制','0x'] },
+  { id: 'number-base', render: 'renderNumberBase',   icon: '🔢', color: '#f97316', name: '进制转换',      desc: '二/八/十/十六进制任意精度互转，ASCII/Unicode 码点', category: '计算工具', file: 'number-base.js', tags: ['hex','binary','octal','decimal','进制','十六进制','二进制','八进制','0x'] },
   { id: 'yaml-json', render: 'renderYAMLJSON',     icon: '📑', color: '#65a30d', name: 'YAML/JSON 互转',desc: 'YAML 与 JSON 双向转换，配置文件处理', category: '数据格式', file: 'yaml-json.js', tags: ['yaml','yml','json','配置','config','convert'] },
   { id: 'sql-format', render: 'renderSQLFormat',    icon: '🗄️', color: '#b45309', name: 'SQL 格式化',    desc: 'SQL 美化/压缩，支持 SELECT/INSERT/UPDATE/DELETE', category: '数据格式', file: 'sql-format.js', tags: ['sql','format','数据库','query','查询','美化','database'] },
   { id: 'curl-gen', render: 'renderCurlGen',      icon: '🌀', color: '#0369a1', name: 'cURL 生成器',   desc: '可视化配置生成 curl / fetch / axios 代码片段', category: '网络工具', file: 'curl-gen.js', tags: ['curl','http','fetch','axios','api','请求','request'] },
   { id: 'http-status', render: 'renderHttpStatus',   icon: '📡', color: '#be185d', name: 'HTTP 状态码',   desc: '查询 HTTP 状态码含义，支持搜索和分类浏览', category: '网络工具', file: 'http-status.js', tags: ['http','status','状态码','200','404','500','response'] },
-  { id: 'cron', render: 'renderCron',          icon: '⏰', color: '#d97706', name: 'Cron 表达式',   desc: '可视化解析 Cron 表达式，展示下次执行时间', category: '时间效率', file: 'cron.js', tags: ['cron','crontab','定时','schedule','调度','定时任务'] },
+  { id: 'cron', render: 'renderCron',          icon: '⏰', color: '#d97706', name: 'Cron 表达式',   desc: '解析 Linux/Spring/Quartz Cron，校验字段并推算下次执行时间', category: '时间效率', file: 'cron.js', tags: ['cron','crontab','定时','schedule','调度','定时任务'] },
   { id: 'password-gen', render: 'renderPasswordGen',  icon: '🛡️', color: '#16a34a', name: '密码生成器',    desc: '自定义规则生成强密码，密码强度评估', category: '编码加密', file: 'password-gen.js', tags: ['password','密码','生成','random','安全','强密码','pwd'] },
   // CSS 工具
   { id: 'gradient', render: 'renderGradient',      icon: '🎨', color: '#ec4899', name: '渐变生成器',    desc: '可视化创建 CSS 渐变，实时预览代码输出', category: 'CSS 工具', file: 'gradient.js', tags: ['gradient','渐变','css','linear','radial','背景'] },
@@ -46,9 +46,9 @@
   { id: 'calculator', render: 'renderCalculator',     icon: '🧮', color: '#6366f1', name: '科学计算器',     desc: '键盘/鼠标双控，支持基础及百分比运算', category: '计算工具', file: 'calculator.js', tags: ['calculator','calc','计算','数学','math','加减乘除'] },
   { id: 'unit-convert', render: 'renderUnitConvert',   icon: '📏', color: '#10b981', name: '单位换算',       desc: '长度/重量/温度/面积/体积/时间/存储/速度换算与数字格式化', category: '计算工具', file: 'unit-convert.js', tags: ['unit','convert','单位','换算','长度','重量','温度','面积','数字格式化','千分位','currency','货币','number format'] },
   { id: 'loan-calc', render: 'renderLoanCalc',      icon: '🏦', color: '#f59e0b', name: '贷款计算器',     desc: '等额本息/本金还款，含完整还款计划表', category: '计算工具', file: 'loan-calc.js', tags: ['loan','贷款','房贷','还款','利率','mortgage','等额本息'] },
-  { id: 'byte-convert', render: 'renderByteConvert',   icon: '💾', color: '#64748b', name: '存储换算',       desc: '字节/KB/MB/GB/TB 互转，含网速换算', category: '计算工具', file: 'byte-convert.js', tags: ['byte','kb','mb','gb','tb','存储','容量','storage','网速'] },
+  { id: 'byte-convert', render: 'renderByteConvert',   icon: '💾', color: '#64748b', name: '存储换算',       desc: '存储单位 1024/1000 两种进制互转，含网速与传输时间', category: '计算工具', file: 'byte-convert.js', tags: ['byte','kb','mb','gb','tb','存储','容量','storage','网速'] },
   { id: 'number-chinese', render: 'renderNumberChinese', icon: '🀄', color: '#dc2626', name: '数字大写',       desc: '数字转财务中文大写，适合票据填写', category: '计算工具', file: 'number-chinese.js', tags: ['chinese','大写','财务','金额','票据','壹贰叁'] },
-  { id: 'ip-calc', render: 'renderIpCalc',        icon: '🌐', color: '#0891b2', name: 'IP 子网计算',    desc: 'IP/CIDR 子网掩码计算，主机范围与广播地址', category: '网络工具', file: 'ip-calc.js', tags: ['ip','cidr','subnet','子网','掩码','网段','network'] },
+  { id: 'ip-calc', render: 'renderIpCalc',        icon: '🌐', color: '#0891b2', name: 'IP 子网计算',    desc: 'IPv4 子网、掩码、主机范围与地址类型判断', category: '网络工具', file: 'ip-calc.js', tags: ['ip','cidr','subnet','子网','掩码','网段','network'] },
   // 时间工具
   { id: 'date-diff', render: 'renderDateDiff',      icon: '📅', color: '#14b8a6', name: '日期差计算',     desc: '两日期间隔天数、年月日跨度与工作日（不含节假日）', category: '时间效率', file: 'date-diff.js', tags: ['date','diff','日期','天数','间隔','工作日','days'] },
   { id: 'timezone', render: 'renderTimezone',       icon: '🌍', color: '#6366f1', name: '时区转换',       desc: '13 个主要时区实时对比，快速换算', category: '时间效率', file: 'timezone.js', tags: ['timezone','时区','utc','gmt','时差','convert'] },
@@ -92,7 +92,7 @@
   { id: 'terminal-color',  render: 'renderTerminalColor',  icon: '🖥️', color: '#22c55e', name: '终端颜色码',       desc: 'ANSI 颜色代码生成预览，前景/背景/样式任意组合',             category: '开发工具', file: 'terminal-color.js',  isNew: true, tags: ['ansi','terminal','终端','颜色','color','bash','shell'] },
   // 计算工具 - 新增
   { id: 'age-calc',        render: 'renderAgeCalc',        icon: '🎂', color: '#ec4899', name: '年龄计算器',       desc: '精确年龄（岁月日）、距生日天数、生肖星座查询',              category: '计算工具', file: 'age-calc.js',        isNew: true, tags: ['age','年龄','生日','birthday','星座','生肖'] },
-  { id: 'tax-calc',        render: 'renderTaxCalc',        icon: '💰', color: '#f59e0b', name: '个税计算器',       desc: '2024 个人所得税速算，含五险一金和专项附加扣除',            category: '计算工具', file: 'tax-calc.js',        isNew: true, tags: ['tax','个税','所得税','工资','salary','五险一金'] },
+  { id: 'tax-calc',        render: 'renderTaxCalc',        icon: '💰', color: '#f59e0b', name: '个税计算器',       desc: '工资个税按月累计预扣明细，含专项附加扣除与年终奖单独计税',            category: '计算工具', file: 'tax-calc.js',        isNew: true, tags: ['tax','个税','所得税','工资','salary','五险一金'] },
   // 时间工具 - 新增
   { id: 'lunar-calendar',  render: 'renderLunarCalendar',  icon: '🌙', color: '#8b5cf6', name: '农历查询',         desc: '公历农历互转，含干支、生肖、节气与日干支',               category: '时间效率', file: 'lunar-calendar.js',  isNew: true, tags: ['lunar','农历','日历','干支','节气','calendar','阴历'] },
   // 效率工具 - 新增
