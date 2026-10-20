@@ -108,6 +108,13 @@ const express = require('express');
     await page.evaluate(() => parseUrl());
     await page.locator('#urlParamsTable .copy-inline').click();
     assert.equal(await page.evaluate(() => window.__copiedStatus), `it's"x`);
+    // Shared compute modules load on demand (versioned like tools); 2027's new moon is at 23:56 Beijing time.
+    await route('lunar-calendar', '#lcDate');
+    await page.locator('#lcDate').fill('2027-02-06');
+    await page.waitForFunction(() => document.querySelector('#lcCards')?.textContent.includes('丁未年 正月初一'));
+    await route('number-chinese', '#ncInput');
+    await page.locator('#ncInput').fill('16409.02');
+    assert.equal(await page.locator('#ncOutput').textContent(), '壹万陆仟肆佰零玖元零贰分');
     await route('hmac-gen', '#hmacMsg');
     for (const width of [375, 768]) {
       await page.setViewportSize({ width, height: 850 });

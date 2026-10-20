@@ -38,7 +38,58 @@
     else if (sort !== 'none') throw new Error('Unknown line order: ' + sort);
     return { result: lines.join('\n'), inputLines, outputLines: lines.length, removed: inputLines - lines.length };
   }
+  // Calendar dates are local days: `new Date('YYYY-MM-DD')` is UTC midnight and toISOString() is the UTC day.
+  const pad2 = n => String(n).padStart(2, '0');
+  const localDate = (date = new Date()) => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  function parseLocalDate(text) {
+    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(text ?? '').trim());
+    if (!m) return null;
+    const date = new Date(2000, 0, 1);
+    date.setFullYear(+m[1], +m[2] - 1, +m[3]);
+    return date.getMonth() === +m[2] - 1 && date.getDate() === +m[3] ? date : null;
+  }
+  const dayNumber = date => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000;
+  function addMonths(date, months) {
+    const result = new Date(date.getFullYear(), date.getMonth() + months, 1);
+    result.setDate(Math.min(date.getDate(), new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate()));
+    return result;
+  }
+  /** Whole years/months/days from a to b (month ends clamp, e.g. Jan 31 + 1 month = Feb 28/29). */
+  function calendarDiff(a, b) {
+    const sign = dayNumber(b) < dayNumber(a) ? -1 : 1;
+    const [from, to] = sign < 0 ? [b, a] : [a, b];
+    let months = (to.getFullYear() - from.getFullYear()) * 12 + to.getMonth() - from.getMonth();
+    if (dayNumber(addMonths(from, months)) > dayNumber(to)) months--;
+    return { sign, years: Math.floor(months / 12), months: months % 12, totalMonths: months,
+      days: dayNumber(to) - dayNumber(addMonths(from, months)), totalDays: dayNumber(to) - dayNumber(from) };
+  }
+  /** Monday–Friday count in the closed range between two dates (public holidays not included). */
+  function weekdaysBetween(a, b) {
+    let from = dayNumber(a), to = dayNumber(b);
+    if (to < from) [from, to] = [to, from];
+    const total = to - from + 1, full = Math.floor(total / 7);
+    let count = full * 5;
+    for (let day = from + full * 7; day <= to; day++) { const dow = ((day + 4) % 7 + 7) % 7; if (dow !== 0 && dow !== 6) count++; }
+    return count;
+  }
+
+  // Shared DOM-free modules in compute/<name>.js register on window.KCompute; pages and Agent load the same code.
+  const moduleLoads = new Map();
+  function load(name) {
+    if (!/^[a-z][a-z0-9-]*$/.test(name)) return Promise.reject(new Error('Invalid compute module: ' + name));
+    if (window.KCompute?.[name]) return Promise.resolve(window.KCompute[name]);
+    if (!moduleLoads.has(name)) moduleLoads.set(name, new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'compute/' + name + '.js?v=' + encodeURIComponent(document.querySelector('meta[name="toolkit-version"]')?.content || 'dev');
+      script.onload = () => window.KCompute?.[name] ? resolve(window.KCompute[name]) : reject(new Error('Compute module did not register: ' + name));
+      script.onerror = () => { moduleLoads.delete(name); script.remove(); reject(new Error('Failed to load compute module: ' + name)); };
+      document.head.appendChild(script);
+    }));
+    return moduleLoads.get(name);
+  }
+
   window.ToolCompute = Object.freeze({ words, formatWords, base64Encode, base64Decode, processLines,
     caseConvert: (text, style) => style === 'upper' ? text.toUpperCase() : style === 'lower' ? text.toLowerCase() : formatWords(words(text), style),
+    localDate, parseLocalDate, addMonths, calendarDiff, weekdaysBetween, load,
   });
 })();

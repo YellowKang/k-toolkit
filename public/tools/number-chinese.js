@@ -1,66 +1,144 @@
+/* ── 数字大写（财务）：按《支付结算办法》书写规则 ── */
+
+const _ncDict = {
+  zh: {
+    title: '数字大写转换（财务）',
+    input_ph: '输入金额，如 12345.67（可含逗号或 ¥）',
+    convert: '转换',
+    clear: '清空',
+    upper: '财务大写',
+    lower: '中文小写',
+    copy_upper: '复制大写',
+    rounded: v => `已按四舍五入到分：${v}`,
+    err_invalid: '请输入有效金额，例如 12345.67',
+    err_large: '金额过大：整数部分最多 16 位（万亿级）',
+    rules: '规则：数字中间有 0 写“零”；角为 0 分不为 0 时元后写“零”；到元为止写“整”，有分不写“整”。',
+  },
+  en: {
+    title: 'Chinese Financial Numerals',
+    input_ph: 'Amount, e.g. 12345.67 (commas or ¥ allowed)',
+    convert: 'Convert',
+    clear: 'Clear',
+    upper: 'Financial uppercase (大写)',
+    lower: 'Chinese lowercase (小写)',
+    copy_upper: 'Copy uppercase',
+    rounded: v => `Rounded to cents: ${v}`,
+    err_invalid: 'Enter a valid amount, e.g. 12345.67',
+    err_large: 'Amount too large: at most 16 integer digits',
+    rules: 'Rules: write 零 for inner zeros, 零 after 元 when jiao is 0 but fen is not, and 整 when the amount ends at 元.',
+  },
+};
+
+const _NC_UPPER = { digits: '零壹贰叁肆伍陆柒捌玖', units: ['', '拾', '佰', '仟'] };
+const _NC_LOWER = { digits: '零一二三四五六七八九', units: ['', '十', '百', '千'] };
+
+/** Parse an amount into integer cents (half-up on the third decimal); null when invalid. */
+function ncParseAmount(input) {
+  let s = String(input ?? '').trim().replace(/[,，\s]/g, '').replace(/^[¥￥]/, '');
+  if (/e/i.test(s)) {
+    const n = Number(s);
+    if (!Number.isFinite(n)) return null;
+    s = n.toFixed(2);
+  }
+  const m = s.match(/^([+-])?(\d*)(?:\.(\d*))?$/);
+  if (!m || (!m[2] && !m[3])) return null;
+  const frac = m[3] || '';
+  let cents = BigInt(m[2] || '0') * 100n + BigInt((frac + '00').slice(0, 2));
+  if ((frac[2] || '0') >= '5') cents += 1n;
+  return { negative: m[1] === '-' && cents > 0n, cents, exact: frac.length <= 2 };
+}
+
+function _ncSection(n, set) {
+  let s = '', zero = false;
+  for (let i = 3; i >= 0; i--) {
+    const d = Math.floor(n / 10 ** i) % 10;
+    if (d === 0) { if (s) zero = true; continue; }
+    if (zero) { s += set.digits[0]; zero = false; }
+    s += set.digits[d] + set.units[i];
+  }
+  return s;
+}
+
+function _ncInteger(n, set) {
+  if (n >= 100000000n) {
+    const lo = n % 100000000n;
+    return _ncInteger(n / 100000000n, set) + '亿' + (lo ? (lo < 10000000n ? set.digits[0] : '') + _ncInteger(lo, set) : '');
+  }
+  if (n >= 10000n) {
+    const lo = Number(n % 10000n);
+    return _ncSection(Number(n / 10000n), set) + '万' + (lo ? (lo < 1000 ? set.digits[0] : '') + _ncSection(lo, set) : '');
+  }
+  return n ? _ncSection(Number(n), set) : '';
+}
+
+function _ncAmount(input, set, simplifyTen) {
+  const amount = typeof input === 'object' && input && 'cents' in input ? input : ncParseAmount(input);
+  if (!amount) throw new Error('invalid');
+  const yuan = amount.cents / 100n, rest = Number(amount.cents % 100n);
+  if (yuan >= 10n ** 16n) throw new Error('too-large');
+  let int = _ncInteger(yuan, set);
+  if (simplifyTen && int.startsWith('一十')) int = int.slice(1);
+  const jiao = Math.floor(rest / 10), fen = rest % 10;
+  let out;
+  if (!rest) out = (int || set.digits[0]) + '元整';
+  else {
+    out = int ? int + '元' : '';
+    if (jiao) out += set.digits[jiao] + '角';
+    else if (int) out += set.digits[0];
+    if (fen) out += set.digits[fen] + '分';
+  }
+  return (amount.negative ? '负' : '') + out;
+}
+
+/** 财务大写，如 1409.5 → 壹仟肆佰零玖元伍角；325.04 → 叁佰贰拾伍元零肆分 */
+function numToChinese(input) { return _ncAmount(input, _NC_UPPER, false); }
+/** 中文小写金额，如 12.3 → 十二元三角 */
+function numToSmallChinese(input) { return _ncAmount(input, _NC_LOWER, true); }
+
 function renderNumberChinese(el) {
+  const T = makeToolI18n(_ncDict);
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div class="panel-label">数字大写转换（财务）</div>
-      <input class="tool-input" id="ncInput" type="number" placeholder="输入金额，如 12345.67" oninput="ncConvert()" style="margin-bottom:14px">
+      <div class="panel-label">${T('title')}</div>
+      <input class="tool-input" id="ncInput" inputmode="decimal" autocomplete="off" placeholder="${T('input_ph')}" oninput="ncConvert()" style="margin-bottom:14px">
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="ncConvert()">转换</button>
-        <button class="btn btn-secondary" onclick="document.getElementById('ncInput').value='';document.getElementById('ncResult').style.display='none'">清空</button>
+        <button class="btn btn-primary" onclick="ncConvert()">${T('convert')}</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('ncInput').value='';ncConvert()">${T('clear')}</button>
       </div>
+      <div id="ncError" style="display:none;margin-top:10px;font-size:13px;color:#ef4444"></div>
     </div>
     <div class="tool-card-panel" id="ncResult" style="display:none">
       <div style="margin-bottom:10px">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">财务大写</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${T('upper')}</div>
         <div id="ncOutput" style="font-size:18px;font-weight:700;color:var(--neon);word-break:break-all"></div>
       </div>
       <div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">中文小写</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${T('lower')}</div>
         <div id="ncSmall" style="font-size:16px;color:var(--accent)"></div>
       </div>
-      <button class="btn btn-secondary" style="margin-top:12px" onclick="copyText(document.getElementById('ncOutput').textContent,this)">复制大写</button>
-    </div>`;
+      <div id="ncNote" style="font-size:12px;color:var(--text-muted);margin-top:10px"></div>
+      <button class="btn btn-secondary" style="margin-top:12px" onclick="copyText(document.getElementById('ncOutput').textContent,this)">${T('copy_upper')}</button>
+    </div>
+    <div class="tool-card-panel" style="font-size:12px;color:var(--text-muted)">${T('rules')}</div>`;
 }
 
 function ncConvert() {
-  const v = parseFloat(document.getElementById('ncInput').value);
-  if (isNaN(v)) return;
-  document.getElementById('ncOutput').textContent = numToChinese(v);
-  document.getElementById('ncSmall').textContent = numToSmallChinese(v);
-  document.getElementById('ncResult').style.display='';
-}
-
-function numToChinese(n) {
-  if (n===0) return '零元整';
-  const digits=['零','壹','贰','叁','肆','伍','陆','柒','捌','玖'];
-  const units=['','拾','佰','仟'];
-  const sections=['','万','亿','万亿'];
-  const neg=n<0; n=Math.abs(n);
-  const intPart=Math.floor(n), decPart=Math.round((n-intPart)*100);
-  function sectionToChinese(num) {
-    let s='',zero=false;
-    for(let i=3;i>=0;i--){const d=Math.floor(num/Math.pow(10,i))%10;if(d===0){if(s.length>0&&i>0)zero=true;}else{if(zero){s+='零';zero=false;}s+=digits[d]+(i>0?units[i]:'');}}
-    return s;
+  const T = makeToolI18n(_ncDict);
+  const raw = document.getElementById('ncInput').value;
+  const result = document.getElementById('ncResult'), error = document.getElementById('ncError');
+  if (!raw.trim()) { result.style.display = 'none'; error.style.display = 'none'; return; }
+  const amount = ncParseAmount(raw);
+  try {
+    if (!amount) throw new Error('invalid');
+    document.getElementById('ncOutput').textContent = numToChinese(amount);
+    document.getElementById('ncSmall').textContent = numToSmallChinese(amount);
+    const cents = amount.cents.toString().padStart(3, '0');
+    document.getElementById('ncNote').textContent = amount.exact ? '' : T('rounded', (amount.negative ? '-' : '') + cents.slice(0, -2) + '.' + cents.slice(-2));
+    result.style.display = '';
+    error.style.display = 'none';
+  } catch (e) {
+    error.textContent = T(e.message === 'too-large' ? 'err_large' : 'err_invalid');
+    error.style.display = '';
+    result.style.display = 'none';
   }
-  let result='',parts=[intPart%10000,Math.floor(intPart/10000)%10000,Math.floor(intPart/100000000)];
-  let sec=parts.reverse().findIndex(p=>p>0);
-  let built='',hasContent=false;
-  [parts[0],parts[1],parts[2]].reverse().forEach((p,i)=>{
-    const idx=2-i;
-    if(p>0){const s=sectionToChinese(p);if(hasContent&&p<1000)built+='零';built+=s+sections[idx];hasContent=true;}
-    else if(hasContent&&idx>0) built+='零';
-  });
-  result=built.replace(/零+/g,'零').replace(/零([万亿])/g,'$1').replace(/亿万/g,'亿')+'元';
-  if(decPart>0){const j=Math.floor(decPart/10),f=decPart%10;result+=(j>0?digits[j]+'角':'')+(f>0?digits[f]+'分':'');}
-  else result+='整';
-  return (neg?'负':'')+result;
-}
-
-function numToSmallChinese(n) {
-  const map=['零','一','二','三','四','五','六','七','八','九'];
-  const u=['','十','百','千','万','十万','百万','千万','亿'];
-  const neg=n<0; n=Math.abs(n);
-  const i=Math.floor(n), d=Math.round((n-i)*100);
-  const s=String(i).split('').reverse().map((c,idx)=>map[+c]+(c!=='0'?u[idx]:'')).reverse().join('').replace(/零+/g,'零').replace(/^零/,'');
-  const dec=d>0?(Math.floor(d/10)?map[Math.floor(d/10)]+'角':'')+(d%10?map[d%10]+'分':''):'整';
-  return (neg?'负':'')+(s||'零')+'元'+dec;
 }

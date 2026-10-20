@@ -29,8 +29,8 @@ const REGEX_BEFORE = new Set([
 ]);
 
 function lastToken(s) {
-  // Get the last non-whitespace token from output so far
-  const m = s.match(/([a-zA-Z_$][\w$]*|[^\s\w$])\s*$/);
+  // Get the last non-whitespace token from output so far (a number before '/' means division)
+  const m = s.match(/([a-zA-Z_$][\w$]*|\d[\w.]*|[^\s\w$])\s*$/);
   return m ? m[1] : '';
 }
 
@@ -243,12 +243,14 @@ const toolCount = processDir(path.join(PUB, 'tools'), path.join(DIST, 'tools'), 
 });
 console.log(`  ${toolCount} files`);
 
-// ── Minify agent/ JS ──
-console.log('\nMinifying agent/:');
-const agentCount = processDir(path.join(PUB, 'agent'), path.join(DIST, 'agent'), '.js', (s, d) => {
-  minifyAndWrite(s, d);
-});
-console.log(`  ${agentCount} files`);
+// ── Minify agent/ and compute/ JS ──
+for (const dir of ['agent', 'compute']) {
+  console.log(`\nMinifying ${dir}/:`);
+  const count = processDir(path.join(PUB, dir), path.join(DIST, dir), '.js', (s, d) => {
+    minifyAndWrite(s, d);
+  });
+  console.log(`  ${count} files`);
+}
 
 // ── Publish version metadata and a digest-verified release manifest ──
 const precache = [];

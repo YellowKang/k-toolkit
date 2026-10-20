@@ -36,6 +36,16 @@ test('minifier keeps nested templates, quotes and braces inside substitutions in
   assert.equal(vm.runInNewContext(minifyJS(src)), vm.runInNewContext(src));
 });
 
+test('minifier treats a slash after a number as division, not a regex', () => {
+  const src = [
+    "const units = [['chi', 1 / 3, 'http://a'], ['cun', 1 / 30, 'x']];",
+    '  // indented comment',
+    '  JSON.stringify(units)',
+  ].join('\n');
+  assert.equal(vm.runInNewContext(minifyJS(src)), vm.runInNewContext(src));
+  assert.ok(!minifyJS(src).includes('indented comment'));
+});
+
 test('minifier preserves comment-like text in strings and regex literals', () => {
   const src = [
     'const url = "https://example.com/*x*/";',

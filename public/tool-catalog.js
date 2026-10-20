@@ -44,13 +44,13 @@
   { id: 'xml-format', render: 'renderXmlFormat',     icon: '📰', color: '#0369a1', name: 'XML 格式化',     desc: 'XML 美化/压缩，一键转 JSON', category: '数据格式', file: 'xml-format.js', tags: ['xml','format','格式化','美化','markup'] },
   // 计算工具
   { id: 'calculator', render: 'renderCalculator',     icon: '🧮', color: '#6366f1', name: '科学计算器',     desc: '键盘/鼠标双控，支持基础及百分比运算', category: '计算工具', file: 'calculator.js', tags: ['calculator','calc','计算','数学','math','加减乘除'] },
-  { id: 'unit-convert', render: 'renderUnitConvert',   icon: '📏', color: '#10b981', name: '单位换算',       desc: '长度/重量/温度/面积/存储/速度/数字格式化多维换算', category: '计算工具', file: 'unit-convert.js', tags: ['unit','convert','单位','换算','长度','重量','温度','面积','数字格式化','千分位','currency','货币','number format'] },
+  { id: 'unit-convert', render: 'renderUnitConvert',   icon: '📏', color: '#10b981', name: '单位换算',       desc: '长度/重量/温度/面积/体积/时间/存储/速度换算与数字格式化', category: '计算工具', file: 'unit-convert.js', tags: ['unit','convert','单位','换算','长度','重量','温度','面积','数字格式化','千分位','currency','货币','number format'] },
   { id: 'loan-calc', render: 'renderLoanCalc',      icon: '🏦', color: '#f59e0b', name: '贷款计算器',     desc: '等额本息/本金还款，含完整还款计划表', category: '计算工具', file: 'loan-calc.js', tags: ['loan','贷款','房贷','还款','利率','mortgage','等额本息'] },
   { id: 'byte-convert', render: 'renderByteConvert',   icon: '💾', color: '#64748b', name: '存储换算',       desc: '字节/KB/MB/GB/TB 互转，含网速换算', category: '计算工具', file: 'byte-convert.js', tags: ['byte','kb','mb','gb','tb','存储','容量','storage','网速'] },
   { id: 'number-chinese', render: 'renderNumberChinese', icon: '🀄', color: '#dc2626', name: '数字大写',       desc: '数字转财务中文大写，适合票据填写', category: '计算工具', file: 'number-chinese.js', tags: ['chinese','大写','财务','金额','票据','壹贰叁'] },
   { id: 'ip-calc', render: 'renderIpCalc',        icon: '🌐', color: '#0891b2', name: 'IP 子网计算',    desc: 'IP/CIDR 子网掩码计算，主机范围与广播地址', category: '网络工具', file: 'ip-calc.js', tags: ['ip','cidr','subnet','子网','掩码','网段','network'] },
   // 时间工具
-  { id: 'date-diff', render: 'renderDateDiff',      icon: '📅', color: '#14b8a6', name: '日期差计算',     desc: '两日期间隔天数，含工作日/节假日计算', category: '时间效率', file: 'date-diff.js', tags: ['date','diff','日期','天数','间隔','工作日','days'] },
+  { id: 'date-diff', render: 'renderDateDiff',      icon: '📅', color: '#14b8a6', name: '日期差计算',     desc: '两日期间隔天数、年月日跨度与工作日（不含节假日）', category: '时间效率', file: 'date-diff.js', tags: ['date','diff','日期','天数','间隔','工作日','days'] },
   { id: 'timezone', render: 'renderTimezone',       icon: '🌍', color: '#6366f1', name: '时区转换',       desc: '13 个主要时区实时对比，快速换算', category: '时间效率', file: 'timezone.js', tags: ['timezone','时区','utc','gmt','时差','convert'] },
   { id: 'countdown', render: 'renderCountdown',      icon: '⏳', color: '#ec4899', name: '倒计时',         desc: '自定义目标日期倒计时，SVG 圆弧进度', category: '时间效率', file: 'countdown.js', tags: ['countdown','倒计时','timer','计时','目标'] },
   // 效率工具
@@ -87,14 +87,14 @@
   { id: 'slug-gen',        render: 'renderSlugGen',        icon: '🔗', color: '#6366f1', name: 'Slug 生成器',      desc: '标题转 URL 友好 slug，支持横线/下划线/点分隔符',            category: '文本处理', file: 'slug-gen.js',        isNew: true, tags: ['slug','url','seo','permalink','friendly','链接'] },
   { id: 'line-sort',       render: 'renderLineSort',       icon: '↕️', color: '#0ea5e9', name: '行排序去重',       desc: '多行文本排序、去重、去空行、首尾清理，支持组合清洗',               category: '文本处理', file: 'line-sort.js',       isNew: true, tags: ['sort','排序','去重','dedup','unique','行','line','trim','清洗'] },
   // 开发工具 - 新增
-  { id: 'semver',          render: 'renderSemver',         icon: '🏷️', color: '#8b5cf6', name: 'Semver 比较',      desc: '语义化版本解析、大小比较，支持预发布版本',                   category: '开发工具', file: 'semver.js',          isNew: true, tags: ['semver','version','版本','semantic','比较','npm'] },
+  { id: 'semver',          render: 'renderSemver',         icon: '🏷️', color: '#8b5cf6', name: 'Semver 比较',      desc: '语义化版本解析、比较与批量排序，预发布按规范比较',                   category: '开发工具', file: 'semver.js',          isNew: true, tags: ['semver','version','版本','semantic','比较','npm'] },
   { id: 'dns-lookup',      render: 'renderDnsLookup',      icon: '🌐', color: '#06b6d4', name: 'DNS 查询',         desc: '通过 DNS over HTTPS 查询 A/AAAA/MX/TXT/CNAME/NS 记录',     category: '网络工具', file: 'dns-lookup.js',      isNew: true, tags: ['dns','domain','域名','lookup','mx','cname','ns','resolve'] },
   { id: 'terminal-color',  render: 'renderTerminalColor',  icon: '🖥️', color: '#22c55e', name: '终端颜色码',       desc: 'ANSI 颜色代码生成预览，前景/背景/样式任意组合',             category: '开发工具', file: 'terminal-color.js',  isNew: true, tags: ['ansi','terminal','终端','颜色','color','bash','shell'] },
   // 计算工具 - 新增
   { id: 'age-calc',        render: 'renderAgeCalc',        icon: '🎂', color: '#ec4899', name: '年龄计算器',       desc: '精确年龄（岁月日）、距生日天数、生肖星座查询',              category: '计算工具', file: 'age-calc.js',        isNew: true, tags: ['age','年龄','生日','birthday','星座','生肖'] },
   { id: 'tax-calc',        render: 'renderTaxCalc',        icon: '💰', color: '#f59e0b', name: '个税计算器',       desc: '2024 个人所得税速算，含五险一金和专项附加扣除',            category: '计算工具', file: 'tax-calc.js',        isNew: true, tags: ['tax','个税','所得税','工资','salary','五险一金'] },
   // 时间工具 - 新增
-  { id: 'lunar-calendar',  render: 'renderLunarCalendar',  icon: '🌙', color: '#8b5cf6', name: '农历查询',         desc: '查询任意日期的干支年、生肖、节气、年内天数',               category: '时间效率', file: 'lunar-calendar.js',  isNew: true, tags: ['lunar','农历','日历','干支','节气','calendar','阴历'] },
+  { id: 'lunar-calendar',  render: 'renderLunarCalendar',  icon: '🌙', color: '#8b5cf6', name: '农历查询',         desc: '公历农历互转，含干支、生肖、节气与日干支',               category: '时间效率', file: 'lunar-calendar.js',  isNew: true, tags: ['lunar','农历','日历','干支','节气','calendar','阴历'] },
   // 效率工具 - 新增
   { id: 'todo',            render: 'renderTodo',           icon: '✅', color: '#10b981', name: 'Todo 清单',        desc: '本地存储 Todo 清单，支持完成/删除/清空已完成',             category: '时间效率', file: 'todo.js',            isNew: true, tags: ['todo','待办','任务','task','checklist','清单'] },
   { id: 'note',            render: 'renderNote',           icon: '📝', color: '#f59e0b', name: '临时便签',         desc: '自动保存文本便签，关闭不丢失，字数统计',                    category: '时间效率', file: 'note.js',            isNew: true, tags: ['note','便签','笔记','memo','记事','notepad'] },

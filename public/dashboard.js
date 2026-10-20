@@ -93,7 +93,7 @@ async function renderHomePage(mode) {
       html = `<div class="home-section"><div class="section-title">${t('fav_title')} <span class="section-count">${favTools.length}</span></div><div class="tools-grid">${favTools.map(renderToolCard).join('')}</div></div>`;
     }
     const aiTool = getLocalizedTools(TOOLS).find(t => t.id === 'ai-chat');
-    if (aiTool) html += `<div class="home-section"><div class="section-title">🤖 AI ${t('stat_ai_chat') || '对话'}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
+    if (aiTool) html += `<div class="home-section"><div class="section-title">🤖 ${t('stat_ai_chat')}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
     content.innerHTML = html;
     return;
   }
@@ -106,7 +106,7 @@ async function renderHomePage(mode) {
       html = `<div class="home-section"><div class="section-title">${t('recent_title')} <span class="section-count">${recentTools.length}</span></div><div class="tools-grid">${recentTools.map(renderToolCard).join('')}</div></div>`;
     }
     const aiTool = getLocalizedTools(TOOLS).find(t => t.id === 'ai-chat');
-    if (aiTool) html += `<div class="home-section"><div class="section-title">🤖 AI ${t('stat_ai_chat') || '对话'}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
+    if (aiTool) html += `<div class="home-section"><div class="section-title">🤖 ${t('stat_ai_chat')}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
     content.innerHTML = html;
     return;
   }
@@ -126,13 +126,13 @@ async function renderHomePage(mode) {
   html += `<div class="home-hero">
     <div class="home-hero-top">
       <div class="home-hero-title">🔧 K Toolkit <span style="font-size:12px;opacity:0.6;font-weight:400;margin-left:6px">Agentic</span></div>
-      <div class="home-hero-sub">${greeting}，${t('hero_sub', tools.length)}</div>
+      <div class="home-hero-sub">${greeting}，${t('hero_sub', CATALOG_ENTRIES.filter(tool => tool.id !== 'ai-chat').length)}</div>
     </div>
     <div class="home-hero-stats">
       <div class="home-hero-stat"><strong>${tools.length}</strong>${t('stat_tools')}</div>
       <div class="home-hero-stat" onclick="navigateTo('favorites')" style="cursor:pointer"><strong>${favorites.length || 0}</strong>${t('stat_favs')}</div>
       <div class="home-hero-stat" onclick="navigateTo('recent')" style="cursor:pointer"><strong>${recent.length || 0}</strong>${t('stat_recent')}</div>
-      <div class="home-hero-stat home-hero-stat-ai" onclick="navigateTo('ai-chat')" style="cursor:pointer;border-color:var(--accent)">🤖 AI ${t('stat_ai_chat') || '对话'}</div>
+      <div class="home-hero-stat home-hero-stat-ai" onclick="navigateTo('ai-chat')" style="cursor:pointer;border-color:var(--accent)">🤖 ${t('stat_ai_chat')}</div>
     </div>
     ${topHtml}
   </div>`;
@@ -168,7 +168,7 @@ async function renderHomePage(mode) {
   if (currentCatFilter === 'all') {
     const aiTool = localizedTools.find(t => t.id === 'ai-chat');
     if (aiTool) {
-      html += `<div class="home-section"><div class="section-title">🤖 AI ${t('stat_ai_chat') || '对话'}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
+      html += `<div class="home-section"><div class="section-title">🤖 ${t('stat_ai_chat')}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
     }
   }
 

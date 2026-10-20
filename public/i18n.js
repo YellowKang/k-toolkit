@@ -211,7 +211,7 @@ const TOOLS_EN = {
   'docker-gen':       { name:'Dockerfile Gen',     desc:'Generate best-practice Dockerfile for Node/Python/Go/Java',                  category:'Dev Tools' },
   'nginx-gen':        { name:'Nginx Config',       desc:'Generate Nginx config for static site/reverse proxy/HTTPS redirect',         category:'Dev Tools' },
   'git-commit':       { name:'Git Commit',         desc:'Generate conventional commit messages following Angular convention',          category:'Dev Tools' },
-  'semver':           { name:'Semver',             desc:'Parse semantic versions, compare ranges, check compatibility',               category:'Dev Tools' },
+  'semver':           { name:'Semver',             desc:'Parse, compare and sort semantic versions with spec-compliant pre-releases', category:'Dev Tools' },
   'dns-lookup':       { name:'DNS Lookup',         desc:'DNS over HTTPS query for A/AAAA/MX/TXT/CNAME/NS records',                   category:'Dev Tools' },
   'terminal-color':   { name:'Terminal Color',     desc:'ANSI color code generator with foreground/background/style preview',         category:'Dev Tools' },
   // CSS Tools (CSS 工具)
@@ -236,7 +236,7 @@ const TOOLS_EN = {
   'xml-format':       { name:'XML Formatter',      desc:'Format and validate XML with collapsible nodes',                             category:'Crypto' },
   // Calculator (计算工具)
   'calculator':       { name:'Calculator',         desc:'Scientific calculator with history, supports keyboard input',                category:'Calculator' },
-  'unit-convert':     { name:'Unit Convert',       desc:'Convert length, weight, temperature, area, storage, speed and number formats', category:'Calculator' },
+  'unit-convert':     { name:'Unit Convert',       desc:'Convert length, mass, temperature, area, volume, time, storage, speed and number formats', category:'Calculator' },
   'loan-calc':        { name:'Loan Calculator',    desc:'Monthly payment, total interest and amortization schedule',                  category:'Calculator' },
   'byte-convert':     { name:'Byte Convert',       desc:'Convert B/KB/MB/GB/TB/PB storage units',                                    category:'Calculator' },
   'number-chinese':   { name:'Number Chinese',     desc:'Convert numbers to Chinese uppercase for financial documents',               category:'Calculator' },
@@ -245,11 +245,11 @@ const TOOLS_EN = {
   'age-calc':         { name:'Age Calculator',     desc:'Exact age (years/months/days), days to birthday, zodiac sign',               category:'Calculator' },
   'tax-calc':         { name:'Tax Calculator',     desc:'2024 personal income tax calculator with deductions',                        category:'Calculator' },
   // Time (时间工具)
-  'date-diff':        { name:'Date Diff',          desc:'Days between two dates, with weekday/holiday calculation',                   category:'Time' },
+  'date-diff':        { name:'Date Diff',          desc:'Days between two dates, calendar span and weekdays (holidays excluded)',     category:'Time' },
   'timezone':         { name:'Timezone Convert',   desc:'13 major timezones real-time comparison',                                    category:'Time' },
   'countdown':        { name:'Countdown',          desc:'Custom target date countdown with SVG arc progress',                         category:'Time' },
   'world-clock':      { name:'World Clock',        desc:'8 major timezones displayed simultaneously in real time',                    category:'Time' },
-  'lunar-calendar':   { name:'Lunar Calendar',     desc:'Query Chinese lunar date, zodiac, solar terms for any date',                 category:'Time' },
+  'lunar-calendar':   { name:'Lunar Calendar',     desc:'Convert between Gregorian and Chinese lunar dates with stem-branch, zodiac and solar terms', category:'Time' },
   // Productivity (效率工具)
   'pomodoro':         { name:'Pomodoro',           desc:'25-min focus + 5-min break timer with SVG progress ring',                    category:'Productivity' },
   'meeting-cost':     { name:'Meeting Cost',       desc:'Real-time meeting cost calculator, input headcount and salary',              category:'Productivity' },
