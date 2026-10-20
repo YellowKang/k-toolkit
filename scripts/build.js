@@ -252,6 +252,10 @@ for (const dir of ['agent', 'compute']) {
   console.log(`  ${count} files`);
 }
 
+// ── Copy pinned third-party libraries verbatim (digests are checked by tests) ──
+console.log('\nCopying vendor/:');
+console.log(`  ${processDir(path.join(PUB, 'vendor'), path.join(DIST, 'vendor'), null, null)} files`);
+
 // ── Publish version metadata and a digest-verified release manifest ──
 const precache = [];
 function inventory(dir) {

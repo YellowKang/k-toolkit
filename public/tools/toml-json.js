@@ -1,76 +1,105 @@
+/* ── TOML ↔ JSON：smol-toml（TOML 1.0），见 compute/formats.js ── */
+
+const _tjDict = {
+  zh: {
+    toml_in: 'TOML 输入', json_in: 'JSON 输入',
+    to_json: '转换为 JSON', to_toml: '转换为 TOML', clear: '清空', copy: '复制',
+    ok: '转换成功', toml_err: 'TOML 解析失败', json_err: 'JSON 格式错误', toml_out_err: '无法转换为 TOML',
+    at: (line, col) => line ? `第 ${line} 行${col ? `第 ${col} 列` : ''}：` : '',
+    dropped: list => `TOML 没有 null，已省略：${list}`,
+    note: '支持内联表、多行数组与字符串、点分键、日期时间（保持原样）等完整 TOML 1.0 语法',
+  },
+  en: {
+    toml_in: 'TOML input', json_in: 'JSON input',
+    to_json: 'Convert to JSON', to_toml: 'Convert to TOML', clear: 'Clear', copy: 'Copy',
+    ok: 'Converted', toml_err: 'Invalid TOML', json_err: 'Invalid JSON', toml_out_err: 'Cannot convert to TOML',
+    at: (line, col) => line ? `Line ${line}${col ? `, column ${col}` : ''}: ` : '',
+    dropped: list => `TOML has no null; omitted: ${list}`,
+    note: 'Full TOML 1.0: inline tables, multi-line arrays and strings, dotted keys and date-times (kept as written)',
+  },
+};
+
 window.renderTomlJson = function(el) {
+  const T = makeToolI18n(_tjDict);
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div style="display:flex;gap:0;margin-bottom:12px;border-bottom:2px solid #e5e7eb">
-        <button id="tjTab1" onclick="tjSwitchTab(1)" style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:#4f46e5;border-bottom:2px solid #4f46e5;margin-bottom:-2px">TOML → JSON</button>
-        <button id="tjTab2" onclick="tjSwitchTab(2)" style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:14px;color:#6b7280">JSON → TOML</button>
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <button class="btn btn-primary" id="tjTab1" onclick="tjSwitchTab(1)">TOML → JSON</button>
+        <button class="btn btn-secondary" id="tjTab2" onclick="tjSwitchTab(2)">JSON → TOML</button>
       </div>
       <div id="tjPane1">
-        <div class="panel-label">TOML 输入</div>
-        <textarea class="tool-textarea" id="tjTomlIn" rows="10" placeholder="[server]\nhost = \"localhost\"\nport = 8080\nenabled = true\ntags = [\"web\", \"api\"]"></textarea>
+        <div class="panel-label">${T('toml_in')}</div>
+        <textarea class="tool-textarea" id="tjTomlIn" rows="10" spellcheck="false" style="font-family:monospace" placeholder="[package]\nname = &quot;demo&quot;\n\n[dependencies]\nserde = { version = &quot;1.0&quot;, features = [&quot;derive&quot;] }"></textarea>
         <div class="tool-actions">
-          <button class="btn btn-primary" onclick="tjTomlToJson()">转换为 JSON</button>
-          <button class="btn btn-secondary" onclick="tjClear1()">清空</button>
+          <button class="btn btn-primary" onclick="tjTomlToJson()">${T('to_json')}</button>
+          <button class="btn btn-secondary" onclick="tjClear1()">${T('clear')}</button>
         </div>
       </div>
       <div id="tjPane2" style="display:none">
-        <div class="panel-label">JSON 输入</div>
-        <textarea class="tool-textarea" id="tjJsonIn" rows="10" placeholder='{"server":{"host":"localhost","port":8080}}'></textarea>
+        <div class="panel-label">${T('json_in')}</div>
+        <textarea class="tool-textarea" id="tjJsonIn" rows="10" spellcheck="false" style="font-family:monospace" placeholder='{"server":{"host":"localhost","port":8080}}'></textarea>
         <div class="tool-actions">
-          <button class="btn btn-primary" onclick="tjJsonToToml()">转换为 TOML</button>
-          <button class="btn btn-secondary" onclick="tjClear2()">清空</button>
+          <button class="btn btn-primary" onclick="tjJsonToToml()">${T('to_toml')}</button>
+          <button class="btn btn-secondary" onclick="tjClear2()">${T('clear')}</button>
         </div>
       </div>
+      <div style="font-size:12px;color:var(--text-muted)">${T('note')}</div>
     </div>
     <div class="tool-card-panel" id="tjResult" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div class="panel-label" style="margin:0" id="tjStatus"></div>
-        <button class="btn btn-secondary" onclick="copyText(document.getElementById('tjOutput').textContent,this)">复制</button>
+        <button class="btn btn-secondary" onclick="copyText(document.getElementById('tjOutput').textContent,this)">${T('copy')}</button>
       </div>
+      <div id="tjNote" style="display:none;font-size:12px;color:#f59e0b;margin-bottom:8px"></div>
       <pre class="result-box" id="tjOutput" style="max-height:400px;overflow-y:auto"></pre>
     </div>`;
+  ToolCompute.load('formats').catch(() => {});
 };
 
 function tjSwitchTab(n) {
-  document.getElementById('tjPane1').style.display = n===1 ? '' : 'none';
-  document.getElementById('tjPane2').style.display = n===2 ? '' : 'none';
-  document.getElementById('tjTab1').style.cssText = n===1
-    ? 'padding:8px 20px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:#4f46e5;border-bottom:2px solid #4f46e5;margin-bottom:-2px'
-    : 'padding:8px 20px;border:none;background:none;cursor:pointer;font-size:14px;color:#6b7280';
-  document.getElementById('tjTab2').style.cssText = n===2
-    ? 'padding:8px 20px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:#4f46e5;border-bottom:2px solid #4f46e5;margin-bottom:-2px'
-    : 'padding:8px 20px;border:none;background:none;cursor:pointer;font-size:14px;color:#6b7280';
+  document.getElementById('tjPane1').style.display = n === 1 ? '' : 'none';
+  document.getElementById('tjPane2').style.display = n === 2 ? '' : 'none';
+  document.getElementById('tjTab1').className = n === 1 ? 'btn btn-primary' : 'btn btn-secondary';
+  document.getElementById('tjTab2').className = n === 2 ? 'btn btn-primary' : 'btn btn-secondary';
   document.getElementById('tjResult').style.display = 'none';
 }
 
-function tjShowResult(text, ok, label) {
-  var out = document.getElementById('tjOutput');
-  var status = document.getElementById('tjStatus');
-  out.textContent = text;
-  status.textContent = ok ? '✓ ' + label : '✗ ' + label;
+function tjShowResult(text, ok, label, note = '') {
+  document.getElementById('tjOutput').textContent = text;
+  const status = document.getElementById('tjStatus');
+  status.textContent = (ok ? '✓ ' : '✗ ') + label;
   status.style.color = ok ? '#10b981' : '#e74c3c';
+  const noteEl = document.getElementById('tjNote');
+  noteEl.textContent = note;
+  noteEl.style.display = note ? '' : 'none';
   document.getElementById('tjResult').style.display = '';
 }
 
-function tjTomlToJson() {
-  var src = document.getElementById('tjTomlIn').value.trim();
-  if (!src) return;
+async function tjTomlToJson() {
+  const T = makeToolI18n(_tjDict);
+  const src = document.getElementById('tjTomlIn').value;
+  if (!src.trim()) return;
   try {
-    var obj = tjParseToml(src);
-    tjShowResult(JSON.stringify(obj, null, 2), true, '转换成功');
-  } catch(e) {
-    tjShowResult('错误: ' + e.message, false, '解析失败');
+    const formats = await ToolCompute.load('formats');
+    tjShowResult(JSON.stringify(await formats.tomlParse(src), null, 2), true, T('ok'));
+  } catch (e) {
+    tjShowResult(T('at', e.line, e.column) + e.message, false, T('toml_err'));
   }
 }
 
-function tjJsonToToml() {
-  var src = document.getElementById('tjJsonIn').value.trim();
+async function tjJsonToToml() {
+  const T = makeToolI18n(_tjDict);
+  const src = document.getElementById('tjJsonIn').value.trim();
   if (!src) return;
+  let obj;
+  try { obj = JSON.parse(src); }
+  catch (e) { tjShowResult(e.message, false, T('json_err')); return; }
   try {
-    var obj = JSON.parse(src);
-    tjShowResult(tjObjToToml(obj, ''), true, '转换成功');
-  } catch(e) {
-    tjShowResult('错误: ' + e.message, false, 'JSON 格式错误');
+    const formats = await ToolCompute.load('formats');
+    const { text, dropped } = await formats.tomlStringify(obj);
+    tjShowResult(text, true, T('ok'), dropped.length ? T('dropped', dropped.slice(0, 10).join(', ') + (dropped.length > 10 ? '…' : '')) : '');
+  } catch (e) {
+    tjShowResult(e.message, false, T('toml_out_err'));
   }
 }
 
@@ -81,138 +110,4 @@ function tjClear1() {
 function tjClear2() {
   document.getElementById('tjJsonIn').value = '';
   document.getElementById('tjResult').style.display = 'none';
-}
-
-// ---- TOML parser (key=value, [section], [[array-of-tables]], inline arrays of scalars) ----
-function tjParseToml(src) {
-  var lines = src.split('\n');
-  var root = {};
-  var current = root;
-  var currentPath = [];
-
-  function getOrCreate(obj, keys) {
-    var o = obj;
-    for (var i = 0; i < keys.length; i++) {
-      if (!(keys[i] in o)) o[keys[i]] = {};
-      o = o[keys[i]];
-    }
-    return o;
-  }
-
-  function parseVal(v) {
-    v = v.trim();
-    // quoted string
-    if ((v[0] === '"' && v[v.length-1] === '"') || (v[0] === "'" && v[v.length-1] === "'")) {
-      return v.slice(1, -1);
-    }
-    // inline array
-    if (v[0] === '[') {
-      var inner = v.slice(1, v.lastIndexOf(']')).trim();
-      if (!inner) return [];
-      return inner.split(',').map(function(x){ return parseVal(x.trim()); });
-    }
-    if (v === 'true') return true;
-    if (v === 'false') return false;
-    if (!isNaN(v) && v !== '') return Number(v);
-    return v;
-  }
-
-  // track array-of-tables
-  var arrTableCounts = {};
-
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i].trim();
-    if (!line || line[0] === '#') continue;
-
-    // strip inline comment (not inside strings)
-    var commentIdx = -1;
-    var inStr = false, strChar = '';
-    for (var ci = 0; ci < line.length; ci++) {
-      if (!inStr && (line[ci] === '"' || line[ci] === "'")) { inStr = true; strChar = line[ci]; }
-      else if (inStr && line[ci] === strChar) { inStr = false; }
-      else if (!inStr && line[ci] === '#') { commentIdx = ci; break; }
-    }
-    if (commentIdx > 0) line = line.slice(0, commentIdx).trim();
-
-    // [[array of tables]]
-    if (line.slice(0, 2) === '[[' && line.slice(-2) === ']]') {
-      var path = line.slice(2, -2).trim().split('.');
-      var parentPath = path.slice(0, -1);
-      var lastKey = path[path.length - 1];
-      var parent = getOrCreate(root, parentPath);
-      if (!Array.isArray(parent[lastKey])) parent[lastKey] = [];
-      var newItem = {};
-      parent[lastKey].push(newItem);
-      currentPath = path;
-      current = newItem;
-      var pathKey = path.join('.');
-      arrTableCounts[pathKey] = (arrTableCounts[pathKey] || 0) + 1;
-      continue;
-    }
-
-    // [section]
-    if (line[0] === '[' && line[line.length-1] === ']') {
-      var path = line.slice(1, -1).trim().split('.');
-      currentPath = path;
-      current = getOrCreate(root, path);
-      continue;
-    }
-
-    // key = value
-    var eqIdx = line.indexOf('=');
-    if (eqIdx < 1) continue;
-    var key = line.slice(0, eqIdx).trim().replace(/^["']|["']$/g, '');
-    var val = line.slice(eqIdx + 1).trim();
-    current[key] = parseVal(val);
-  }
-  return root;
-}
-
-// ---- TOML serializer ----
-function tjObjToToml(obj, prefix) {
-  var scalars = [];
-  var tables = [];
-  var arrTables = [];
-
-  Object.keys(obj).forEach(function(k) {
-    var v = obj[k];
-    if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0] !== null) {
-      arrTables.push(k);
-    } else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
-      tables.push(k);
-    } else {
-      scalars.push(k);
-    }
-  });
-
-  var lines = [];
-
-  scalars.forEach(function(k) {
-    lines.push(k + ' = ' + tjTomlVal(obj[k]));
-  });
-
-  tables.forEach(function(k) {
-    var heading = prefix ? prefix + '.' + k : k;
-    lines.push('');
-    lines.push('[' + heading + ']');
-    lines.push(tjObjToToml(obj[k], heading));
-  });
-
-  arrTables.forEach(function(k) {
-    var heading = prefix ? prefix + '.' + k : k;
-    obj[k].forEach(function(item) {
-      lines.push('');
-      lines.push('[[' + heading + ']]');
-      lines.push(tjObjToToml(item, heading));
-    });
-  });
-
-  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-}
-
-function tjTomlVal(v) {
-  if (typeof v === 'string') return '"' + v.replace(/"/g, '\\"') + '"';
-  if (typeof v === 'boolean') return v ? 'true' : 'false';
-  if (Array.isArray(v)) return '[' + v.map(tjTomlVal).join(', ') + ']';
-  return String(v);
 }

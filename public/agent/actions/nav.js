@@ -473,6 +473,8 @@ const TOOL_RUNNERS = {
   },
   'toml-json': {
     mainInput: '#tjTomlIn',
+    beforeRun: ({ action }) => window.tjSwitchTab && window.tjSwitchTab(action === 'toTOML' ? 2 : 1),
+    actionOverrides: { toTOML: { mainInput: '#tjJsonIn' } },
     triggerMap: { toJSON: 'tjTomlToJson', toTOML: 'tjJsonToToml' },
     trigger: 'tjTomlToJson',
     outputSelector: '#tjResult',
@@ -1015,16 +1017,16 @@ const NavActions = [
         await new Promise(r => setTimeout(r, 50));
       }
 
-      // 触发执行
+      // 触发执行（工具函数可能是 async，例如按需加载共享计算模块，等待其完成再读结果）
       let triggered = false;
       if (action && runner.triggerMap) {
         const fn = runner.triggerMap[action];
-        if (typeof fn === 'function') { fn(); triggered = true; }
-        else if (typeof fn === 'string' && window[fn]) { window[fn](); triggered = true; }
+        if (typeof fn === 'function') { await fn(); triggered = true; }
+        else if (typeof fn === 'string' && window[fn]) { await window[fn](); triggered = true; }
       }
       if (!triggered && runner.trigger) {
-        if (typeof runner.trigger === 'function') { runner.trigger(); triggered = true; }
-        else if (typeof runner.trigger === 'string' && window[runner.trigger]) { window[runner.trigger](); triggered = true; }
+        if (typeof runner.trigger === 'function') { await runner.trigger(); triggered = true; }
+        else if (typeof runner.trigger === 'string' && window[runner.trigger]) { await window[runner.trigger](); triggered = true; }
       }
       if (!triggered) {
         // 实时计算工具通过 input 事件自动更新

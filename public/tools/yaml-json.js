@@ -1,148 +1,105 @@
+/* ── YAML ↔ JSON：js-yaml（YAML 1.2 core schema + 合并键），见 compute/formats.js ── */
+
+const _yjDict = {
+  zh: {
+    input: '输入内容',
+    placeholder: '粘贴 YAML 或 JSON，自动识别方向...',
+    to_json: 'YAML → JSON',
+    to_yaml: 'JSON → YAML',
+    swap: '↕ 互换',
+    clear: '清空',
+    copy: '复制',
+    ok_json: n => n > 1 ? `✓ 转换成功（${n} 个文档，已合并为数组）` : '✓ 转换成功',
+    ok_yaml: '✓ 转换成功',
+    yaml_err: '✗ YAML 解析失败',
+    json_err: '✗ JSON 格式错误',
+    at: (line, col) => line ? `第 ${line} 行${col ? `第 ${col} 列` : ''}：` : '',
+    note: '支持锚点/别名与 << 合并键、多文档（---）；日期保持字符串；超过 2^53 的整数会损失精度',
+  },
+  en: {
+    input: 'Input',
+    placeholder: 'Paste YAML or JSON; direction is detected automatically...',
+    to_json: 'YAML → JSON',
+    to_yaml: 'JSON → YAML',
+    swap: '↕ Swap',
+    clear: 'Clear',
+    copy: 'Copy',
+    ok_json: n => n > 1 ? `✓ Converted (${n} documents merged into an array)` : '✓ Converted',
+    ok_yaml: '✓ Converted',
+    yaml_err: '✗ Invalid YAML',
+    json_err: '✗ Invalid JSON',
+    at: (line, col) => line ? `Line ${line}${col ? `, column ${col}` : ''}: ` : '',
+    note: 'Supports anchors/aliases, << merge keys and multiple documents (---); dates stay strings; integers beyond 2^53 lose precision',
+  },
+};
+
 function renderYAMLJSON(el) {
+  const T = makeToolI18n(_yjDict);
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div class="panel-label">输入内容</div>
-      <textarea class="tool-textarea" id="yjInput" rows="10" placeholder="粘贴 YAML 或 JSON..." oninput="_yjAutoDetect()"></textarea>
+      <div class="panel-label">${T('input')}</div>
+      <textarea class="tool-textarea" id="yjInput" rows="10" spellcheck="false" placeholder="${T('placeholder')}" oninput="_yjAutoDetect()" style="font-family:monospace"></textarea>
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="yjToJSON()">YAML → JSON</button>
-        <button class="btn btn-primary" onclick="yjToYAML()">JSON → YAML</button>
-        <button class="btn btn-secondary" onclick="yjSwap()">↕ 互换</button>
-        <button class="btn btn-secondary" onclick="yjClear()">清空</button>
+        <button class="btn btn-primary" onclick="yjToJSON()">${T('to_json')}</button>
+        <button class="btn btn-primary" onclick="yjToYAML()">${T('to_yaml')}</button>
+        <button class="btn btn-secondary" onclick="yjSwap()">${T('swap')}</button>
+        <button class="btn btn-secondary" onclick="yjClear()">${T('clear')}</button>
       </div>
+      <div style="font-size:12px;color:var(--text-muted)">${T('note')}</div>
     </div>
     <div class="tool-card-panel" id="yjResult" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div class="panel-label" style="margin:0" id="yjStatus"></div>
-        <button class="btn btn-secondary" onclick="copyText(document.getElementById('yjOutput').textContent,this)">复制</button>
+        <button class="btn btn-secondary" onclick="copyText(document.getElementById('yjOutput').textContent,this)">${T('copy')}</button>
       </div>
       <pre class="result-box" id="yjOutput" style="max-height:400px;overflow-y:auto"></pre>
     </div>`;
+  ToolCompute.load('formats').catch(() => {});
 }
 
-function yjParseYAML(yaml) {
-  // 简单 YAML 解析：支持 key: value、缩进列表、字符串、数字、布尔
-  const lines = yaml.split('\n');
-  function parseBlock(lines, baseIndent) {
-    const result = {};
-    let i = 0;
-    while (i < lines.length) {
-      const line = lines[i];
-      const trimmed = line.trimStart();
-      if (!trimmed || trimmed.startsWith('#')) { i++; continue; }
-      const indent = line.length - trimmed.length;
-      if (indent < baseIndent) break;
-      const colonIdx = trimmed.indexOf(': ');
-      if (colonIdx > -1) {
-        const key = trimmed.slice(0, colonIdx);
-        const val = trimmed.slice(colonIdx + 2).trim();
-        if (val === '' || val === '|' || val === '>') {
-          // nested block
-          const subLines = [];
-          i++;
-          while (i < lines.length) {
-            const sub = lines[i];
-            const subTrim = sub.trimStart();
-            const subIndent = sub.length - subTrim.length;
-            if (subTrim && subIndent <= indent) break;
-            subLines.push(sub.slice(indent + 2));
-            i++;
-          }
-          if (subLines[0] && subLines[0].trimStart().startsWith('- ')) {
-            result[key] = subLines.filter(l=>l.trim()).map(l=>yjParseVal(l.trim().replace(/^- /,'')));
-          } else {
-            result[key] = parseBlock(subLines, 0)[Object.keys(parseBlock(subLines,0))[0]] || parseBlock(subLines,0);
-            result[key] = parseBlock(subLines, 0);
-          }
-        } else {
-          result[key] = yjParseVal(val);
-          i++;
-        }
-      } else if (trimmed.startsWith('- ')) {
-        // array at root
-        if (!Array.isArray(result._arr)) result._arr = [];
-        result._arr.push(yjParseVal(trimmed.slice(2)));
-        i++;
-      } else { i++; }
-    }
-    return result._arr || result;
-  }
-  function yjParseVal(v) {
-    if (v === 'true') return true;
-    if (v === 'false') return false;
-    if (v === 'null' || v === '~') return null;
-    if (!isNaN(v) && v !== '') return Number(v);
-    return v.replace(/^['"]|['"]$/g,'');
-  }
-  return parseBlock(lines, 0);
-}
-
-function objToYAML(obj, indent) {
-  const pad = ' '.repeat(indent);
-  if (Array.isArray(obj)) {
-    return obj.map(item => {
-      if (typeof item === 'object' && item !== null) {
-        const inner = objToYAML(item, indent + 2).trimStart();
-        return pad + '- ' + inner;
-      }
-      return pad + '- ' + item;
-    }).join('\n');
-  }
-  if (typeof obj === 'object' && obj !== null) {
-    return Object.entries(obj).map(([k,v]) => {
-      if (typeof v === 'object' && v !== null) {
-        return pad + k + ':\n' + objToYAML(v, indent + 2);
-      }
-      return pad + k + ': ' + v;
-    }).join('\n');
-  }
-  return pad + obj;
-}
-
-function yjToJSON() {
-  const v = document.getElementById('yjInput').value.trim();
-  const out = document.getElementById('yjOutput');
+function _yjShow(ok, label, text) {
   const status = document.getElementById('yjStatus');
-  const result = document.getElementById('yjResult');
-  if (!v) return;
-  try {
-    const obj = yjParseYAML(v);
-    out.textContent = JSON.stringify(obj, null, 2);
-    status.textContent = '✓ 转换成功';
-    status.style.color = '#10b981';
-  } catch(e) {
-    out.textContent = '错误: ' + e.message;
-    status.textContent = '✗ 解析失败';
-    status.style.color = '#e74c3c';
-  }
-  result.style.display = '';
+  status.textContent = label;
+  status.style.color = ok ? '#10b981' : '#e74c3c';
+  document.getElementById('yjOutput').textContent = text;
+  document.getElementById('yjResult').style.display = '';
 }
 
-function yjToYAML() {
-  const v = document.getElementById('yjInput').value.trim();
-  const out = document.getElementById('yjOutput');
-  const status = document.getElementById('yjStatus');
-  const result = document.getElementById('yjResult');
-  if (!v) return;
+async function yjToJSON() {
+  const T = makeToolI18n(_yjDict);
+  const v = document.getElementById('yjInput').value;
+  if (!v.trim()) return;
   try {
-    const obj = JSON.parse(v);
-    out.textContent = objToYAML(obj, 0);
-    status.textContent = '✓ 转换成功';
-    status.style.color = '#10b981';
-  } catch(e) {
-    out.textContent = '错误: ' + e.message;
-    status.textContent = '✗ JSON 格式错误';
-    status.style.color = '#e74c3c';
+    const formats = await ToolCompute.load('formats');
+    const { value, documents } = await formats.yamlParse(v);
+    _yjShow(true, T('ok_json', documents), JSON.stringify(value, null, 2) ?? 'null');
+  } catch (e) {
+    _yjShow(false, T('yaml_err'), T('at', e.line, e.column) + e.message);
   }
-  result.style.display = '';
+}
+
+async function yjToYAML() {
+  const T = makeToolI18n(_yjDict);
+  const v = document.getElementById('yjInput').value.trim();
+  if (!v) return;
+  let obj;
+  try { obj = JSON.parse(v); }
+  catch (e) { _yjShow(false, T('json_err'), e.message); return; }
+  try {
+    const formats = await ToolCompute.load('formats');
+    _yjShow(true, T('ok_yaml'), await formats.yamlStringify(obj));
+  } catch (e) {
+    _yjShow(false, T('json_err'), e.message);
+  }
 }
 
 let _yjTimer = null;
 function _yjAutoDetect() {
   clearTimeout(_yjTimer);
   const v = document.getElementById('yjInput').value.trim();
-  if (!v) { document.getElementById('yjResult').style.display='none'; return; }
+  if (!v) { document.getElementById('yjResult').style.display = 'none'; return; }
   _yjTimer = setTimeout(() => {
-    if (v.startsWith('{') || v.startsWith('[')) yjToYAML();
+    if (/^[[{]/.test(v)) yjToYAML();
     else yjToJSON();
   }, 400);
 }

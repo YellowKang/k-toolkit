@@ -1,0 +1,34 @@
+{
+  "jsqr": {
+    "version": "1.4.0",
+    "license": "Apache-2.0",
+    "source": "npm:jsqr@1.4.0/dist/jsQR.js",
+    "file": "jsqr/jsQR.js",
+    "global": "jsQR",
+    "sha256": "bc40c8a15196236b2314db0856f72ca0b49980cd5413b8c852a7349f5fee0859"
+  },
+  "qrcodejs": {
+    "version": "1.0.0",
+    "license": "MIT",
+    "source": "npm:qrcodejs@1.0.0/qrcode.min.js",
+    "file": "qrcodejs/qrcode.min.js",
+    "global": "QRCode",
+    "sha256": "c541ef06327885a8415bca8df6071e14189b4855336def4f36db54bde8484f36"
+  },
+  "js-yaml": {
+    "version": "4.1.1",
+    "license": "MIT",
+    "source": "npm:js-yaml@4.1.1/dist/js-yaml.min.js",
+    "file": "js-yaml/js-yaml.min.js",
+    "global": "jsyaml",
+    "sha256": "0de3dec92d20eab9e0b46a5d928cd45ec025d73e348ddf458dbfb01da00cb473"
+  },
+  "smol-toml": {
+    "version": "1.6.1",
+    "license": "BSD-3-Clause",
+    "source": "npm:smol-toml@1.6.1/dist/index.cjs (wrapped between upstream markers)",
+    "file": "smol-toml/smol-toml.js",
+    "global": "smolToml",
+    "sha256": "690b76d0fac1eec8066b877e7345a4a127691007a363a045d0fea900d48186cb"
+  }
+}

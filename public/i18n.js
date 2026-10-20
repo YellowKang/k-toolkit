@@ -192,7 +192,7 @@ const TOOLS_EN = {
   'lorem':            { name:'Lorem Ipsum',        desc:'Generate Lorem Ipsum placeholder text, custom paragraphs and word count',    category:'Text' },
   'text-escape':      { name:'Text Escape',        desc:'Escape/unescape JSON/regex/HTML/URL special characters',                     category:'Text' },
   'diff-json':        { name:'JSON Diff',          desc:'Diff two JSON or YAML objects with highlighted differences',                  category:'Text' },
-  'toml-json':        { name:'TOML/JSON',          desc:'Bidirectional conversion between TOML and JSON',                             category:'Text' },
+  'toml-json':        { name:'TOML/JSON',          desc:'Convert TOML 1.0 and JSON both ways, incl. inline tables and multi-line arrays', category:'Data' },
   'slug-gen':         { name:'Slug Generator',     desc:'Convert text to URL-friendly slug with pinyin support',                      category:'Text' },
   'line-sort':        { name:'Line Sort',          desc:'Sort lines alphabetically, reverse, deduplicate, shuffle or remove blanks',  category:'Text' },
   // Dev Tools (开发工具)
@@ -201,7 +201,7 @@ const TOOLS_EN = {
   'hash':             { name:'Hash Generator',     desc:'SHA-1/256/384/512, supports text and file hash verification',                category:'Dev Tools' },
   'jwt':              { name:'JWT Tool',           desc:'Decode/generate JWT tokens with HS256 signing support',                      category:'Dev Tools' },
   'number-base':      { name:'Number Base',        desc:'Arbitrary-precision binary/octal/decimal/hex conversion and code points',   category:'Dev Tools' },
-  'yaml-json':        { name:'YAML/JSON',          desc:'Bidirectional conversion between YAML and JSON',                             category:'Dev Tools' },
+  'yaml-json':        { name:'YAML/JSON',          desc:'Convert YAML and JSON both ways with anchors, merge keys and multi-document', category:'Data' },
   'sql-format':       { name:'SQL Formatter',      desc:'Beautify/minify SQL, supports SELECT/INSERT/UPDATE/DELETE',                  category:'Dev Tools' },
   'curl-gen':         { name:'cURL Generator',     desc:'Visually generate curl/fetch/axios code snippets with cURL import',          category:'Dev Tools' },
   'http-status':      { name:'HTTP Status',        desc:'Look up HTTP status code meanings, search and browse by category',           category:'Dev Tools' },
@@ -233,7 +233,7 @@ const TOOLS_EN = {
   // Crypto (编码加密)
   'aes':              { name:'AES Encrypt',        desc:'AES-GCM symmetric encryption and decryption, SubtleCrypto',                  category:'Crypto' },
   'morse':            { name:'Morse Code',         desc:'Convert text to Morse code and decode back',                                 category:'Crypto' },
-  'xml-format':       { name:'XML Formatter',      desc:'Format and validate XML with collapsible nodes',                             category:'Crypto' },
+  'xml-format':       { name:'XML Formatter',      desc:'Format, minify and convert XML to JSON, keeping comments and CDATA',        category:'Data' },
   // Calculator (计算工具)
   'calculator':       { name:'Calculator',         desc:'Scientific calculator with history, supports keyboard input',                category:'Calculator' },
   'unit-convert':     { name:'Unit Convert',       desc:'Convert length, mass, temperature, area, volume, time, storage, speed and number formats', category:'Calculator' },

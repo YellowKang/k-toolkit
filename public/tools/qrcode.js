@@ -23,7 +23,7 @@ function _qrInitI18n() {
       result_title:  '二维码',
       download_png:  '下载 PNG',
       download_svg:  '下载 SVG',
-      loading_lib:   '正在加载 QR 库，请稍后重试...',
+      loading_lib:   '正在加载二维码库...',
       gen_fail:      '生成失败：',
     },
     en: {
@@ -47,7 +47,7 @@ function _qrInitI18n() {
       result_title:  'QR Code',
       download_png:  'Download PNG',
       download_svg:  'Download SVG',
-      loading_lib:   'Loading QR library, please retry...',
+      loading_lib:   'Loading the QR library...',
       gen_fail:      'Generation failed: ',
     }
   });
@@ -88,7 +88,7 @@ function renderQrCode(el) {
     '</div>' +
     '</div>' +
     '<div class="tool-card-panel" id="qrResult" style="display:none"></div>';
-  loadQrLib();
+  loadQrLib().catch(function() {});
 
   window._activeCleanup = function() {
     clearTimeout(_qrAutoTimer);
@@ -109,17 +109,12 @@ function renderQrCode(el) {
 }
 
 var _qrLibLoaded = false;
-var _qrLibLoading = false;
 var _qrAutoTimer = null;
 var _qrLogoImg = null;
 
+// qrcodejs is pinned locally in vendor/ (works offline, covered by release digests).
 function loadQrLib() {
-  if (_qrLibLoaded || _qrLibLoading) return;
-  _qrLibLoading = true;
-  var s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
-  s.onload = function() { _qrLibLoaded = true; _qrLibLoading = false; };
-  document.head.appendChild(s);
+  return ToolCompute.loadVendor('qrcodejs').then(function() { _qrLibLoaded = true; });
 }
 
 function qrAutoGen() {
@@ -136,7 +131,9 @@ function generateQr() {
   if (!_qrLibLoaded) {
     panel.style.display = '';
     panel.innerHTML = '<div style="color:var(--text-muted);font-size:13px">' + tl('loading_lib') + '</div>';
-    loadQrLib();
+    loadQrLib().then(generateQr, function(e) {
+      panel.innerHTML = '<div style="color:#ef4444">' + tl('gen_fail') + escHtml(e.message) + '</div>';
+    });
     return;
   }
   var size = parseInt(document.getElementById('qrSize').value);

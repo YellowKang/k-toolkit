@@ -124,6 +124,27 @@ const express = require('express');
     await page.evaluate(() => convertJsonCsv());
     await page.waitForFunction(() => document.querySelector('#jcOutput').value.includes('Bob, Jr.'));
     assert.deepEqual(JSON.parse(await page.locator('#jcOutput').inputValue()), [{ name: 'Bob, Jr.', note: 'a\nb' }]);
+    // QR libraries are local (CDNs are blocked here); decoded content is untrusted and must stay inert.
+    const qrPayload = 'https://example.com/?q=" onmouseover="window.__qrPwned=1" x="';
+    await route('qrcode', '#qrInput');
+    await page.locator('#qrInput').fill(qrPayload);
+    await page.evaluate(() => generateQr());
+    await page.locator('#qrCanvas canvas').waitFor({ state: 'attached' });
+    const qrPng = await page.evaluate(async () => { await new Promise(r => setTimeout(r, 200)); return document.querySelector('#qrCanvas canvas').toDataURL('image/png'); });
+    await route('qrcode-decode', '#qrdFile');
+    await page.locator('#qrdFile').setInputFiles({ name: 'qr.png', mimeType: 'image/png', buffer: Buffer.from(qrPng.split(',')[1], 'base64') });
+    await page.waitForFunction(text => document.querySelector('#qrdContent')?.textContent === text, qrPayload);
+    assert.deepEqual(await page.locator('#qrdActions a').evaluate(a => [...a.attributes].map(x => x.name).sort()), ['class', 'href', 'rel', 'target', 'title']);
+    await page.locator('#qrdActions a').hover();
+    assert.equal(await page.evaluate(() => window.__qrPwned), undefined);
+    await route('xml-format', '#xmlInput');
+    await page.locator('#xmlInput').fill('<a x="&quot;"><b>Tom &amp; Jerry</b><!--keep--></a>');
+    await page.evaluate(() => doXml());
+    assert.equal(await page.locator('#xmlOutput').textContent(), '<a x="&quot;">\n  <b>Tom &amp; Jerry</b>\n  <!--keep-->\n</a>');
+    await route('yaml-json', '#yjInput');
+    await page.locator('#yjInput').fill('base: &b\n  image: nginx\nweb:\n  <<: *b\n  ports: [80]\n');
+    await page.evaluate(() => yjToJSON());
+    assert.deepEqual(JSON.parse(await page.locator('#yjOutput').textContent()), { base: { image: 'nginx' }, web: { image: 'nginx', ports: [80] } });
     await route('hmac-gen', '#hmacMsg');
     for (const width of [375, 768]) {
       await page.setViewportSize({ width, height: 850 });

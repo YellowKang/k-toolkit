@@ -2,185 +2,9 @@
 
 // ── 格式转换 & 编码加密 原子 Actions ─────────────────────────────
 
-// ─── 简易 YAML ↔ JSON ───────────────────────────────────────────
-function _yamlToJson(yaml) {
-  const lines = yaml.split('\n');
-  function parseVal(v) {
-    v = v.trim();
-    if (v === '' || v === 'null' || v === '~') return null;
-    if (v === 'true') return true;
-    if (v === 'false') return false;
-    if (/^-?\d+$/.test(v)) return parseInt(v, 10);
-    if (/^-?\d+\.\d+$/.test(v)) return parseFloat(v);
-    if (/^\[.*\]$/.test(v)) {
-      return v.slice(1, -1).split(',').map(s => parseVal(s.replace(/^\s*["']?|["']?\s*$/g, '')));
-    }
-    return v.replace(/^["']|["']$/g, '');
-  }
-  function parse(lines, base) {
-    const obj = {}; let i = 0, isArr = false;
-    const arr = [];
-    while (i < lines.length) {
-      const line = lines[i], trimmed = line.trimStart();
-      if (!trimmed || trimmed.startsWith('#')) { i++; continue; }
-      const indent = line.length - trimmed.length;
-      if (indent < base) break;
-      if (indent > base) { i++; continue; }
-      if (trimmed.startsWith('- ')) {
-        isArr = true;
-        arr.push(parseVal(trimmed.slice(2)));
-        i++;
-      } else {
-        const ci = trimmed.indexOf(':');
-        if (ci === -1) { i++; continue; }
-        const key = trimmed.slice(0, ci).trim();
-        const val = trimmed.slice(ci + 1).trim();
-        if (val) { obj[key] = parseVal(val); }
-        else {
-          const sub = []; i++;
-          while (i < lines.length) {
-            const sl = lines[i], st = sl.trimStart();
-            if (st && (sl.length - st.length) <= indent) break;
-            sub.push(sl); i++;
-          }
-          obj[key] = parse(sub, indent + 2);
-          continue;
-        }
-        i++;
-      }
-    }
-    return isArr ? arr : obj;
-  }
-  return parse(lines, 0);
-}
-
-function _jsonToYaml(obj, indent) {
-  indent = indent || 0;
-  const pad = '  '.repeat(indent);
-  if (Array.isArray(obj)) {
-    return obj.map(v => {
-      if (typeof v === 'object' && v !== null) return pad + '- ' + _jsonToYaml(v, indent + 1).trimStart();
-      return pad + '- ' + _yamlVal(v);
-    }).join('\n');
-  }
-  if (typeof obj === 'object' && obj !== null) {
-    return Object.entries(obj).map(([k, v]) => {
-      if (typeof v === 'object' && v !== null) return pad + k + ':\n' + _jsonToYaml(v, indent + 1);
-      return pad + k + ': ' + _yamlVal(v);
-    }).join('\n');
-  }
-  return pad + _yamlVal(obj);
-}
-
-function _yamlVal(v) {
-  if (v === null) return 'null';
-  if (typeof v === 'string') return /[:#\[\]{}&*!|>'",%@`]/.test(v) ? JSON.stringify(v) : v;
-  return String(v);
-}
-
-// ─── 简易 TOML ↔ JSON ──────────────────────────────────────────
-function _tomlToJson(toml) {
-  const result = {}; let current = result;
-  for (const line of toml.split('\n')) {
-    const t = line.trim();
-    if (!t || t.startsWith('#')) continue;
-    const secMatch = t.match(/^\[([^\]]+)\]$/);
-    if (secMatch) {
-      const keys = secMatch[1].split('.');
-      current = result;
-      for (const k of keys) { if (!current[k]) current[k] = {}; current = current[k]; }
-      continue;
-    }
-    const eqIdx = t.indexOf('=');
-    if (eqIdx === -1) continue;
-    const key = t.slice(0, eqIdx).trim();
-    const val = t.slice(eqIdx + 1).trim();
-    current[key] = _tomlParseVal(val);
-  }
-  return result;
-}
-
-function _tomlParseVal(v) {
-  if (v === 'true') return true;
-  if (v === 'false') return false;
-  if (/^-?\d+$/.test(v)) return parseInt(v, 10);
-  if (/^-?\d+\.\d+$/.test(v)) return parseFloat(v);
-  if (v.startsWith('"') && v.endsWith('"')) return v.slice(1, -1);
-  if (v.startsWith("'") && v.endsWith("'")) return v.slice(1, -1);
-  if (v.startsWith('[') && v.endsWith(']')) {
-    return v.slice(1, -1).split(',').map(s => _tomlParseVal(s.trim())).filter(x => x !== '');
-  }
-  return v;
-}
-
-function _jsonToToml(obj, prefix) {
-  prefix = prefix || '';
-  const lines = [], sections = [];
-  for (const [k, v] of Object.entries(obj)) {
-    if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
-      sections.push([prefix ? prefix + '.' + k : k, v]);
-    } else {
-      lines.push(k + ' = ' + _tomlStringify(v));
-    }
-  }
-  let out = '';
-  if (prefix) out += '[' + prefix + ']\n';
-  out += lines.join('\n');
-  for (const [sec, val] of sections) {
-    out += '\n\n' + _jsonToToml(val, sec);
-  }
-  return out.trim();
-}
-
-function _tomlStringify(v) {
-  if (v === null) return '""';
-  if (typeof v === 'boolean') return String(v);
-  if (typeof v === 'number') return String(v);
-  if (Array.isArray(v)) return '[' + v.map(_tomlStringify).join(', ') + ']';
-  return JSON.stringify(String(v));
-}
-
-// ─── XML 格式化 ─────────────────────────────────────────────────
-function _xmlFormat(xml, minify) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xml, 'text/xml');
-  if (doc.querySelector('parsererror')) throw new Error('XML 解析失败');
-  if (minify) return new XMLSerializer().serializeToString(doc).replace(/>\s+</g, '><');
-  // Pretty print
-  const serialized = new XMLSerializer().serializeToString(doc);
-  let formatted = '', indent = 0;
-  for (const node of serialized.replace(/>\s*</g, '><').split(/(<[^>]+>)/)) {
-    if (!node.trim()) continue;
-    if (node.startsWith('</')) { indent--; formatted += '  '.repeat(Math.max(0, indent)) + node + '\n'; }
-    else if (node.startsWith('<') && !node.startsWith('<?') && !node.endsWith('/>')) {
-      formatted += '  '.repeat(indent) + node + '\n'; indent++;
-    }
-    else if (node.startsWith('<')) { formatted += '  '.repeat(indent) + node + '\n'; }
-    else { formatted += '  '.repeat(indent) + node + '\n'; }
-  }
-  return formatted.trim();
-}
-
-function _xmlToJson(xml) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xml, 'text/xml');
-  if (doc.querySelector('parsererror')) throw new Error('XML 解析失败');
-  function nodeToObj(node) {
-    if (node.nodeType === 3) return node.textContent.trim() || undefined;
-    const obj = {};
-    for (const attr of node.attributes || []) obj['@' + attr.name] = attr.value;
-    const children = [...node.childNodes].map(nodeToObj).filter(x => x !== undefined);
-    if (children.length === 1 && typeof children[0] === 'string') return children[0];
-    for (const child of node.children) {
-      const name = child.tagName;
-      const val = nodeToObj(child);
-      if (obj[name]) { if (!Array.isArray(obj[name])) obj[name] = [obj[name]]; obj[name].push(val); }
-      else obj[name] = val;
-    }
-    return obj;
-  }
-  return nodeToObj(doc.documentElement);
-}
+// YAML / TOML / XML conversions live in compute/formats.js and are shared with the format pages.
+const _formats = () => ToolCompute.load('formats');
+const _formatError = e => (e.line ? `第 ${e.line} 行：` : '') + e.message;
 
 // ─── SQL 格式化 ──────────────────────────────────────────────────
 const _SQL_KW = ['SELECT','FROM','WHERE','JOIN','LEFT JOIN','RIGHT JOIN','INNER JOIN','ON','AND','OR','ORDER BY','GROUP BY','HAVING','LIMIT','OFFSET','INSERT INTO','VALUES','UPDATE','SET','DELETE FROM','CREATE TABLE','DISTINCT','AS','UNION','UNION ALL','WITH','CASE','WHEN','THEN','ELSE','END'];
@@ -252,9 +76,9 @@ const ConvertActions = [
     description: 'YAML 转 JSON',
     meta: { tier: 'standard', tags: ['yaml','json','convert','配置'], category: 'convert' },
     parameters: { type: 'object', properties: { input: { type: 'string', description: 'YAML 字符串' } }, required: ['input'] },
-    execute({ input }) {
-      try { const r = JSON.stringify(_yamlToJson(input), null, 2); return { success: true, data: { result: r }, display: 'YAML → JSON 完成' }; }
-      catch (e) { return { success: false, data: { error: e.message }, display: '转换失败: ' + e.message }; }
+    async execute({ input }) {
+      try { const { value } = await (await _formats()).yamlParse(input); const r = JSON.stringify(value, null, 2); return { success: true, data: { result: r }, display: 'YAML → JSON 完成' }; }
+      catch (e) { return { success: false, data: { error: _formatError(e) }, display: '转换失败: ' + _formatError(e) }; }
     },
   },
   {
@@ -262,8 +86,8 @@ const ConvertActions = [
     description: 'JSON 转 YAML',
     meta: { tier: 'standard', tags: ['json','yaml','convert','配置'], category: 'convert' },
     parameters: { type: 'object', properties: { input: { type: 'string', description: 'JSON 字符串' } }, required: ['input'] },
-    execute({ input }) {
-      try { const r = _jsonToYaml(JSON.parse(input)); return { success: true, data: { result: r }, display: 'JSON → YAML 完成' }; }
+    async execute({ input }) {
+      try { const r = await (await _formats()).yamlStringify(JSON.parse(input)); return { success: true, data: { result: r }, display: 'JSON → YAML 完成' }; }
       catch (e) { return { success: false, data: { error: e.message }, display: '转换失败: ' + e.message }; }
     },
   },
@@ -272,9 +96,9 @@ const ConvertActions = [
     description: 'TOML 转 JSON',
     meta: { tier: 'standard', tags: ['toml','json','convert','cargo'], category: 'convert' },
     parameters: { type: 'object', properties: { input: { type: 'string', description: 'TOML 字符串' } }, required: ['input'] },
-    execute({ input }) {
-      try { const r = JSON.stringify(_tomlToJson(input), null, 2); return { success: true, data: { result: r }, display: 'TOML → JSON 完成' }; }
-      catch (e) { return { success: false, data: { error: e.message }, display: '转换失败: ' + e.message }; }
+    async execute({ input }) {
+      try { const r = JSON.stringify(await (await _formats()).tomlParse(input), null, 2); return { success: true, data: { result: r }, display: 'TOML → JSON 完成' }; }
+      catch (e) { return { success: false, data: { error: _formatError(e) }, display: '转换失败: ' + _formatError(e) }; }
     },
   },
   {
@@ -282,9 +106,11 @@ const ConvertActions = [
     description: 'JSON 转 TOML',
     meta: { tier: 'standard', tags: ['json','toml','convert','cargo'], category: 'convert' },
     parameters: { type: 'object', properties: { input: { type: 'string', description: 'JSON 字符串' } }, required: ['input'] },
-    execute({ input }) {
-      try { const r = _jsonToToml(JSON.parse(input)); return { success: true, data: { result: r }, display: 'JSON → TOML 完成' }; }
-      catch (e) { return { success: false, data: { error: e.message }, display: '转换失败: ' + e.message }; }
+    async execute({ input }) {
+      try {
+        const { text, dropped } = await (await _formats()).tomlStringify(JSON.parse(input));
+        return { success: true, data: { result: text, dropped }, display: 'JSON → TOML 完成' + (dropped.length ? `（TOML 无 null，已省略 ${dropped.length} 项）` : '') };
+      } catch (e) { return { success: false, data: { error: e.message }, display: '转换失败: ' + e.message }; }
     },
   },
   {
@@ -292,9 +118,9 @@ const ConvertActions = [
     description: 'XML 格式化/压缩',
     meta: { tier: 'standard', tags: ['xml','format','美化','压缩'], category: 'convert' },
     parameters: { type: 'object', properties: { input: { type: 'string' }, minify: { type: 'boolean', default: false } }, required: ['input'] },
-    execute({ input, minify = false }) {
-      try { const r = _xmlFormat(input, minify); return { success: true, data: { result: r }, display: minify ? 'XML 已压缩' : 'XML 已格式化' }; }
-      catch (e) { return { success: false, data: { error: e.message }, display: 'XML 错误: ' + e.message }; }
+    async execute({ input, minify = false }) {
+      try { const f = await _formats(); const r = minify ? f.xmlMinify(input) : f.xmlFormat(input); return { success: true, data: { result: r }, display: minify ? 'XML 已压缩' : 'XML 已格式化' }; }
+      catch (e) { return { success: false, data: { error: _formatError(e) }, display: 'XML 错误: ' + _formatError(e) }; }
     },
   },
   {
@@ -302,9 +128,9 @@ const ConvertActions = [
     description: 'XML 转 JSON',
     meta: { tier: 'standard', tags: ['xml','json','convert'], category: 'convert' },
     parameters: { type: 'object', properties: { input: { type: 'string', description: 'XML 字符串' } }, required: ['input'] },
-    execute({ input }) {
-      try { const r = JSON.stringify(_xmlToJson(input), null, 2); return { success: true, data: { result: r }, display: 'XML → JSON 完成' }; }
-      catch (e) { return { success: false, data: { error: e.message }, display: '转换失败: ' + e.message }; }
+    async execute({ input }) {
+      try { const r = JSON.stringify((await _formats()).xmlToObject(input), null, 2); return { success: true, data: { result: r }, display: 'XML → JSON 完成' }; }
+      catch (e) { return { success: false, data: { error: _formatError(e) }, display: '转换失败: ' + _formatError(e) }; }
     },
   },
   {

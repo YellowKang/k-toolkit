@@ -1,90 +1,89 @@
+/* ── XML 格式化 / 压缩 / 转 JSON：见 compute/formats.js（保留注释/CDATA/声明，转义文本与属性） ── */
+
+const _xmlDict = {
+  zh: {
+    format: '格式化', minify: '压缩', tojson: 'XML→JSON',
+    input: '输入 XML', run: '执行', demo: '示例', clear: '清空', copy: '复制结果',
+    ok_format: '✓ 格式化完成', ok_minify: '✓ 压缩完成', ok_json: '✓ 转换完成',
+    error: '✗ XML 解析错误',
+    at: (line, col) => line ? `第 ${line} 行${col ? `第 ${col} 列` : ''}：` : '',
+    note: '压缩只移除标签间空白与注释，不改动文本和属性；转 JSON 时属性放在 "@"、文本放在 "#"，同名子元素合并为数组',
+  },
+  en: {
+    format: 'Format', minify: 'Minify', tojson: 'XML→JSON',
+    input: 'XML input', run: 'Run', demo: 'Sample', clear: 'Clear', copy: 'Copy result',
+    ok_format: '✓ Formatted', ok_minify: '✓ Minified', ok_json: '✓ Converted',
+    error: '✗ XML parse error',
+    at: (line, col) => line ? `Line ${line}${col ? `, column ${col}` : ''}: ` : '',
+    note: 'Minify removes only whitespace between tags and comments; text and attributes are untouched. JSON puts attributes under "@", text under "#", repeated elements into arrays',
+  },
+};
+
 function renderXmlFormat(el) {
+  const T = makeToolI18n(_xmlDict);
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div style="display:flex;gap:10px;margin-bottom:14px">
-        <button class="btn btn-primary" id="xmlFmtBtn" onclick="setXmlMode('format')">格式化</button>
-        <button class="btn btn-secondary" id="xmlMinBtn" onclick="setXmlMode('minify')">压缩</button>
-        <button class="btn btn-secondary" id="xmlJsonBtn" onclick="setXmlMode('tojson')">XML→JSON</button>
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="xmlFmtBtn" onclick="setXmlMode('format')">${T('format')}</button>
+        <button class="btn btn-secondary" id="xmlMinBtn" onclick="setXmlMode('minify')">${T('minify')}</button>
+        <button class="btn btn-secondary" id="xmlJsonBtn" onclick="setXmlMode('tojson')">${T('tojson')}</button>
       </div>
-      <div class="panel-label">输入 XML</div>
-      <textarea class="tool-textarea" id="xmlInput" rows="10" placeholder="<root><item id=&quot;1&quot;>value</item></root>" oninput="_xmlRealtime()"></textarea>
+      <div class="panel-label">${T('input')}</div>
+      <textarea class="tool-textarea" id="xmlInput" rows="10" spellcheck="false" style="font-family:monospace" placeholder="<root><item id=&quot;1&quot;>value</item></root>" oninput="_xmlRealtime()"></textarea>
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="doXml()">执行</button>
-        <button class="btn btn-secondary" onclick="xmlLoadDemo()">示例</button>
-        <button class="btn btn-secondary" onclick="document.getElementById('xmlInput').value='';document.getElementById('xmlResult').style.display='none'">清空</button>
+        <button class="btn btn-primary" onclick="doXml()">${T('run')}</button>
+        <button class="btn btn-secondary" onclick="xmlLoadDemo()">${T('demo')}</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('xmlInput').value='';document.getElementById('xmlResult').style.display='none'">${T('clear')}</button>
       </div>
+      <div style="font-size:12px;color:var(--text-muted)">${T('note')}</div>
     </div>
     <div class="tool-card-panel" id="xmlResult" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div class="panel-label" style="margin:0" id="xmlStatus"></div>
-        <button class="btn btn-secondary" onclick="copyText(document.getElementById('xmlOutput').textContent,this)">复制结果</button>
+        <button class="btn btn-secondary" onclick="copyText(document.getElementById('xmlOutput').textContent,this)">${T('copy')}</button>
       </div>
       <pre class="result-box" id="xmlOutput" style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto"></pre>
     </div>`;
-  window._xmlMode='format';
+  window._xmlMode = 'format';
+  ToolCompute.load('formats').catch(() => {});
 }
 
 let _xmlTimer = null;
 function _xmlRealtime() {
   clearTimeout(_xmlTimer);
   const v = document.getElementById('xmlInput').value.trim();
-  if (!v) { document.getElementById('xmlResult').style.display='none'; return; }
+  if (!v) { document.getElementById('xmlResult').style.display = 'none'; return; }
   _xmlTimer = setTimeout(doXml, 500);
 }
 
 function setXmlMode(m) {
-  window._xmlMode=m;
-  document.getElementById('xmlFmtBtn').className=m==='format'?'btn btn-primary':'btn btn-secondary';
-  document.getElementById('xmlMinBtn').className=m==='minify'?'btn btn-primary':'btn btn-secondary';
-  document.getElementById('xmlJsonBtn').className=m==='tojson'?'btn btn-primary':'btn btn-secondary';
+  window._xmlMode = m;
+  document.getElementById('xmlFmtBtn').className = m === 'format' ? 'btn btn-primary' : 'btn btn-secondary';
+  document.getElementById('xmlMinBtn').className = m === 'minify' ? 'btn btn-primary' : 'btn btn-secondary';
+  document.getElementById('xmlJsonBtn').className = m === 'tojson' ? 'btn btn-primary' : 'btn btn-secondary';
+  if (document.getElementById('xmlInput').value.trim()) doXml();
 }
 
-function doXml() {
-  const v=document.getElementById('xmlInput').value.trim();
-  if(!v) return;
-  const status=document.getElementById('xmlStatus');
-  const output=document.getElementById('xmlOutput');
+async function doXml() {
+  const T = makeToolI18n(_xmlDict);
+  const v = document.getElementById('xmlInput').value.trim();
+  if (!v) return;
+  const status = document.getElementById('xmlStatus'), output = document.getElementById('xmlOutput');
   try {
-    const parser=new DOMParser();
-    const doc=parser.parseFromString(v,'text/xml');
-    const err=doc.querySelector('parsererror');
-    if(err){output.textContent='XML 解析错误：'+err.textContent.split('\n')[0];status.textContent='✗ 错误';status.style.color='#ef4444';document.getElementById('xmlResult').style.display='';return;}
-    if(window._xmlMode==='format') {
-      output.textContent=xmlSerialize(doc.documentElement,0);
-      status.textContent='✓ 格式化完成';status.style.color='#10b981';
-    } else if(window._xmlMode==='minify') {
-      output.textContent=new XMLSerializer().serializeToString(doc).replace(/\s+/g,' ').replace(/> </g,'><');
-      status.textContent='✓ 压缩完成';status.style.color='#10b981';
-    } else {
-      output.textContent=JSON.stringify(xmlToObj(doc.documentElement),null,2);
-      status.textContent='✓ 转换完成';status.style.color='#10b981';
-    }
-  } catch(e){output.textContent='处理失败：'+e.message;status.textContent='✗ 错误';status.style.color='#ef4444';}
-  document.getElementById('xmlResult').style.display='';
-}
-
-function xmlSerialize(node,depth) {
-  const indent='  '.repeat(depth);
-  if(node.nodeType===3){const t=node.textContent.trim();return t?indent+t+'\n':'';}
-  if(node.nodeType!==1) return '';
-  const attrs=[...node.attributes].map(a=>` ${a.name}="${a.value}"`).join('');
-  const children=[...node.childNodes].map(c=>xmlSerialize(c,depth+1)).join('');
-  if(!children.trim()) return `${indent}<${node.tagName}${attrs}/>${'\n'}`;
-  const inline=node.childNodes.length===1&&node.firstChild.nodeType===3&&node.firstChild.textContent.trim().length<60;
-  if(inline) return `${indent}<${node.tagName}${attrs}>${node.textContent.trim()}</${node.tagName}>\n`;
-  return `${indent}<${node.tagName}${attrs}>\n${children}${indent}</${node.tagName}>\n`;
-}
-
-function xmlToObj(node) {
-  if(node.nodeType===3) return node.textContent.trim()||undefined;
-  const obj={};
-  if(node.attributes.length) obj['@']=[...node.attributes].reduce((a,attr)=>{a[attr.name]=attr.value;return a;},{});
-  const kids=[...node.childNodes].filter(n=>!(n.nodeType===3&&!n.textContent.trim()));
-  if(kids.length===1&&kids[0].nodeType===3) obj['#']=kids[0].textContent.trim();
-  else kids.forEach(c=>{if(c.nodeType!==1) return;const v=xmlToObj(c);obj[c.tagName]=obj[c.tagName]?[].concat(obj[c.tagName],v):v;});
-  return obj;
+    const formats = await ToolCompute.load('formats');
+    if (window._xmlMode === 'minify') { output.textContent = formats.xmlMinify(v); status.textContent = T('ok_minify'); }
+    else if (window._xmlMode === 'tojson') { output.textContent = JSON.stringify(formats.xmlToObject(v), null, 2); status.textContent = T('ok_json'); }
+    else { output.textContent = formats.xmlFormat(v); status.textContent = T('ok_format'); }
+    status.style.color = '#10b981';
+  } catch (e) {
+    output.textContent = T('at', e.line, e.column) + e.message;
+    status.textContent = T('error');
+    status.style.color = '#ef4444';
+  }
+  document.getElementById('xmlResult').style.display = '';
 }
 
 function xmlLoadDemo() {
-  document.getElementById('xmlInput').value=`<?xml version="1.0" encoding="UTF-8"?><bookstore><book id="1" category="fiction"><title>JavaScript权威指南</title><author>David Flanagan</author><price>89.00</price></book><book id="2" category="tech"><title>Clean Code</title><author>Robert Martin</author><price>69.00</price></book></bookstore>`;
+  document.getElementById('xmlInput').value = `<?xml version="1.0" encoding="UTF-8"?><!-- 书店示例 --><bookstore><book id="1" category="fiction"><title lang="zh">JavaScript权威指南</title><author>David Flanagan</author><price currency="CNY">89.00</price></book><book id="2" category="tech"><title lang="en">Clean Code &amp; Craft</title><author>Robert Martin</author><price currency="USD">69.00</price><note><![CDATA[<b>二手</b> 九成新]]></note></book></bookstore>`;
+  doXml();
 }

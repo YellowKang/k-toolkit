@@ -88,8 +88,27 @@
     return moduleLoads.get(name);
   }
 
+  // Third-party libraries are pinned in vendor/ (see vendor/manifest.json); never loaded from a CDN.
+  const VENDOR = { jsqr: ['vendor/jsqr/jsQR.js', 'jsQR'], qrcodejs: ['vendor/qrcodejs/qrcode.min.js', 'QRCode'],
+    'js-yaml': ['vendor/js-yaml/js-yaml.min.js', 'jsyaml'], 'smol-toml': ['vendor/smol-toml/smol-toml.js', 'smolToml'] };
+  const vendorLoads = new Map();
+  function loadVendor(name) {
+    const entry = VENDOR[name];
+    if (!entry) return Promise.reject(new Error('Unknown vendor library: ' + name));
+    const [src, global] = entry;
+    if (window[global]) return Promise.resolve(window[global]);
+    if (!vendorLoads.has(name)) vendorLoads.set(name, new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src + '?v=' + encodeURIComponent(document.querySelector('meta[name="toolkit-version"]')?.content || 'dev');
+      script.onload = () => window[global] ? resolve(window[global]) : reject(new Error('Library did not load: ' + name));
+      script.onerror = () => { vendorLoads.delete(name); script.remove(); reject(new Error('Failed to load library: ' + name)); };
+      document.head.appendChild(script);
+    }));
+    return vendorLoads.get(name);
+  }
+
   window.ToolCompute = Object.freeze({ words, formatWords, base64Encode, base64Decode, processLines,
     caseConvert: (text, style) => style === 'upper' ? text.toUpperCase() : style === 'lower' ? text.toLowerCase() : formatWords(words(text), style),
-    localDate, parseLocalDate, addMonths, calendarDiff, weekdaysBetween, load,
+    localDate, parseLocalDate, addMonths, calendarDiff, weekdaysBetween, load, loadVendor,
   });
 })();
