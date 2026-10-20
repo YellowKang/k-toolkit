@@ -29,7 +29,7 @@
 
 `Alt+A` 打开助手，`Cmd/Ctrl+J` 打开迷你对话框。支持配置 Claude、OpenAI、Gemini 适配器；实际连接取决于模型服务、接口配置及浏览器 CORS 限制。
 
-- 本地计算工具在浏览器执行；部分依赖库可能从 CDN 加载，离线能力取决于已缓存的资源。
+- 本地计算工具在浏览器执行；第三方库（二维码、YAML、TOML）以固定版本放在 `public/vendor/`，随站点校验和缓存，离线可用。
 - 网络工具向相应服务发送请求；AI 助手会把对话、页面上下文和工具结果发送到配置的模型接口。
 - 收藏、偏好和部分工具内容保存在浏览器。当前 API Key 配置使用浏览器存储，不应在共享设备上保存长期密钥，也不要把密钥写入仓库。
 - GitHub Pages 提供静态站点。需要隐藏服务端密钥或统一鉴权时，应单独配置后端代理。
@@ -54,7 +54,7 @@ TEST_BROWSER=firefox TEST_BUILD=1 npm run test:browser
 npm run build
 ```
 
-`npm test` 检查 Agent 行为、工具目录、构建、CSS 和缓存版本。浏览器回归检查图片选择/处理/下载、分类、工作台、旧链接、收藏、脚本重复加载、SVG 预览隔离、Agent 工作流与版本更新。测试自动启动本地服务，生成测试图片，不连接模型服务。
+`npm test` 检查 Agent 行为、工具目录、构建、CSS、缓存版本、第三方库摘要，以及财务大写、农历、Cron、CSV、单位换算等工具的计算结果。浏览器回归检查图片选择/处理/下载、分类、工作台、旧链接、收藏、脚本重复加载、SVG 预览隔离、Agent 工作流、版本更新，并对全部工具做 XSS 注入检查（用户输入、本地存储记录、DNS/IP 接口返回、Markdown 原始 HTML）。测试自动启动本地服务，生成测试图片，不连接模型服务。
 
 可用 `TEST_BROWSER_CHANNEL=chrome` 使用已安装的 Chrome。375px / 768px 检查是桌面浏览器视口模拟，不代替手机真机测试。
 
@@ -68,7 +68,7 @@ npm run build
 
 刷新会结束任务、清除未保存输入、图片暂存和未下载结果；收藏及设置保留。图片暂存仅在当前标签页内存中，最多 20 张、共 100 MB，可把处理结果继续暂存复用。
 
-首次成功安装会缓存站点自有静态文件，工具代码仍按需执行。缓存按项目路径隔离，并保留当前及前两个版本；其他打开的标签页不会被强制刷新。模型服务及外部 CDN 依赖仍需要网络。从旧机制首次迁移时，若仍显示旧页面，请关闭此站点的所有标签页后重新打开，让等待中的新 Worker 接管；之后即可使用新的更新按钮。直接运行 `public/` 显示开发版；完整更新测试需 `npm run build` 后托管 `dist/`。
+首次成功安装会缓存站点自有静态文件，工具代码仍按需执行。缓存按项目路径隔离，并保留当前及前两个版本；其他打开的标签页不会被强制刷新。模型服务与网络类工具仍需要网络。从旧机制首次迁移时，若仍显示旧页面，请关闭此站点的所有标签页后重新打开，让等待中的新 Worker 接管；之后即可使用新的更新按钮。直接运行 `public/` 显示开发版；完整更新测试需 `npm run build` 后托管 `dist/`。
 
 `npm run test:updates` 使用真实 Service Worker 模拟三个发布版本，验证手动更新、多标签页、离线、缺失/错版资源与缓存隔离。
 
@@ -86,17 +86,19 @@ Docker 使用 Nginx 提供构建后的静态文件。
 ```text
 public/
   tool-catalog.js     工具元数据、分类和工作台
-  tool-compute.js     页面与 Agent 共享的文本计算
+  tool-compute.js     页面与 Agent 共享的文本/日期计算与按需加载器
   dashboard.js        路由、导航和页面渲染
   i18n.js             双语标签
   tools/             按需加载的工具
+  compute/           页面与 Agent 共用的计算模块（Cron、CSV、农历、YAML/TOML/XML、.env）
+  vendor/            固定版本的第三方库及许可证、摘要清单
   agent/             会话、适配器、动作、界面
 scripts/             构建与目录文档生成
 tests/               单元测试与浏览器回归
 docs/                工具目录与架构说明
 ```
 
-新增工具时，在 `public/tools/` 实现界面，在 `public/tool-catalog.js` 注册元数据，并在 `public/i18n.js` 添加英文标签。使用独立作用域隔离工具内部状态，提供页面离开时的清理逻辑。需要 Agent 调用时，在 `public/agent/` 注册相应能力和参数约束。
+新增工具时，在 `public/tools/` 实现界面（文案用 `makeToolI18n` 提供中英文），在 `public/tool-catalog.js` 注册元数据，并在 `public/i18n.js` 添加英文标签。使用独立作用域隔离工具内部状态，提供页面离开时的清理逻辑。页面与 Agent 都要用的计算逻辑放进 `public/compute/`，通过 `ToolCompute.load()` 按需加载；第三方库放进 `public/vendor/` 并更新 `manifest.json` 摘要，不从 CDN 加载。用户输入、存储记录和网络返回一律经 `escHtml` 或 `textContent` 输出，不拼进内联事件。需要 Agent 调用时，在 `public/agent/` 注册相应能力和参数约束。
 
 修改目录后运行 `npm run docs:catalog`，提交生成的目录文档，并运行相关测试。修改分类或入口时保留现有工具 ID，避免破坏历史链接和收藏。
 
@@ -106,11 +108,11 @@ K Toolkit is a static developer toolbox with an AI assistant, bilingual UI, them
 
 Ten categories organize the tools. Five workbenches group image compression/conversion, hashes/HMAC, QR generation/decoding, time zones/world clocks and HTTP tools. Existing child URLs and favorites remain valid; compression, WebP and Base64 can explicitly reuse files staged in the current tab’s memory. See the generated [tool catalog](docs/tool-catalog.md) for the current inventory.
 
-Local tools process inputs in the browser. Network tools contact external services, and AI requests send conversation context and tool results to the configured model provider. Some libraries load from CDNs. API keys are currently stored in browser storage; a separate backend is needed to keep service credentials off the client.
+Local tools process inputs in the browser. Network tools contact external services, and AI requests send conversation context and tool results to the configured model provider. Third-party libraries (QR, YAML, TOML) are pinned under `public/vendor/` and cached with the site, so they work offline. API keys are currently stored in browser storage; a separate backend is needed to keep service credentials off the client.
 
 Use `/workflows` in the assistant for local templates that require no model or API key. Typed result references chain validated actions, stop on errors, and keep intermediate data in the browser. See [workflow usage and roadmap](docs/agent-workflows.md).
 
-Use Node.js 20.13+ and `npm ci`, then `npm run dev`. Run `npm test` for unit/build/catalog checks. Install Playwright browsers with `npx playwright install chromium firefox`, then run `TEST_BUILD=1 npm run test:browser`; set `TEST_BROWSER=firefox` for Firefox. `npm run build` writes the static site to `dist/`.
+Use Node.js 20.13+ and `npm ci`, then `npm run dev`. Run `npm test` for unit/build/catalog checks. Install Playwright browsers with `npx playwright install chromium firefox`, then run `TEST_BUILD=1 npm run test:browser`; set `TEST_BROWSER=firefox` for Firefox. The browser suite includes an XSS fuzz pass over every tool. `npm run build` writes the static site to `dist/`.
 
 Pull requests run Chromium and Firefox checks. Successful pushes to `master` deploy through the official Pages artifact workflow. Set the repository’s Pages Source to **GitHub Actions**. The ↻ button checks for updates and refreshes only when requested; deployment/CDN propagation is not instantaneous. To host locally with Docker, run `docker compose up -d --build` and open port 8080.
 
