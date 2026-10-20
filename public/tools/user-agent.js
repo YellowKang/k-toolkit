@@ -39,7 +39,7 @@ function _renderUAGrid(ua, id, title) {
   document.getElementById(id).innerHTML = `
     <div class="panel-label" style="margin-bottom:10px">${title}</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
-      ${info.map(([k,v])=>`<div style="padding:10px 14px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:10px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${k}</div><div style="font-weight:600;color:var(--neon)">${v}</div></div>`).join('')}
+      ${info.map(([k,v])=>`<div style="padding:10px 14px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:10px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${k}</div><div style="font-weight:600;color:var(--neon)">${escHtml(String(v))}</div></div>`).join('')}
     </div>`;
 }
 

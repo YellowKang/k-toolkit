@@ -113,14 +113,16 @@ function _htRenderHistory() {
   }
   container.innerHTML = list.map((item, i) => {
     const mc = _htMethodColor(item.method);
-    const truncUrl = item.url.length > 60 ? item.url.slice(0, 57) + '...' : item.url;
+    // History lives in localStorage: treat every stored field as untrusted text.
+    const url = String(item.url ?? ''), method = escHtml(String(item.method ?? ''));
+    const truncUrl = escHtml(url.length > 60 ? url.slice(0, 57) + '...' : url);
     const statusColor = item.status >= 200 && item.status < 300 ? '#10b981' : '#ef4444';
-    const statusText = item.status ? `<span style="color:${statusColor};font-weight:600;font-size:12px">${item.status}</span>` : '';
+    const statusText = item.status ? `<span style="color:${statusColor};font-weight:600;font-size:12px">${escHtml(String(item.status))}</span>` : '';
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .15s;border-bottom:1px solid var(--border-color,rgba(128,128,128,0.12))" onmouseenter="this.style.background='var(--hover-bg,rgba(128,128,128,0.06))'" onmouseleave="this.style.background=''" onclick="_htRestoreFromHistory(${i})">
-      <span style="padding:2px 8px;border-radius:6px;font-weight:700;font-size:11px;min-width:52px;text-align:center;background:${mc.bg};color:${mc.fg}">${item.method}</span>
-      <span style="flex:1;font-size:12px;color:var(--text-main);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${item.url}">${truncUrl}</span>
+      <span style="padding:2px 8px;border-radius:6px;font-weight:700;font-size:11px;min-width:52px;text-align:center;background:${mc.bg};color:${mc.fg}">${method}</span>
+      <span style="flex:1;font-size:12px;color:var(--text-main);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(url)}">${truncUrl}</span>
       ${statusText}
-      <span style="font-size:11px;color:var(--text-muted);white-space:nowrap">${item.time || ''}</span>
+      <span style="font-size:11px;color:var(--text-muted);white-space:nowrap">${escHtml(String(item.time || ''))}</span>
       <button class="btn btn-secondary" style="padding:2px 7px;font-size:14px;line-height:1;min-width:auto;border:none;opacity:0.5" onclick="event.stopPropagation();_htDeleteHistory(${i})" title="Delete">&times;</button>
     </div>`;
   }).join('');
@@ -133,17 +135,19 @@ function _htExportCurl(btnEl) {
   if (!url) return;
   const headersRaw = document.getElementById('htHeaders').value.trim();
   const bodyRaw = document.getElementById('htBody').value.trim();
-  let cmd = `curl -X ${method} '${url}'`;
+  // Single-quote every argument so URLs/headers containing quotes cannot break out of the command.
+  const shq = v => "'" + String(v).replace(/'/g, "'\\''") + "'";
+  let cmd = `curl -X ${method} ${shq(url)}`;
   if (headersRaw) {
     headersRaw.split('\n').forEach(line => {
       const [k, ...v] = line.split(':');
       if (k && v.length) {
-        cmd += ` \\\n  -H '${k.trim()}: ${v.join(':').trim()}'`;
+        cmd += ` \\\n  -H ${shq(`${k.trim()}: ${v.join(':').trim()}`)}`;
       }
     });
   }
   if (bodyRaw && !['GET', 'HEAD'].includes(method)) {
-    cmd += ` \\\n  -d '${bodyRaw.replace(/'/g, "'\\''")}'`;
+    cmd += ` \\\n  -d ${shq(bodyRaw)}`;
   }
   copyText(cmd, btnEl);
 }

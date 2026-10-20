@@ -124,9 +124,43 @@ function renderMarkdown(el) {
 
 function mdUpdate() {
   var text = document.getElementById('mdInput').value;
-  document.getElementById('mdPreview').innerHTML = _mdParse(text);
+  document.getElementById('mdPreview').replaceChildren(_mdSanitize(_mdParse(text)));
   // attach checkbox click handlers after rendering
   _mdBindCheckboxes();
+}
+
+// Markdown may embed raw HTML from untrusted sources (READMEs, docs): keep a safe allowlist, drop scripts and handlers.
+var _MD_TAGS = new Set(['a','b','strong','i','em','del','s','u','mark','code','pre','kbd','samp','sup','sub','br','hr','p','div','span',
+  'ul','ol','li','blockquote','h1','h2','h3','h4','h5','h6','table','thead','tbody','tfoot','tr','th','td','img','details','summary','dl','dt','dd','abbr','small']);
+var _MD_ATTRS = new Set(['href','src','alt','title','style','class','id','colspan','rowspan','align','target','rel','open','width','height','data-cb-index','data-cb-checked']);
+function _mdSanitize(html) {
+  var tpl = document.createElement('template');
+  tpl.innerHTML = html; // template content is inert: nothing loads or runs while we clean it
+  (function clean(node) {
+    Array.from(node.childNodes).forEach(function(child) {
+      if (child.nodeType === 8) { child.remove(); return; }
+      if (child.nodeType !== 1) return;
+      var tag = child.localName;
+      if (!_MD_TAGS.has(tag)) {
+        // Unknown but harmless containers keep their text; active content is dropped entirely.
+        if (/^(script|style|iframe|object|embed|frame|frameset|link|meta|base|form|input|button|textarea|select|svg|math|template|noscript|audio|video|source|track|canvas)$/.test(tag)) child.remove();
+        else { clean(child); child.replaceWith.apply(child, Array.from(child.childNodes)); }
+        return;
+      }
+      Array.from(child.attributes).forEach(function(attr) {
+        var name = attr.name.toLowerCase();
+        if (!_MD_ATTRS.has(name)) { child.removeAttribute(attr.name); return; }
+        if (name === 'href' || name === 'src') {
+          var url = attr.value.trim().replace(/[\u0000- ]/g, '').toLowerCase();
+          if (!/^(https?:|mailto:|#|\/|\.\/|\.\.\/)/.test(url) && /^[a-z][a-z0-9+.-]*:/.test(url)) child.removeAttribute(attr.name);
+        }
+        if (name === 'style' && /url\s*\(|expression\s*\(|javascript:/i.test(attr.value)) child.removeAttribute(attr.name);
+      });
+      if (tag === 'a') { child.setAttribute('rel', 'noopener noreferrer'); child.setAttribute('target', '_blank'); }
+      clean(child);
+    });
+  })(tpl.content);
+  return tpl.content;
 }
 
 function _mdSafeUrl(url) {

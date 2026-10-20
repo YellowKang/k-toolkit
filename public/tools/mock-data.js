@@ -96,7 +96,7 @@ function _mockRenderFields() {
   const c = document.getElementById('mockFieldList');
   c.innerHTML = _mockFields.map((f, i) => `
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
-      <input class="tool-input" value="${f.name}" onchange="_mockFields[${i}].name=this.value" placeholder="${T('field_name')}" style="width:120px">
+      <input class="tool-input" value="${escHtml(f.name)}" onchange="_mockFields[${i}].name=this.value" placeholder="${T('field_name')}" style="width:120px">
       <select class="tool-input" style="width:auto" onchange="_mockFields[${i}].type=this.value">
         ${types.map(t => `<option value="${t}" ${t===f.type?'selected':''}>${T('t_'+t)}</option>`).join('')}
       </select>

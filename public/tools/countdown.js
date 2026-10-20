@@ -92,8 +92,9 @@ function cdSave() {
 function cdRenderSaved() {
   const el = document.getElementById('cdSavedList');
   if (!el) return;
-  const list = JSON.parse(localStorage.getItem('dtb_countdowns') || '[]');
-  if (!list.length) { el.innerHTML = '<span style="color:var(--text-muted);font-size:12px">暂无保存</span>'; return; }
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem('dtb_countdowns') || '[]'); } catch {}
+  if (!Array.isArray(list) || !list.length) { el.innerHTML = '<span style="color:var(--text-muted);font-size:12px">暂无保存</span>'; return; }
   el.innerHTML = list.map((item, i) => {
     const diff = new Date(item.target) - Date.now();
     const past = diff < 0;
@@ -102,7 +103,7 @@ function cdRenderSaved() {
     const h = Math.floor(abs%86400000/3600000);
     const summary = past ? `已过 ${d}天${h}时` : `还有 ${d}天${h}时`;
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--surface);margin-bottom:6px">
-      <span style="flex:1;font-size:13px;color:var(--text)">${item.name}</span>
+      <span style="flex:1;font-size:13px;color:var(--text)">${escHtml(String(item.name ?? ''))}</span>
       <span style="font-size:12px;color:${past?'var(--text-muted)':'var(--accent)'}">${summary}</span>
       <button onclick="cdLoadSaved(${i})" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px">加载</button>
       <button onclick="cdDeleteSaved(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px">×</button>

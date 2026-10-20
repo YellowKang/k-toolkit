@@ -7,8 +7,10 @@ async function renderIpInfo(container) {
 
   const box = container.querySelector('#ip-result');
 
+  // Values come from a third-party API: escape them for both text and attributes.
   function row(label, value) {
-    const safe = String(value).replace(/"/g, '&quot;');
+    const safe = escHtml(String(value));
+    value = safe;
     return `<div style="display:flex;justify-content:space-between;align-items:center;
       padding:12px 16px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);
       border-radius:10px;gap:12px">

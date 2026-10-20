@@ -39,8 +39,8 @@ async function doDnsLookup() {
     }
     data.innerHTML = json.Answer.map(a =>
       `<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--glass-border);font-family:monospace;font-size:13px">
-        <span style="color:var(--text-muted);min-width:50px">TTL:${a.TTL}</span>
-        <span style="color:var(--text);word-break:break-all">${a.data}</span>
+        <span style="color:var(--text-muted);min-width:50px">TTL:${escHtml(String(a.TTL))}</span>
+        <span style="color:var(--text);word-break:break-all">${escHtml(String(a.data ?? ''))}</span>
       </div>`
     ).join('');
   } catch(e) {

@@ -79,5 +79,5 @@ function doTc() {
   const bgStyle = bg ? `background:${bgColorMap[bg]||'inherit'}` : '';
   const txStyle = style ? styleMap[style]||'' : '';
   document.getElementById('tcPreview').innerHTML =
-    `<span style="${fgStyle};${bgStyle};${txStyle};padding:2px 4px">${text}</span>`;
+    `<span style="${fgStyle};${bgStyle};${txStyle};padding:2px 4px">${escHtml(text)}</span>`;
 }
