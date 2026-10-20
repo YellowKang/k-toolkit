@@ -44,6 +44,6 @@ async function doDnsLookup() {
       </div>`
     ).join('');
   } catch(e) {
-    data.innerHTML = `<span style="color:#ef4444">查询失败：${e.message}</span>`;
+    data.innerHTML = `<span style="color:#ef4444">查询失败：${escHtml(e.message)}</span>`;
   }
 }

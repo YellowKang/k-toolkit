@@ -211,6 +211,7 @@ select.tool-input { cursor: pointer; }
 @media (hover: hover) {
   .copy-inline:hover { color: var(--text); }
 }
+.copy-inline.active { color: var(--text); border-color: var(--accent); }
 
 /* ── 加载状态 ── */
 

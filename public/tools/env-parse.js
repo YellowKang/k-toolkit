@@ -1,92 +1,108 @@
+/* ── .env 解析：dotenv 兼容规则见 compute/env.js（页面与 Agent 共用） ── */
+
+const _epDict = {
+  zh: {
+    input: '粘贴 .env 内容',
+    placeholder: '# 注释行会被忽略\nAPP_NAME=MyApp\nexport PORT=3000\nDB_URL="postgres://localhost/db" # 行尾注释\nPRIVATE_KEY="-----BEGIN-----\n...\n-----END-----"',
+    parse: '解析', clear: '清空',
+    found: n => `✓ 解析到 ${n} 个变量`,
+    none: '未找到有效键值对',
+    hint: '点击值可复制',
+    duplicates: list => `重复的键（以最后一次为准）：${list}`,
+    invalid: list => `无法解析的行：${list}`,
+    export_as: '导出为',
+    formats: { json: 'JSON', shell: 'Shell export', docker: 'docker run -e', compose: 'docker-compose' },
+    copy: '复制',
+  },
+  en: {
+    input: 'Paste .env content',
+    placeholder: '# comments are ignored\nAPP_NAME=MyApp\nexport PORT=3000\nDB_URL="postgres://localhost/db" # trailing comment\nPRIVATE_KEY="-----BEGIN-----\n...\n-----END-----"',
+    parse: 'Parse', clear: 'Clear',
+    found: n => `✓ Parsed ${n} variable(s)`,
+    none: 'No valid KEY=VALUE pairs found',
+    hint: 'Click a value to copy',
+    duplicates: list => `Duplicate keys (last one wins): ${list}`,
+    invalid: list => `Unparsed lines: ${list}`,
+    export_as: 'Export as',
+    formats: { json: 'JSON', shell: 'Shell export', docker: 'docker run -e', compose: 'docker-compose' },
+    copy: 'Copy',
+  },
+};
+
 window.renderEnvParse = function(el) {
+  const T = makeToolI18n(_epDict);
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div class="panel-label">粘贴 .env 内容</div>
-      <textarea class="tool-textarea" id="epInput" rows="10" placeholder="# 注释行会被忽略\nAPP_NAME=MyApp\nPORT=3000\nDB_URL=postgres://localhost/db" oninput="epParse()"></textarea>
+      <div class="panel-label">${T('input')}</div>
+      <textarea class="tool-textarea" id="epInput" rows="10" spellcheck="false" style="font-family:monospace" placeholder="${escHtml(T('placeholder'))}" oninput="epParse()"></textarea>
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="epParse()">解析</button>
-        <button class="btn btn-secondary" onclick="epClear()">清空</button>
+        <button class="btn btn-primary" onclick="epParse()">${T('parse')}</button>
+        <button class="btn btn-secondary" onclick="epClear()">${T('clear')}</button>
       </div>
     </div>
     <div class="tool-card-panel" id="epResult" style="display:none">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">
         <div class="panel-label" style="margin:0" id="epStatus"></div>
-        <span style="font-size:12px;color:#9ca3af">点击值可复制</span>
+        <span style="font-size:12px;color:var(--text-muted)">${T('hint')}</span>
       </div>
+      <div id="epWarnings" style="font-size:12px;color:#f59e0b;margin-bottom:8px"></div>
       <div id="epTable"></div>
+      <div id="epExport" style="display:none;margin-top:14px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <span style="font-size:12px;color:var(--text-muted)">${T('export_as')}</span>
+          ${Object.entries(T('formats')).map(([k, label], i) => `<button class="copy-inline${i ? '' : ' active'}" data-format="${k}" onclick="epExport('${k}')">${label}</button>`).join('')}
+          <button class="btn btn-secondary" style="margin-left:auto;padding:4px 12px;font-size:12px" onclick="copyText(document.getElementById('epExportOut').textContent,this)">${T('copy')}</button>
+        </div>
+        <pre class="result-box" id="epExportOut" style="max-height:260px;overflow:auto"></pre>
+      </div>
     </div>`;
+  ToolCompute.load('env').catch(() => {});
 };
 
-var _epValMap = new Map();
+let _epLast = null, _epFormat = 'json';
 
-function epParse() {
-  var input = document.getElementById('epInput').value;
-  var result = document.getElementById('epResult');
-  var status = document.getElementById('epStatus');
-  var tableEl = document.getElementById('epTable');
-  var lines = input.split('\n');
-  var pairs = [];
-  lines.forEach(function(line) {
-    var t = line.trim();
-    if (!t || t.startsWith('#')) return;
-    var idx = t.indexOf('=');
-    if (idx < 1) return;
-    var key = t.slice(0, idx).trim();
-    var val = t.slice(idx + 1).trim();
-    // strip surrounding quotes
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-      val = val.slice(1, -1);
-    }
-    pairs.push({key: key, val: val});
-  });
-  if (pairs.length === 0) {
-    status.textContent = '未找到有效键值对';
-    status.style.color = '#e74c3c';
-    tableEl.innerHTML = '';
+async function epParse() {
+  const T = makeToolI18n(_epDict);
+  const input = document.getElementById('epInput').value;
+  const result = document.getElementById('epResult'), status = document.getElementById('epStatus');
+  if (!input.trim()) { result.style.display = 'none'; return; }
+  const env = await ToolCompute.load('env');
+  const parsed = env.parse(input);
+  _epLast = parsed;
+  const warnings = [];
+  if (parsed.duplicates.length) warnings.push(T('duplicates', parsed.duplicates.join(', ')));
+  if (parsed.invalid.length) warnings.push(T('invalid', parsed.invalid.map(x => x.line).join(', ')));
+  document.getElementById('epWarnings').textContent = warnings.join('；');
+  const table = document.getElementById('epTable');
+  if (!parsed.entries.length) {
+    status.textContent = T('none'); status.style.color = '#e74c3c';
+    table.replaceChildren();
+    document.getElementById('epExport').style.display = 'none';
     result.style.display = '';
     return;
   }
-  status.textContent = '✓ 解析到 ' + pairs.length + ' 个变量';
-  status.style.color = '#10b981';
-  _epValMap.clear();
-  var esc = function(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  };
-  var html = '<table style="width:100%;border-collapse:collapse;font-size:13px">';
-  html += '<thead><tr style="background:#f3f4f6"><th style="text-align:left;padding:8px 12px;border:1px solid #e5e7eb;color:#374151;font-weight:600">KEY</th><th style="text-align:left;padding:8px 12px;border:1px solid #e5e7eb;color:#374151;font-weight:600">VALUE</th></tr></thead><tbody>';
-  pairs.forEach(function(p, i) {
-    var bg = i % 2 === 0 ? '#fff' : '#f9fafb';
-    _epValMap.set(i, p.val);
-    html += '<tr style="background:' + bg + '">';
-    html += '<td style="padding:7px 12px;border:1px solid #e5e7eb;font-family:monospace;color:#1e40af;font-weight:500">' + esc(p.key) + '</td>';
-    html += '<td style="padding:7px 12px;border:1px solid #e5e7eb"><span style="font-family:monospace;cursor:pointer;background:#f3f4f6;padding:2px 6px;border-radius:4px;display:inline-block;max-width:100%;word-break:break-all" title="点击复制" onclick="epCopyVal(this,' + i + ')">' + esc(p.val) + '</span></td>';
-    html += '</tr>';
-  });
-  html += '</tbody></table>';
-  tableEl.innerHTML = html;
+  status.textContent = T('found', parsed.entries.length); status.style.color = '#10b981';
+  table.innerHTML = parsed.entries.map((e, i) => `
+    <div class="result-row" style="margin-bottom:6px;align-items:flex-start">
+      <span style="font-family:monospace;color:var(--accent);font-weight:600;min-width:140px;word-break:break-all">${escHtml(e.key)}</span>
+      <span class="ep-val" data-index="${i}" title="${T('hint')}" style="font-family:monospace;flex:1;white-space:pre-wrap;word-break:break-all;cursor:pointer;color:var(--text)">${escHtml(e.value) || '<span style="color:var(--text-muted)">""</span>'}</span>
+    </div>`).join('');
+  table.querySelectorAll('.ep-val').forEach(el => { el.onclick = () => copyText(parsed.entries[+el.dataset.index].value, el); });
+  document.getElementById('epExport').style.display = '';
+  epExport(_epFormat);
   result.style.display = '';
 }
 
-function epCopyVal(el, idx) {
-  var val = _epValMap.get(idx);
-  if (val === undefined) return;
-  var orig = el.style.background;
-  navigator.clipboard.writeText(val).then(function() {
-    el.style.background = '#d1fae5';
-    setTimeout(function() { el.style.background = orig; }, 800);
-  }).catch(function() {
-    var ta = document.createElement('textarea');
-    ta.value = val;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    el.style.background = '#d1fae5';
-    setTimeout(function() { el.style.background = orig; }, 800);
-  });
+async function epExport(kind) {
+  if (!_epLast) return;
+  _epFormat = kind;
+  const env = await ToolCompute.load('env');
+  document.querySelectorAll('#epExport [data-format]').forEach(b => b.classList.toggle('active', b.dataset.format === kind));
+  document.getElementById('epExportOut').textContent = env.format(_epLast.variables, kind);
 }
 
 function epClear() {
   document.getElementById('epInput').value = '';
   document.getElementById('epResult').style.display = 'none';
+  _epLast = null;
 }

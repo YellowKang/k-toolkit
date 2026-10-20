@@ -26,6 +26,13 @@ test('escHtml escapes text and both attribute quote styles', () => {
   assert.equal(escHtml(undefined), '');
 });
 
+test('error messages are escaped before reaching innerHTML', () => {
+  // JSON.parse/DOMParser messages quote the offending input, which may be attacker-controlled (JWTs, pasted JSON).
+  const unsafe = /innerHTML[^;]*(\$\{(e|err|error)\.message\}|\+\s*(e|err|error)\.message\b)/;
+  const offenders = sources.flatMap(s => s.text.split('\n').map((line, i) => unsafe.test(line) ? `${s.rel}:${i + 1}` : null)).filter(Boolean);
+  assert.deepEqual(offenders, []);
+});
+
 test('inline handlers never embed escaped user text inside a JS string', () => {
   // HTML entities are decoded before the handler runs, so `'${escHtml(x)}'` breaks on quotes; use data-* instead.
   const unsafe = /on[a-z]+="[^"]*'\$\{(?:escHtml\(|escaped\})/;

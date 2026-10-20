@@ -407,7 +407,7 @@ function convertColor() {
     } else throw new Error(tl('unrecognized'));
   } catch(e) {
     document.getElementById('cvResultPanel').style.display='';
-    document.getElementById('cvResults').innerHTML = `<span style="color:#ef4444">${e.message}</span>`;
+    document.getElementById('cvResults').innerHTML = `<span style="color:#ef4444">${escHtml(e.message)}</span>`;
     return;
   }
 

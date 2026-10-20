@@ -207,7 +207,7 @@ const TOOLS_EN = {
   'http-status':      { name:'HTTP Status',        desc:'Look up HTTP status code meanings, search and browse by category',           category:'Dev Tools' },
   'cron':             { name:'Cron Expression',    desc:'Parse Linux/Spring/Quartz cron, validate fields and list next runs',          category:'Dev Tools' },
   'password-gen':     { name:'Password Generator', desc:'Generate strong passwords with HIBP breach detection and Diceware mode',     category:'Dev Tools' },
-  'env-parse':        { name:'Env Parser',         desc:'Parse .env files, format checking and key extraction',                       category:'Dev Tools' },
+  'env-parse':        { name:'Env Parser',         desc:'Parse .env with dotenv rules, flag duplicates, export JSON/shell/Docker',    category:'Dev Tools' },
   'docker-gen':       { name:'Dockerfile Gen',     desc:'Generate best-practice Dockerfile for Node/Python/Go/Java',                  category:'Dev Tools' },
   'nginx-gen':        { name:'Nginx Config',       desc:'Generate Nginx config for static site/reverse proxy/HTTPS redirect',         category:'Dev Tools' },
   'git-commit':       { name:'Git Commit',         desc:'Generate conventional commit messages following Angular convention',          category:'Dev Tools' },

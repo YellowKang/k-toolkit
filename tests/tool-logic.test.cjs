@@ -158,6 +158,39 @@ test('subnet math validates octets and labels special-purpose ranges', () => {
   assert.deepEqual(plain(ipTypes(ipParse('203.0.113.9'))), ['doc']);
 });
 
+test('.env parsing follows dotenv quoting, comments, export and duplicates', () => {
+  const { KCompute: { env } } = load('compute/env.js');
+  const text = [
+    '# comment', 'export PORT=3000', 'URL=http://x/#anchor # trailing', 'EMPTY=', "SINGLE='a #b \\n'",
+    'DOUBLE="line1\\nline2 \\"q\\""', 'MULTI="-----BEGIN-----', 'abc', '-----END-----"', 'PORT=4000', 'not a pair', 'BAD="open',
+  ].join('\n');
+  const parsed = env.parse(text);
+  assert.deepEqual(plain(parsed.variables), {
+    PORT: '4000', URL: 'http://x/#anchor', EMPTY: '', SINGLE: 'a #b \\n', DOUBLE: 'line1\nline2 "q"', MULTI: '-----BEGIN-----\nabc\n-----END-----',
+  });
+  assert.deepEqual(plain(parsed.duplicates), ['PORT']);
+  assert.deepEqual(plain(parsed.invalid.map(x => x.line)), [11, 12]);
+  assert.equal(env.format({ A: 'x y', B: "it's" }, 'shell'), "export A='x y'\nexport B='it'\\''s'");
+});
+
+test('timestamps are classified as s/ms/µs/ns by digit count', () => {
+  const { tsDetectUnit, tsToMillis } = load('tools/timestamp.js');
+  assert.deepEqual(['1700000000', '1700000000123', '1700000000123456', '1700000000123456789', '-86400', '0'].map(tsDetectUnit), ['s', 'ms', 'us', 'ns', 's', 's']);
+  assert.equal(tsToMillis('1700000000123456'), 1700000000123.456);
+  assert.equal(new Date(tsToMillis('1700000000123456789')).toISOString(), '2023-11-14T22:13:20.123Z');
+  assert.equal(tsDetectUnit('12abc'), null);
+});
+
+test('CSS units convert through px with root and parent font sizes', () => {
+  const { cuConvertValue: c } = load('tools/css-unit.js');
+  assert.equal(c(24, 'px', 'rem', { root: 16 }), 1.5);
+  assert.equal(c(1.5, 'em', 'px', { parent: 20 }), 30);
+  assert.equal(c(150, '%', 'px', { parent: 12 }), 18);
+  assert.equal(c(50, 'vw', 'px', { vw: 1440 }), 720);
+  assert.equal(c(12, 'pt', 'px'), 16);
+  assert.throws(() => c(1, 'cm', 'px'), /Unknown unit/);
+});
+
 test('unit conversions use exact definitions without floating-point noise', () => {
   const { ucConvertValue: c } = load('tools/unit-convert.js');
   assert.equal(c('speed', 1, 'mps', 'kmh'), 3.6);

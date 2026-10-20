@@ -251,7 +251,8 @@ function _jPathKey(key) {
 function _jsonBuildTree(val, depth, path) {
   depth = depth || 0;
   path = path || '$';
-  const esc = (s) => s.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Keys and values come from user JSON: escape for both text and quoted attributes.
+  const esc = escHtml;
   const pathAttr = `data-jpath="${esc(path)}"`;
   const editAttr = `ondblclick="_jTreeEdit(this,event)"`;
   if (val === null) return `<span class="jt-clickable jt-editable" ${pathAttr} onclick="_jShowPath(this,event)" ${editAttr} data-jtype="null" style="color:#ef4444">null</span>`;
@@ -301,8 +302,22 @@ function _jShowPath(el, e) {
     treeEl.insertBefore(bar, treeEl.firstChild);
   }
   const copyLabel = _jsonTl('copy_btn');
-  const row = (p) => `<div style="display:flex;align-items:center;gap:8px"><code style="flex:1;font-size:13px;word-break:break-all">${p.replace(/</g,'&lt;')}</code><button class="btn btn-secondary" style="padding:2px 10px;font-size:11px;flex-shrink:0" onclick="copyText('${p.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}',this)">${copyLabel}</button></div>`;
-  bar.innerHTML = row(path) + (hasWildcard ? row(wildcard) : '');
+  // Paths contain user-supplied JSON keys: build with DOM APIs, never inline handlers.
+  const row = (p) => {
+    const line = document.createElement('div');
+    line.style.cssText = 'display:flex;align-items:center;gap:8px';
+    const code = document.createElement('code');
+    code.style.cssText = 'flex:1;font-size:13px;word-break:break-all';
+    code.textContent = p;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary';
+    btn.style.cssText = 'padding:2px 10px;font-size:11px;flex-shrink:0';
+    btn.textContent = copyLabel;
+    btn.onclick = () => copyText(p, btn);
+    line.append(code, btn);
+    return line;
+  };
+  bar.replaceChildren(row(path), ...(hasWildcard ? [row(wildcard)] : []));
   bar.style.cssText = 'position:sticky;top:0;z-index:2;background:rgba(30,30,40,0.95);border:1px solid var(--glass-border);border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:4px;backdrop-filter:blur(8px)';
 }
 
@@ -407,7 +422,7 @@ function jsonPathQuery() {
   const raw = (document.getElementById('jsonInput') || {}).value.trim();
   if (!raw) { resultEl.innerHTML = ''; return; }
   let obj;
-  try { obj = JSON.parse(raw); } catch(e) { resultEl.innerHTML = `<span style="color:#ef4444;font-size:12px">${_jsonTl('json_invalid_msg')}${e.message}</span>`; return; }
+  try { obj = JSON.parse(raw); } catch(e) { resultEl.innerHTML = `<span style="color:#ef4444;font-size:12px">${_jsonTl('json_invalid_msg')}${escHtml(e.message)}</span>`; return; }
   if (!path.trim()) { resultEl.innerHTML = ''; return; }
   try {
     const result = _jsonPath(obj, path.trim());
@@ -415,10 +430,10 @@ function jsonPathQuery() {
       resultEl.innerHTML = `<span style="color:var(--text-muted);font-size:12px">${_jsonTl('no_match')}</span>`;
     } else {
       const text = JSON.stringify(result, null, 2);
-      resultEl.innerHTML = `<pre class="result-box" style="max-height:200px;overflow-y:auto">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`;
+      resultEl.innerHTML = `<pre class="result-box" style="max-height:200px;overflow-y:auto">${escHtml(text)}</pre>`;
     }
   } catch(e) {
-    resultEl.innerHTML = `<span style="color:#ef4444;font-size:12px">${_jsonTl('path_error')}${e.message}</span>`;
+    resultEl.innerHTML = `<span style="color:#ef4444;font-size:12px">${_jsonTl('path_error')}${escHtml(e.message)}</span>`;
   }
 }
 

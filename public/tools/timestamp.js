@@ -16,7 +16,9 @@ function renderTimestamp(el) {
       ts_sec:          '秒级时间戳',
       ts_ms:           '毫秒时间戳',
       local_time:      '本地时间',
-      invalid_ts:      '无效时间戳',
+      invalid_ts:      '无效时间戳（只接受数字，可带负号/小数）',
+      unit_detected:   '识别单位',
+      units:           { s: '秒（10 位）', ms: '毫秒（13 位）', us: '微秒（16 位）', ns: '纳秒（19 位）' },
       utc_time:        'UTC 时间',
       iso_8601:        'ISO 8601',
       relative_time:   '相对时间',
@@ -54,7 +56,9 @@ function renderTimestamp(el) {
       ts_sec:          'Unix (s)',
       ts_ms:           'Unix (ms)',
       local_time:      'Local Time',
-      invalid_ts:      'Invalid timestamp',
+      invalid_ts:      'Invalid timestamp (digits only, optional sign/decimals)',
+      unit_detected:   'Detected unit',
+      units:           { s: 'seconds (10 digits)', ms: 'milliseconds (13 digits)', us: 'microseconds (16 digits)', ns: 'nanoseconds (19 digits)' },
       utc_time:        'UTC',
       iso_8601:        'ISO 8601',
       relative_time:   'Relative',
@@ -189,8 +193,8 @@ function tsToDate() {
   const tl = window._tsTl;
   const val = document.getElementById('tsInput').value.trim();
   if (!val) return;
-  const num = parseFloat(val);
-  const d = new Date(num > 1e10 ? num : num * 1000);
+  const unit = tsDetectUnit(val);
+  const d = unit ? new Date(tsToMillis(val, unit)) : new Date(NaN);
   if (isNaN(d.getTime())) {
     document.getElementById('tsDateResult').innerHTML = `<span style="color:#ef4444;font-size:13px">${tl('invalid_ts')}</span>`;
     return;
@@ -199,6 +203,7 @@ function tsToDate() {
   const Y = d.getFullYear(), M = _padTwo(d.getMonth()+1), D = _padTwo(d.getDate());
   const h = _padTwo(d.getHours()), m = _padTwo(d.getMinutes()), s = _padTwo(d.getSeconds());
   const fmt = [
+    { label: tl('unit_detected'),  time: tl('units')[unit] },
     { label: tl('utc_time'),       time: d.toUTCString() },
     { label: tl('local_time'),     time: d.toLocaleString(locale) },
     { label: tl('iso_8601'),       time: d.toISOString() },
@@ -213,8 +218,21 @@ function tsToDate() {
     `<div class="result-row" style="margin-bottom:6px;display:flex;align-items:center;gap:10px">
       <span style="color:var(--text-muted);width:100px;flex-shrink:0;font-size:12px">${z.label}</span>
       <span style="font-weight:600;flex:1;font-size:13px">${z.time}</span>
-      <button class="copy-inline" onclick="copyText('${z.time}',this)">${tl('copy')}</button>
+      <button class="copy-inline" data-copy="${escHtml(z.time)}" onclick="copyText(this.dataset.copy,this)">${tl('copy')}</button>
     </div>`).join('');
+}
+
+/** Unit of a numeric timestamp by integer digit count: ≤11 s, 12–14 ms, 15–17 µs, ≥18 ns; null if not numeric. */
+function tsDetectUnit(text) {
+  const m = /^-?(\d+)(?:\.\d+)?$/.exec(String(text ?? '').trim());
+  if (!m) return null;
+  const digits = m[1].replace(/^0+(?=\d)/, '').length;
+  return digits >= 18 ? 'ns' : digits >= 15 ? 'us' : digits >= 12 ? 'ms' : 's';
+}
+
+function tsToMillis(text, unit = tsDetectUnit(text)) {
+  const n = Number(String(text).trim());
+  return unit === 's' ? n * 1000 : unit === 'ms' ? n : unit === 'us' ? n / 1000 : n / 1e6;
 }
 
 function dateToTs() {

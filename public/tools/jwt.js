@@ -220,7 +220,7 @@ function decodeJWT() {
     payload = JSON.parse(atob(segs[1].replace(/-/g,'+').replace(/_/g,'/')));
   } catch(e) {
     panel.style.display='';
-    parts.innerHTML = '<div style="color:#ef4444">' + tl('parse_fail') + '：' + e.message + '</div>';
+    parts.innerHTML = '<div style="color:#ef4444">' + tl('parse_fail') + '：' + escHtml(e.message) + '</div>';
     return;
   }
   const now = Math.floor(Date.now()/1000);

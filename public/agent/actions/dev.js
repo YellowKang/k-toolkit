@@ -445,74 +445,14 @@ const DevActions = [
       properties: { content: { type: 'string', description: '.env 文件内容' } },
       required: ['content'],
     },
-    execute({ content }) {
-      try {
-        const result = {};
-        const lines = content.split('\n');
-        let currentKey = null;
-        let currentValue = '';
-        let multiline = false;
-        let multilineQuote = '';
-
-        for (const line of lines) {
-          // Continue multiline value
-          if (multiline) {
-            if (line.endsWith(multilineQuote)) {
-              currentValue += '\n' + line.slice(0, -1);
-              result[currentKey] = currentValue;
-              multiline = false;
-              currentKey = null;
-              currentValue = '';
-            } else {
-              currentValue += '\n' + line;
-            }
-            continue;
-          }
-
-          const trimmed = line.trim();
-          // Skip empty lines and comments
-          if (!trimmed || trimmed.startsWith('#')) continue;
-
-          // Match KEY=VALUE
-          const match = trimmed.match(/^([A-Za-z_][\w.]*)\s*=\s*(.*)/);
-          if (!match) continue;
-
-          const key = match[1];
-          let value = match[2];
-
-          // Handle quoted values
-          if ((value.startsWith('"') && !value.endsWith('"')) ||
-              (value.startsWith("'") && !value.endsWith("'"))) {
-            // Start of multiline
-            multiline = true;
-            multilineQuote = value[0];
-            currentKey = key;
-            currentValue = value.slice(1);
-            continue;
-          }
-
-          // Remove surrounding quotes
-          if ((value.startsWith('"') && value.endsWith('"')) ||
-              (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-          }
-
-          // Strip inline comments (only for unquoted values)
-          if (!match[2].startsWith('"') && !match[2].startsWith("'")) {
-            const commentIdx = value.indexOf(' #');
-            if (commentIdx !== -1) value = value.slice(0, commentIdx).trim();
-          }
-
-          result[key] = value;
-        }
-
-        const entries = Object.entries(result);
-        return { success: true,
-          data: { variables: result, count: entries.length },
-          display: `解析到 ${entries.length} 个变量: ${entries.slice(0, 5).map(([k]) => k).join(', ')}${entries.length > 5 ? '...' : ''}` };
-      } catch (e) {
-        return { success: false, data: { error: e.message }, display: `解析失败: ${e.message}` };
-      }
+    async execute({ content }) {
+      const env = await ToolCompute.load('env');
+      const { variables, duplicates, invalid } = env.parse(content);
+      const entries = Object.entries(variables);
+      return { success: true,
+        data: { variables, count: entries.length, duplicates, invalidLines: invalid.map(x => x.line) },
+        display: `解析到 ${entries.length} 个变量: ${entries.slice(0, 5).map(([k]) => k).join(', ')}${entries.length > 5 ? '...' : ''}` +
+          (duplicates.length ? `；重复键 ${duplicates.join(', ')}` : '') + (invalid.length ? `；无法解析 ${invalid.length} 行` : '') };
     },
   },
   {
