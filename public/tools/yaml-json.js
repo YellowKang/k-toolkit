@@ -34,6 +34,7 @@ const _yjDict = {
 };
 
 function renderYAMLJSON(el) {
+  window._activeCleanup = () => clearTimeout(_yjTimer);
   const T = makeToolI18n(_yjDict);
   el.innerHTML = `
     <div class="tool-card-panel">

@@ -231,7 +231,7 @@ const TOOLS_EN = {
   'img-webp':         { name:'Image to WebP',      desc:'Batch convert images to WebP with quality control',                          category:'Image' },
   'img-exif':         { name:'EXIF Viewer',        desc:'Read image EXIF data: camera model, ISO, exposure time and more',            category:'Image' },
   // Crypto (编码加密)
-  'aes':              { name:'AES Encrypt',        desc:'AES-GCM symmetric encryption and decryption, SubtleCrypto',                  category:'Crypto' },
+  'aes':              { name:'AES Encrypt',        desc:'AES-GCM/CBC/CTR encryption that interoperates with OpenSSL, Java and Python', category:'Crypto' },
   'morse':            { name:'Morse Code',         desc:'Convert text to Morse code and decode back',                                 category:'Crypto' },
   'xml-format':       { name:'XML Formatter',      desc:'Format, minify and convert XML to JSON, keeping comments and CDATA',        category:'Data' },
   // Calculator (计算工具)

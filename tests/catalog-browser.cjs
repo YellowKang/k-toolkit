@@ -159,14 +159,64 @@ const express = require('express');
     await page.locator('#yjInput').fill('base: &b\n  image: nginx\nweb:\n  <<: *b\n  ports: [80]\n');
     await page.evaluate(() => yjToJSON());
     assert.deepEqual(JSON.parse(await page.locator('#yjOutput').textContent()), { base: { image: 'nginx' }, web: { image: 'nginx', ports: [80] } });
-    await route('hmac-gen', '#hmacMsg');
-    for (const width of [375, 768]) {
-      await page.setViewportSize({ width, height: 850 });
-      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    // AES: page round trip, Node/OpenSSL ciphertext, the old page's IV:data output, and Chrome's missing AES-192.
+    await route('aes', '#aesInput');
+    const aesRun = async () => {
+      await page.locator('#aesRunBtn').click();
+      await page.waitForFunction(() => ['ok', 'error'].includes(document.querySelector('#aesStatus').dataset.state));
+      return page.locator('#aesOutput').textContent();
+    };
+    await page.locator('#aesKey').fill('secret');
+    await page.locator('#aesInput').fill('页面 AES ✓');
+    assert.match(await aesRun(), /^[A-Za-z0-9+/]{70,}={0,2}$/);
+    assert.match(await page.locator('#aesStatus').textContent(), /AES-256-GCM/);
+    await page.locator('button', { hasText: '结果→输入' }).click();
+    assert.equal(await aesRun(), '页面 AES ✓');
+    const aesKey = crypto.randomBytes(32), nonce = crypto.randomBytes(12), sealer = crypto.createCipheriv('aes-256-gcm', aesKey, nonce);
+    sealer.setAAD(Buffer.from('order-7'));
+    const sealedByNode = Buffer.concat([nonce, sealer.update('来自 Node'), sealer.final(), sealer.getAuthTag()]).toString('base64');
+    await page.locator('#aesKeyType').selectOption('hex');
+    await page.locator('#aesKey').fill(aesKey.toString('hex'));
+    await page.locator('#aesAad').fill('order-7');
+    await page.locator('#aesInput').fill(sealedByNode);
+    assert.equal(await aesRun(), '来自 Node');
+    await page.locator('#aesKeyType').selectOption('password');
+    await page.locator('#aesKey').fill('legacy-pass');
+    await page.locator('#aesAad').fill('');
+    await page.locator('#aesInput').fill('ABEiM0RVZneImaq7zN3u/w==:fjaw2IX2v1So20/47JnT+Opy3qg3o+XE5YaUTQFeJlU=');
+    assert.equal(await aesRun(), '旧版页面 legacy ✓');
+    assert.equal(await page.locator('#aesBadge').isVisible(), true);
+    await page.locator('#aesEncBtn').click();
+    await page.locator('#aesMode').selectOption('CBC');
+    await page.locator('#aesKeyType').selectOption('hex');
+    const key192 = '8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b', iv = '000102030405060708090a0b0c0d0e0f';
+    await page.locator('#aesKey').fill(key192);
+    await page.locator('#aesIvType').selectOption('hex');
+    await page.locator('#aesIv').fill(iv);
+    await page.locator('#aesEncoding').selectOption('hex');
+    await page.locator('#aesInput').fill('AES-192 回退');
+    const cbc192 = crypto.createCipheriv('aes-192-cbc', Buffer.from(key192, 'hex'), Buffer.from(iv, 'hex'));
+    assert.equal(await aesRun(), Buffer.concat([cbc192.update('AES-192 回退'), cbc192.final()]).toString('hex'));
+    if (await page.evaluate(() => crypto.subtle.importKey('raw', new Uint8Array(24), 'AES-CBC', false, ['encrypt']).then(() => false, () => true))) {
+      assert.match(await page.locator('#aesNote').textContent(), /192/);
+    }
+    assert.match(await page.locator('#aesSnippets').textContent(), new RegExp(`openssl enc -d -aes-192-cbc -K ${key192} -iv ${iv}`));
+    await page.evaluate(() => setLang('en'));
+    await route('aes', '#aesInput');
+    assert.equal(await page.locator('#aesEncBtn').textContent(), 'Encrypt');
+    await page.waitForFunction(() => document.querySelector('#aesSummary').textContent.includes('ciphertext'));
+    assert.equal(await page.locator('#aesSummary').textContent(), 'AES-256-GCM · PBKDF2-SHA256 ×100000 → Base64 (salt(16B) ‖ IV(12B) ‖ ciphertext ‖ tag(16B))');
+    await page.evaluate(() => setLang('zh'));
+    for (const [id, selector] of [['hmac-gen', '#hmacMsg'], ['aes', '#aesInput']]) {
+      await route(id, selector);
+      for (const width of [375, 768]) {
+        await page.setViewportSize({ width, height: 850 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${id} at ${width}px`);
+      }
     }
     if (process.env.TEST_SCREENSHOT) await page.screenshot({ path: process.env.TEST_SCREENSHOT, fullPage: true, animations: 'disabled' });
     assert.deepEqual(errors, []);
-    console.log('PASS: 10 categories, 5 workbenches, all legacy child routes/favorites, bilingual catalog, HMAC/hash, >30 script loads, SVG isolation, mobile widths');
+    console.log('PASS: 10 categories, 5 workbenches, all legacy child routes/favorites, bilingual catalog, HMAC/hash, AES interop/legacy/AES-192, >30 script loads, SVG isolation, mobile widths');
   } finally {
     if (browser) await browser.close();
     if (server) await new Promise(resolve => server.close(resolve));

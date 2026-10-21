@@ -20,6 +20,7 @@ const _xmlDict = {
 };
 
 function renderXmlFormat(el) {
+  window._activeCleanup = () => clearTimeout(_xmlTimer);
   const T = makeToolI18n(_xmlDict);
   el.innerHTML = `
     <div class="tool-card-panel">

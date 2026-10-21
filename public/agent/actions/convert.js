@@ -47,27 +47,21 @@ const _MORSE_MAP = {A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'.
 const _MORSE_REV = Object.fromEntries(Object.entries(_MORSE_MAP).map(([k,v])=>[v,k]));
 
 // ─── AES 加解密 ─────────────────────────────────────────────────
-async function _aesEncrypt(text, password) {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(text));
-  const buf = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
-  buf.set(salt, 0); buf.set(iv, salt.length); buf.set(new Uint8Array(encrypted), salt.length + iv.length);
-  return btoa(String.fromCharCode(...buf));
-}
-
-async function _aesDecrypt(b64, password) {
-  const enc = new TextEncoder();
-  const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-  const salt = buf.slice(0, 16), iv = buf.slice(16, 28), data = buf.slice(28);
-  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
-  const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
-  return new TextDecoder().decode(decrypted);
-}
+// compute/aes.js 与 AES 页面共用。默认（口令 PBKDF2-SHA256 10 万次 + AES-256-GCM）就是此前的
+// Base64(salt‖IV‖密文‖tag) 输出，旧密文照常可解；返回 IV/salt/tag 等公开参数，不返回密钥。
+const _aesModule = () => ToolCompute.load('aes');
+const _AES_ACTION_PARAMS = {
+  mode: { type: 'string', enum: ['GCM', 'CBC', 'CTR'], description: '模式，默认 GCM' },
+  keyType: { type: 'string', enum: ['password', 'openssl', 'hex', 'base64', 'utf8'], description: 'password=口令 PBKDF2（默认）；openssl=兼容 openssl enc -pbkdf2（仅 CBC/CTR）；hex/base64/utf8=原始密钥（16/24/32 字节）' },
+  keySize: { type: 'integer', minimum: 128, maximum: 256, description: '口令派生的密钥位数：128 / 192 / 256，默认 256' },
+  iterations: { type: 'integer', minimum: 1, maximum: 10000000, description: 'PBKDF2 迭代次数，默认 100000' },
+  iv: { type: 'string', description: '指定 IV（Hex），不写入输出；不填则随机生成并拼在开头' },
+  salt: { type: 'string', description: '指定 salt（Hex，仅口令），不写入输出；不填则随机生成并拼在开头' },
+  aad: { type: 'string', description: 'GCM 附加认证数据（UTF-8），解密时须一致' },
+};
+const _aesActionOptions = (password, { mode, keyType, keySize, iterations, iv, salt, aad, encoding }) =>
+  ({ key: password, mode, keyType, keySize, iterations, iv, salt, aad, encoding: encoding === 'auto' ? undefined : encoding });
+const _aesActionFailure = (prefix, e) => ({ success: false, data: { error: e.message, code: e.code }, display: prefix + e.message });
 
 // ─── Actions 注册 ────────────────────────────────────────────────
 const ConvertActions = [
@@ -182,30 +176,52 @@ const ConvertActions = [
   },
   {
     name: 'aes_encrypt',
-    description: 'AES-GCM 加密文本',
-    meta: { tier: 'standard', tags: ['aes','encrypt','加密','crypto'], category: 'convert' },
+    description: 'AES 加密文本（默认 AES-256-GCM + PBKDF2 口令，输出 Base64(salt‖IV‖密文‖tag)；可选 CBC/CTR、原始密钥、OpenSSL 格式，可与 OpenSSL/Java/Python 互通）',
+    meta: { tier: 'standard', tags: ['aes','encrypt','加密','crypto','openssl','gcm','cbc'], category: 'convert' },
     parameters: {
       type: 'object',
-      properties: { text: { type: 'string', description: '明文' }, password: { type: 'string', description: '密码' } },
+      properties: {
+        text: { type: 'string', description: '明文' },
+        password: { type: 'string', description: '口令；keyType 为 hex/base64/utf8 时为原始密钥' },
+        ..._AES_ACTION_PARAMS,
+        encoding: { type: 'string', enum: ['base64', 'hex'], description: '输出编码，默认 base64' },
+      },
       required: ['text', 'password'],
     },
-    async execute({ text, password }) {
-      try { const r = await _aesEncrypt(text, password); return { success: true, data: { result: r }, display: 'AES 加密完成（' + r.length + ' 字符）' }; }
-      catch (e) { return { success: false, data: { error: e.message }, display: '加密失败: ' + e.message }; }
+    async execute({ text, password, ...options }) {
+      try {
+        const r = await (await _aesModule()).encrypt(text, _aesActionOptions(password, options));
+        return {
+          success: true,
+          data: { result: r.output, mode: r.mode, keySize: r.keySize, format: r.format, encoding: r.encoding, iv: r.iv, salt: r.salt, tag: r.tag, ciphertext: r.ciphertext, iterations: r.iterations },
+          display: `AES-${r.keySize}-${r.mode} 加密完成（${r.output.length} 字符）`,
+        };
+      } catch (e) { return _aesActionFailure('加密失败: ', e); }
     },
   },
   {
     name: 'aes_decrypt',
-    description: 'AES-GCM 解密',
-    meta: { tier: 'standard', tags: ['aes','decrypt','解密','crypto'], category: 'convert' },
+    description: 'AES 解密（参数与 aes_encrypt 一致；口令模式自动识别 OpenSSL "Salted__" 与旧版页面的 IV:密文 格式）',
+    meta: { tier: 'standard', tags: ['aes','decrypt','解密','crypto','openssl','gcm','cbc'], category: 'convert' },
     parameters: {
       type: 'object',
-      properties: { encrypted: { type: 'string', description: '密文(base64)' }, password: { type: 'string', description: '密码' } },
+      properties: {
+        encrypted: { type: 'string', description: '密文（Base64 或 Hex）' },
+        password: { type: 'string', description: '口令；keyType 为 hex/base64/utf8 时为原始密钥' },
+        ..._AES_ACTION_PARAMS,
+        encoding: { type: 'string', enum: ['auto', 'base64', 'hex'], description: '密文编码，默认自动识别' },
+      },
       required: ['encrypted', 'password'],
     },
-    async execute({ encrypted, password }) {
-      try { const r = await _aesDecrypt(encrypted, password); return { success: true, data: { result: r }, display: 'AES 解密完成' }; }
-      catch (e) { return { success: false, data: { error: e.message }, display: '解密失败: ' + e.message }; }
+    async execute({ encrypted, password, ...options }) {
+      try {
+        const r = await (await _aesModule()).decrypt(encrypted, _aesActionOptions(password, options));
+        return {
+          success: true,
+          data: { result: r.text ?? r.hex, encoding: r.text === null ? 'hex' : 'utf8', mode: r.mode, keySize: r.keySize, format: r.format, legacy: r.legacy, iv: r.iv, salt: r.salt },
+          display: `AES-${r.keySize}-${r.mode} 解密完成${r.legacy ? '（旧格式）' : ''}${r.text === null ? '（明文非 UTF-8，返回 Hex）' : ''}`,
+        };
+      } catch (e) { return _aesActionFailure('解密失败: ', e); }
     },
   },
   {

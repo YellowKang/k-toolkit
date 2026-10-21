@@ -26,7 +26,7 @@ const TOOL_CAPS = {
   'color':        { autoRun: true,  inputs: ['text','fg','bg'], actions: ['convert','check'], desc: '颜色工具：拾色器（需手动）、格式转换（text 输入颜色值）、对比度检查（fg/bg 为 HEX）' },
   // 以下工具有 TOOL_RUNNERS 或 SPECIAL_RUNNERS 配置，autoRun:true
   'gradient':     { autoRun: true,  inputs: ['colors','positions','angle','type'], actions: ['generate'], desc: '生成 CSS 渐变，colors 为颜色数组如["#00c6ff","#0072ff"]，angle 为角度，type 为 linear/radial' },
-  'aes':          { autoRun: true,  inputs: ['text','key','mode'], actions: ['encrypt','decrypt'], desc: 'AES 加解密' },
+  'aes':          { autoRun: true,  inputs: ['text','key','mode'], actions: ['encrypt','decrypt'], desc: 'AES 加解密：key 为口令（PBKDF2），mode 为 GCM/CBC/CTR；纯计算可直接用 aes_encrypt/aes_decrypt' },
   'ascii-art':    { autoRun: true,  inputs: ['text'], actions: ['render'], desc: '文字转 ASCII 艺术字' },
   'dns-lookup':   { autoRun: true,  inputs: ['text'], actions: ['lookup'], desc: 'DNS 查询' },
   'env-parse':    { autoRun: true,  inputs: ['text'], actions: ['parse'], desc: '解析 .env 文件内容' },
@@ -297,7 +297,11 @@ const TOOL_RUNNERS = {
   // ── 补全工具 ────────────────────────────────────────────────
   'aes': {
     mainInput: '#aesInput',
-    extraInputs: { key: '#aesKey' },
+    extraInputs: { key: '#aesKey', mode: '#aesMode' },
+    preTriggerMap: {
+      encrypt: () => window.setAESMode && window.setAESMode('enc'),
+      decrypt: () => window.setAESMode && window.setAESMode('dec'),
+    },
     trigger: 'doAES',
     outputSelector: '#aesOutput',
     waitMs: 500,

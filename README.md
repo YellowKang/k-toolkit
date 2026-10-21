@@ -25,6 +25,8 @@
 
 图片工具支持文件选择和拖放；图片压缩、Base64 转换及 WebP 转换在浏览器内处理。工具卡片会标注本地处理、联网、可选联网或 AI 模型调用。
 
+AES 加解密支持 GCM/CBC/CTR、PBKDF2 口令、OpenSSL `enc -pbkdf2` 格式和原始密钥，结果可与 OpenSSL、Java、Python 互通，并能解密旧版页面的输出；格式与示例见 [AES 说明](docs/aes.md)。
+
 ## AI 助手与数据
 
 `Alt+A` 打开助手，`Cmd/Ctrl+J` 打开迷你对话框。支持配置 Claude、OpenAI、Gemini 适配器；实际连接取决于模型服务、接口配置及浏览器 CORS 限制。
@@ -90,12 +92,12 @@ public/
   dashboard.js        路由、导航和页面渲染
   i18n.js             双语标签
   tools/             按需加载的工具
-  compute/           页面与 Agent 共用的计算模块（Cron、CSV、农历、YAML/TOML/XML、.env）
+  compute/           页面与 Agent 共用的计算模块（Cron、CSV、农历、YAML/TOML/XML、.env、AES）
   vendor/            固定版本的第三方库及许可证、摘要清单
   agent/             会话、适配器、动作、界面
 scripts/             构建与目录文档生成
 tests/               单元测试与浏览器回归
-docs/                工具目录与架构说明
+docs/                工具目录、架构与 AES 格式说明
 ```
 
 新增工具时，在 `public/tools/` 实现界面（文案用 `makeToolI18n` 提供中英文），在 `public/tool-catalog.js` 注册元数据，并在 `public/i18n.js` 添加英文标签。使用独立作用域隔离工具内部状态，提供页面离开时的清理逻辑。页面与 Agent 都要用的计算逻辑放进 `public/compute/`，通过 `ToolCompute.load()` 按需加载；第三方库放进 `public/vendor/` 并更新 `manifest.json` 摘要，不从 CDN 加载。用户输入、存储记录和网络返回一律经 `escHtml` 或 `textContent` 输出，不拼进内联事件。需要 Agent 调用时，在 `public/agent/` 注册相应能力和参数约束。
@@ -108,7 +110,7 @@ K Toolkit is a static developer toolbox with an AI assistant, bilingual UI, them
 
 Ten categories organize the tools. Five workbenches group image compression/conversion, hashes/HMAC, QR generation/decoding, time zones/world clocks and HTTP tools. Existing child URLs and favorites remain valid; compression, WebP and Base64 can explicitly reuse files staged in the current tab’s memory. See the generated [tool catalog](docs/tool-catalog.md) for the current inventory.
 
-Local tools process inputs in the browser. Network tools contact external services, and AI requests send conversation context and tool results to the configured model provider. Third-party libraries (QR, YAML, TOML) are pinned under `public/vendor/` and cached with the site, so they work offline. API keys are currently stored in browser storage; a separate backend is needed to keep service credentials off the client.
+Local tools process inputs in the browser. Network tools contact external services, and AI requests send conversation context and tool results to the configured model provider. Third-party libraries (QR, YAML, TOML) are pinned under `public/vendor/` and cached with the site, so they work offline. AES (GCM/CBC/CTR, PBKDF2, OpenSSL `enc -pbkdf2`, raw keys) interoperates with OpenSSL, Java and Python; see [the AES notes](docs/aes.md). API keys are currently stored in browser storage; a separate backend is needed to keep service credentials off the client.
 
 Use `/workflows` in the assistant for local templates that require no model or API key. Typed result references chain validated actions, stop on errors, and keep intermediate data in the browser. See [workflow usage and roadmap](docs/agent-workflows.md).
 
