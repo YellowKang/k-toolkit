@@ -58,7 +58,7 @@ GitHub Pages 继续承载静态前端；只有需要隐藏密钥、统一鉴权�
 
 ## 发布和客户端更新
 
-构建为 HTML 注入内容版本，所有应用脚本/样式 URL 携带版本参数，生成 `version.json` 及 Worker 内的 SHA-256 资源清单。Worker 最多并发下载八个自有静态资源，全部校验通过后才完成安装。用户确认更新后发送 ACTIVATE，只有发起操作的标签页刷新；旧标签页按旧版本参数读取保留缓存，超出最近三个版本的资源返回失败，避免混用新脚本。
+构建为 HTML 注入内容版本，所有应用脚本/样式 URL 携带版本参数，生成 `version.json` 及 Worker 内的 SHA-256 资源清单。Worker 安装新版本时，先按路径在本 scope 保留的旧版本缓存中由新到旧查找，重新计算 SHA-256 与新清单一致才复制，否则带新版本参数从网络下载并校验；路径只用于定位候选，内容损坏或被篡改的副本不会进入新版本。最多并发处理八个资源，全部校验通过后才完成安装；任一文件失败即删除新缓存、停止其余处理并保留当前版本。用户确认更新后发送 ACTIVATE，只有发起操作的标签页刷新；旧标签页按旧版本参数读取保留缓存，超出最近三个版本的资源返回失败，避免混用新脚本。
 
 缓存前缀包含 scope 路径，不清理同域其他项目。version.json 不经过 Worker 缓存，检查使用 no-store 与查询参数；Worker 注册使用 updateViaCache:none。GitHub/CDN 仍可能有传播延迟，更新失败保留现有运行版本。GitHub 工作流使用 configure-pages/upload-pages-artifact/deploy-pages，仓库 Source 需设为 GitHub Actions。
 
