@@ -1,16 +1,22 @@
+const _swDict = {
+  zh: { title: '秒表', start: '开始', pause: '暂停', resume: '继续', lap: '计次', reset: '重置', laps: '计次记录' },
+  en: { title: 'Stopwatch', start: 'Start', pause: 'Pause', resume: 'Resume', lap: 'Lap', reset: 'Reset', laps: 'Laps' },
+};
+
 window.renderStopwatch = function(el) {
+  const T = makeToolI18n(_swDict);
   el.innerHTML = `
     <div class="tool-card-panel" style="text-align:center">
-      <div class="panel-label">秒表</div>
+      <div class="panel-label">${T('title')}</div>
       <div id="swDisplay" style="font-size:52px;font-weight:800;color:var(--neon);font-variant-numeric:tabular-nums;letter-spacing:.04em;margin:18px 0">00:00.000</div>
       <div class="tool-actions" style="justify-content:center">
-        <button class="btn btn-primary"  id="swBtnStart" onclick="_swToggle()">开始</button>
-        <button class="btn btn-secondary" onclick="_swLap()" id="swBtnLap" disabled>计次</button>
-        <button class="btn btn-secondary" onclick="_swReset()">重置</button>
+        <button class="btn btn-primary"  id="swBtnStart" onclick="_swToggle()">${T('start')}</button>
+        <button class="btn btn-secondary" onclick="_swLap()" id="swBtnLap" disabled>${T('lap')}</button>
+        <button class="btn btn-secondary" onclick="_swReset()">${T('reset')}</button>
       </div>
     </div>
     <div class="tool-card-panel" id="swLapPanel" style="display:none">
-      <div class="panel-label">计次记录</div>
+      <div class="panel-label">${T('laps')}</div>
       <div id="swLapList" style="max-height:260px;overflow-y:auto"></div>
     </div>`;
 
@@ -35,14 +41,14 @@ window.renderStopwatch = function(el) {
         document.getElementById('swDisplay').textContent = _swFmt(elapsed);
       }, 10);
       running = true;
-      document.getElementById('swBtnStart').textContent = '暂停';
+      document.getElementById('swBtnStart').textContent = T('pause');
       document.getElementById('swBtnStart').className = 'btn btn-secondary';
       document.getElementById('swBtnLap').disabled = false;
       window._activeCleanup = () => clearInterval(timer);
     } else {
       clearInterval(timer); timer = null;
       running = false;
-      document.getElementById('swBtnStart').textContent = '继续';
+      document.getElementById('swBtnStart').textContent = T('resume');
       document.getElementById('swBtnStart').className = 'btn btn-primary';
     }
   };
@@ -68,7 +74,7 @@ window.renderStopwatch = function(el) {
     clearInterval(timer); timer = null;
     running = false; elapsed = 0; laps = [];
     document.getElementById('swDisplay').textContent = '00:00.000';
-    document.getElementById('swBtnStart').textContent = '开始';
+    document.getElementById('swBtnStart').textContent = T('start');
     document.getElementById('swBtnStart').className = 'btn btn-primary';
     document.getElementById('swBtnLap').disabled = true;
     document.getElementById('swLapPanel').style.display = 'none';

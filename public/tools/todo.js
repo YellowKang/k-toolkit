@@ -1,15 +1,21 @@
+const _todoDict = {
+  zh: { title: 'Todo 清单', input_ph: '添加新任务...', add: '添加', clear_done: '清空已完成', empty: '暂无任务', stats: (n, done) => `共 ${n} 项，已完成 ${done} 项` },
+  en: { title: 'Todo list', input_ph: 'Add a task...', add: 'Add', clear_done: 'Clear completed', empty: 'No tasks yet', stats: (n, done) => `${n} task${n === 1 ? '' : 's'}, ${done} done` },
+};
+
 window.renderTodo = function(el) {
+  const T = makeToolI18n(_todoDict);
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div class="panel-label">Todo 清单</div>
+      <div class="panel-label">${T('title')}</div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
-        <input class="tool-input" id="todoInput" placeholder="添加新任务..." style="flex:1" onkeydown="if(event.key==='Enter')addTodo()">
-        <button class="btn btn-primary" onclick="addTodo()">添加</button>
+        <input class="tool-input" id="todoInput" placeholder="${T('input_ph')}" style="flex:1" onkeydown="if(event.key==='Enter')addTodo()">
+        <button class="btn btn-primary" onclick="addTodo()">${T('add')}</button>
       </div>
       <div id="todoList"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:12px;color:var(--text-muted)">
         <span id="todoStats"></span>
-        <button class="btn btn-secondary" onclick="clearDoneTodos()" style="font-size:12px;padding:4px 10px">清空已完成</button>
+        <button class="btn btn-secondary" onclick="clearDoneTodos()" style="font-size:12px;padding:4px 10px">${T('clear_done')}</button>
       </div>
     </div>`;
   renderTodoList();
@@ -23,11 +29,12 @@ function _saveTodos(arr) {
 }
 
 function renderTodoList() {
+  const T = makeToolI18n(_todoDict);
   const todos = _getTodos();
   const list = document.getElementById('todoList');
   if (!list) return;
   if (!todos.length) {
-    list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">暂无任务</div>';
+    list.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">${T('empty')}</div>`;
   } else {
     list.innerHTML = todos.map((t,i) => `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--glass-border)">
@@ -38,7 +45,7 @@ function renderTodoList() {
   }
   const done = todos.filter(t => t.done).length;
   const stats = document.getElementById('todoStats');
-  if (stats) stats.textContent = `共 ${todos.length} 项，已完成 ${done} 项`;
+  if (stats) stats.textContent = T('stats', todos.length, done);
 }
 
 function addTodo() {

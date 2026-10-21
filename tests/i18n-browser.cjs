@@ -10,8 +10,8 @@ const express = require('express');
 
 // Tools still waiting for their English UI; remove an id as soon as it is translated.
 const PENDING = [
-  'aes', 'color', 'countdown', 'favicon-gen', 'jwt', 'loan-calc', 'lunar-calendar', 'meeting-cost', 'note', 'number-chinese',
-  'password-gen', 'pomodoro', 'stopwatch', 'timezone', 'todo', 'typing-speed', 'unit-convert', 'world-clock', 'xml-format',
+  'aes', 'color', 'favicon-gen', 'jwt', 'lunar-calendar', 'number-chinese', 'password-gen', 'typing-speed', 'unit-convert',
+  'xml-format',
 ];
 // Buttons that wipe samples or end a run go last, so every other button acts on the default data.
 const LAST = 'clear|reset|delete|remove|stop|清空|重置|删除|停止';
