@@ -1,21 +1,35 @@
+const _arDict = {
+  zh: {
+    find_ratio: '已知一边求另一边', width: '宽度', height: '高度', width_ph: '宽', height_ph: '高', presets: '常用比例快速选择',
+    convert: '比例换算', known_width: '已知宽度', out_height: '对应高度', known_height: '已知高度', out_width: '对应宽度',
+    ratio: '比例', decimal: '小数',
+  },
+  en: {
+    find_ratio: 'Ratio from width and height', width: 'Width', height: 'Height', width_ph: 'W', height_ph: 'H', presets: 'Common ratios',
+    convert: 'Scale by ratio', known_width: 'Width', out_height: 'Height', known_height: 'Height', out_width: 'Width',
+    ratio: 'Ratio', decimal: 'Decimal',
+  },
+};
+
 function renderAspectRatio(container) {
+  const T = makeToolI18n(_arDict);
   container.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
       <div style="display:flex;flex-direction:column;gap:16px">
         <div>
-          <div style="font-size:13px;font-weight:600;margin-bottom:12px">已知一边求另一边</div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:12px">${T('find_ratio')}</div>
           <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:8px">
             <div>
-              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">宽度</div>
-              <input id="ar-w" type="number" min="1" placeholder="宽"
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${T('width')}</div>
+              <input id="ar-w" type="number" min="1" placeholder="${T('width_ph')}"
                 style="width:100%;padding:8px;background:rgba(255,255,255,0.04);
                 border:1px solid var(--glass-border);border-radius:8px;
                 color:var(--text);font-size:14px;box-sizing:border-box">
             </div>
             <div style="color:var(--text-muted);font-size:16px;text-align:center">×</div>
             <div>
-              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">高度</div>
-              <input id="ar-h" type="number" min="1" placeholder="高"
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${T('height')}</div>
+              <input id="ar-h" type="number" min="1" placeholder="${T('height_ph')}"
                 style="width:100%;padding:8px;background:rgba(255,255,255,0.04);
                 border:1px solid var(--glass-border);border-radius:8px;
                 color:var(--text);font-size:14px;box-sizing:border-box">
@@ -27,12 +41,12 @@ function renderAspectRatio(container) {
             align-items:center;gap:8px"></div>
         </div>
         <div>
-          <div style="font-size:13px;font-weight:600;margin-bottom:12px">常用比例快速选择</div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:12px">${T('presets')}</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px" id="ar-presets"></div>
         </div>
       </div>
       <div>
-        <div style="font-size:13px;font-weight:600;margin-bottom:12px">比例换算</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px">${T('convert')}</div>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <input id="ratio-a" type="number" min="1" placeholder="16"
             style="flex:1;padding:8px;background:rgba(255,255,255,0.04);
@@ -46,7 +60,7 @@ function renderAspectRatio(container) {
         </div>
         <div style="display:flex;gap:8px;margin-bottom:8px">
           <div>
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">已知宽度</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${T('known_width')}</div>
             <input id="ratio-w-in" type="number" min="1" placeholder="1920"
               style="width:100%;padding:8px;background:rgba(255,255,255,0.04);
               border:1px solid var(--glass-border);border-radius:8px;
@@ -54,7 +68,7 @@ function renderAspectRatio(container) {
           </div>
           <div style="display:flex;align-items:flex-end;padding-bottom:8px;color:var(--text-muted)">→</div>
           <div>
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">对应高度</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${T('out_height')}</div>
             <input id="ratio-h-out" readonly
               style="width:100%;padding:8px;background:rgba(255,255,255,0.02);
               border:1px solid var(--glass-border);border-radius:8px;
@@ -63,7 +77,7 @@ function renderAspectRatio(container) {
         </div>
         <div style="display:flex;gap:8px">
           <div>
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">已知高度</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${T('known_height')}</div>
             <input id="ratio-h-in" type="number" min="1" placeholder="1080"
               style="width:100%;padding:8px;background:rgba(255,255,255,0.04);
               border:1px solid var(--glass-border);border-radius:8px;
@@ -71,7 +85,7 @@ function renderAspectRatio(container) {
           </div>
           <div style="display:flex;align-items:flex-end;padding-bottom:8px;color:var(--text-muted)">→</div>
           <div>
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">对应宽度</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${T('out_width')}</div>
             <input id="ratio-w-out" readonly
               style="width:100%;padding:8px;background:rgba(255,255,255,0.02);
               border:1px solid var(--glass-border);border-radius:8px;
@@ -92,8 +106,8 @@ function renderAspectRatio(container) {
     const w = parseInt(wIn.value), h = parseInt(hIn.value);
     if (!w || !h || w <= 0 || h <= 0) { result.textContent = ''; return; }
     const g = gcd(w, h);
-    result.innerHTML = `比例: <strong style="color:var(--accent)">${w/g}:${h/g}</strong>
-      &nbsp; 小数: <strong style="color:var(--accent)">${(w/h).toFixed(4)}</strong>`;
+    result.innerHTML = `${T('ratio')}: <strong style="color:var(--accent)">${w/g}:${h/g}</strong>
+      &nbsp; ${T('decimal')}: <strong style="color:var(--accent)">${(w/h).toFixed(4)}</strong>`;
   }
 
   wIn.oninput = hIn.oninput = calcRatio;

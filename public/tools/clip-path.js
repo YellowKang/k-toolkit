@@ -1,21 +1,35 @@
+const _cpDict = {
+  zh: {
+    title: 'CSS clip-path 生成器', reset: '重置', preview: '预览（拖拽控制点）', code: '生成代码', copy: '复制', copied: '已复制',
+    shapes: { polygon: '多边形 Polygon', circle: '圆形 Circle', ellipse: '椭圆 Ellipse', inset: '内嵌 Inset' },
+    bg: '背景色', bg_gradient: '渐变', bg_solid: '纯色', bg_image: '图片', add_point: '+ 添加点',
+    radius: '半径', center_x: '中心 X', center_y: '中心 Y', radius_x: 'X半径', radius_y: 'Y半径', sides: ['上','右','下','左'],
+  },
+  en: {
+    title: 'CSS clip-path generator', reset: 'Reset', preview: 'Preview (drag the handles)', code: 'Generated code', copy: 'Copy', copied: 'Copied',
+    shapes: { polygon: 'Polygon', circle: 'Circle', ellipse: 'Ellipse', inset: 'Inset' },
+    bg: 'Background', bg_gradient: 'Gradient', bg_solid: 'Solid', bg_image: 'Image', add_point: '+ Add point',
+    radius: 'Radius', center_x: 'Center X', center_y: 'Center Y', radius_x: 'X radius', radius_y: 'Y radius', sides: ['Top','Right','Bottom','Left'],
+  },
+};
+
 window.renderClipPath = function(el) {
+  const T = makeToolI18n(_cpDict);
+  const shapes = T('shapes');
   el.innerHTML = `
     <div class="tool-card-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <div class="panel-label" style="margin:0">CSS clip-path 生成器</div>
+        <div class="panel-label" style="margin:0">${T('title')}</div>
         <div style="display:flex;gap:8px">
           <select id="cpShape" class="tool-input" style="width:auto;font-size:12px" onchange="_cpRender()">
-            <option value="polygon">多边形 Polygon</option>
-            <option value="circle">圆形 Circle</option>
-            <option value="ellipse">椭圆 Ellipse</option>
-            <option value="inset">内嵌 Inset</option>
+            ${Object.keys(shapes).map(shape => `<option value="${shape}">${shapes[shape]}</option>`).join('')}
           </select>
-          <button class="btn btn-secondary" onclick="_cpReset()">重置</button>
+          <button class="btn btn-secondary" onclick="_cpReset()">${T('reset')}</button>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div>
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-weight:600">预览（拖拽控制点）</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-weight:600">${T('preview')}</div>
           <div style="position:relative;width:100%;aspect-ratio:1;background:rgba(0,0,0,0.25);border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;touch-action:none" id="cpCanvas">
             <div id="cpShape" style="position:absolute;inset:0;background:linear-gradient(135deg,var(--accent),var(--accent-blue));transition:clip-path 0.15s"></div>
             <svg id="cpSvg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" id="cpSvgEl"></svg>
@@ -24,18 +38,18 @@ window.renderClipPath = function(el) {
         <div style="display:flex;flex-direction:column;gap:12px">
           <div id="cpControls" style="display:flex;flex-direction:column;gap:8px;flex:1;overflow-y:auto;max-height:280px"></div>
           <div>
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600">生成代码</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600">${T('code')}</div>
             <div style="position:relative">
               <pre class="result-box" id="cpOutput" style="margin:0;font-size:12px;padding:10px 40px 10px 12px;min-height:48px"></pre>
-              <button class="btn btn-secondary" onclick="_cpCopy(this)" style="position:absolute;right:6px;top:6px;padding:2px 8px;font-size:11px">复制</button>
+              <button class="btn btn-secondary" onclick="_cpCopy(this)" style="position:absolute;right:6px;top:6px;padding:2px 8px;font-size:11px">${T('copy')}</button>
             </div>
           </div>
           <div>
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600">背景色</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;font-weight:600">${T('bg')}</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_cpBg('linear-gradient(135deg,var(--accent),var(--accent-blue))')">渐变</button>
-              <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_cpBg('var(--accent)')">纯色</button>
-              <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_cpBg('url(https://picsum.photos/300/300)')">图片</button>
+              <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_cpBg('linear-gradient(135deg,var(--accent),var(--accent-blue))')">${T('bg_gradient')}</button>
+              <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_cpBg('var(--accent)')">${T('bg_solid')}</button>
+              <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_cpBg('url(https://picsum.photos/300/300)')">${T('bg_image')}</button>
             </div>
           </div>
         </div>
@@ -94,35 +108,36 @@ function _cpRenderControls() {
       <span style="font-size:11px;color:var(--text-muted);width:22px">${p[1]}%</span>
       <button onclick="_cpRemovePt(${i})" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 2px">×</button>
     </div>`).join('') +
-    `<button class="btn btn-secondary" style="font-size:11px;margin-top:4px" onclick="_cpAddPt()">+ 添加点</button>`;
+    `<button class="btn btn-secondary" style="font-size:11px;margin-top:4px" onclick="_cpAddPt()">${makeToolI18n(_cpDict)('add_point')}</button>`;
 }
 
 function _cpNonPolyControls() {
+  const T = makeToolI18n(_cpDict);
   if (_cpMode === 'circle') {
     return `<div style="display:flex;flex-direction:column;gap:8px">
-      <label style="font-size:12px">半径 <span id="cpCR">50</span>%
+      <label style="font-size:12px">${T('radius')} <span id="cpCR">50</span>%
         <input type="range" min="5" max="80" value="50" id="cpCRv" style="width:100%" oninput="document.getElementById('cpCR').textContent=this.value;_cpUpdate()">
       </label>
-      <label style="font-size:12px">中心 X <span id="cpCX">50</span>%
+      <label style="font-size:12px">${T('center_x')} <span id="cpCX">50</span>%
         <input type="range" min="0" max="100" value="50" id="cpCXv" style="width:100%" oninput="document.getElementById('cpCX').textContent=this.value;_cpUpdate()">
       </label>
-      <label style="font-size:12px">中心 Y <span id="cpCY">50</span>%
+      <label style="font-size:12px">${T('center_y')} <span id="cpCY">50</span>%
         <input type="range" min="0" max="100" value="50" id="cpCYv" style="width:100%" oninput="document.getElementById('cpCY').textContent=this.value;_cpUpdate()">
       </label>
     </div>`;
   }
   if (_cpMode === 'ellipse') {
     return `<div style="display:flex;flex-direction:column;gap:8px">
-      <label style="font-size:12px">X半径 <span id="cpERx">50</span>%
+      <label style="font-size:12px">${T('radius_x')} <span id="cpERx">50</span>%
         <input type="range" min="5" max="80" value="50" id="cpERxv" style="width:100%" oninput="document.getElementById('cpERx').textContent=this.value;_cpUpdate()">
       </label>
-      <label style="font-size:12px">Y半径 <span id="cpERy">35</span>%
+      <label style="font-size:12px">${T('radius_y')} <span id="cpERy">35</span>%
         <input type="range" min="5" max="80" value="35" id="cpERyv" style="width:100%" oninput="document.getElementById('cpERy').textContent=this.value;_cpUpdate()">
       </label>
     </div>`;
   }
   if (_cpMode === 'inset') {
-    return ['上','右','下','左'].map((d,i) => {
+    return T('sides').map((d,i) => {
       const ids = ['IT','IR','IB','IL'];
       return `<label style="font-size:12px">${d} <span id="cp${ids[i]}">10</span>%
         <input type="range" min="0" max="50" value="10" id="cp${ids[i]}v" style="width:100%" oninput="document.getElementById('cp${ids[i]}').textContent=this.value;_cpUpdate()">
@@ -195,7 +210,7 @@ function _cpCopy(btn) {
   if (!text) return;
   navigator.clipboard.writeText(text).then(() => {
     const orig = btn.textContent;
-    btn.textContent = '已复制';
+    btn.textContent = makeToolI18n(_cpDict)('copied');
     setTimeout(() => btn.textContent = orig, 1500);
   });
 }

@@ -1,11 +1,33 @@
+const _exifDict = {
+  zh: {
+    title: 'EXIF 信息查看器', drop: '点击或拖拽图片到此处', drop_hint: '支持 JPEG（含 EXIF 数据）',
+    file_name: '文件名', file_size: '文件大小', mime: 'MIME 类型', modified: '最后修改',
+    tags: {
+      0x010F:'相机厂商',0x0110:'相机型号',0x0112:'方向',0x0131:'软件',0x0132:'修改时间',
+      0x9003:'拍摄时间',0x920A:'焦距',0xA002:'图像宽度',0xA003:'图像高度',
+      0x8827:'ISO感光度',0x829A:'曝光时间',0x829D:'光圈F值',0xA403:'白平衡',
+    },
+  },
+  en: {
+    title: 'EXIF viewer', drop: 'Click or drop an image here', drop_hint: 'JPEG files with EXIF data',
+    file_name: 'File name', file_size: 'File size', mime: 'MIME type', modified: 'Last modified',
+    tags: {
+      0x010F:'Camera make',0x0110:'Camera model',0x0112:'Orientation',0x0131:'Software',0x0132:'Modified',
+      0x9003:'Date taken',0x920A:'Focal length',0xA002:'Image width',0xA003:'Image height',
+      0x8827:'ISO',0x829A:'Exposure time',0x829D:'F-number',0xA403:'White balance',
+    },
+  },
+};
+
 window.renderImgExif = function(el) {
+  const T = makeToolI18n(_exifDict);
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div class="panel-label">EXIF 信息查看器</div>
+      <div class="panel-label">${T('title')}</div>
       <div id="exifDrop" onclick="document.getElementById('exifFile').click()" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='var(--glass-border)'" ondrop="exifHandleDrop(event)" style="border:2px dashed var(--glass-border);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:border-color 0.2s">
         <div style="font-size:32px;margin-bottom:8px">🖼️</div>
-        <div style="color:var(--text-muted);font-size:14px">点击或拖拽图片到此处</div>
-        <div style="color:var(--text-muted);font-size:12px;margin-top:4px">支持 JPEG（含 EXIF 数据）</div>
+        <div style="color:var(--text-muted);font-size:14px">${T('drop')}</div>
+        <div style="color:var(--text-muted);font-size:12px;margin-top:4px">${T('drop_hint')}</div>
         <input type="file" id="exifFile" accept="image/*" style="display:none" onchange="exifLoad(this.files[0])">
       </div>
     </div>
@@ -27,18 +49,19 @@ function exifLoad(file) {
   document.getElementById('exifFilename').textContent = file.name;
   const reader = new FileReader();
   reader.onload = ev => {
+    const T = makeToolI18n(_exifDict);
     const info = [
-      {label:'文件名', val: file.name},
-      {label:'文件大小', val: (file.size/1024).toFixed(1)+' KB'},
-      {label:'MIME 类型', val: file.type},
-      {label:'最后修改', val: new Date(file.lastModified).toLocaleString()},
+      {label:T('file_name'), val: file.name},
+      {label:T('file_size'), val: (file.size/1024).toFixed(1)+' KB'},
+      {label:T('mime'), val: file.type},
+      {label:T('modified'), val: new Date(file.lastModified).toLocaleString()},
     ];
     try {
       const data = new DataView(ev.target.result);
       if (data.getUint16(0) === 0xFFD8) info.push(..._exifParseJpeg(data));
     } catch {}
     document.getElementById('exifData').innerHTML = info.map(r =>
-      `<div style="display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--glass-border)"><span style="font-size:12px;color:var(--text-muted);min-width:130px;flex-shrink:0">${r.label}</span><span style="font-size:13px;color:var(--text);word-break:break-all">${r.val}</span></div>`
+      `<div style="display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--glass-border)"><span style="font-size:12px;color:var(--text-muted);min-width:130px;flex-shrink:0">${r.label}</span><span style="font-size:13px;color:var(--text);word-break:break-all">${escHtml(r.val)}</span></div>`
     ).join('');
     document.getElementById('exifResult').style.display = '';
   };
@@ -46,11 +69,7 @@ function exifLoad(file) {
 }
 
 function _exifParseJpeg(data) {
-  const TAGS = {
-    0x010F:'相机厂商',0x0110:'相机型号',0x0112:'方向',0x0131:'软件',0x0132:'修改时间',
-    0x9003:'拍摄时间',0x920A:'焦距',0xA002:'图像宽度',0xA003:'图像高度',
-    0x8827:'ISO感光度',0x829A:'曝光时间',0x829D:'光圈F值',0xA403:'白平衡',
-  };
+  const TAGS = makeToolI18n(_exifDict)('tags');
   const results = [];
   let offset = 2;
   while (offset < data.byteLength - 4) {

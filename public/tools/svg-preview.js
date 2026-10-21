@@ -1,40 +1,54 @@
+const _svgDict = {
+  zh: {
+    code: 'SVG 代码', sample: '示例', clear: '清空', copy: '复制', copied: '已复制!', input_ph: '粘贴 SVG 代码...', preview: '预览', zoom: '缩放',
+    bg_checker: '格子', bg_white: '白色', bg_black: '黑色', placeholder: '预览区域', not_svg: '不是有效的 SVG', invalid: 'SVG 格式无效',
+    size: (w, h) => `尺寸: ${w} × ${h}px`,
+  },
+  en: {
+    code: 'SVG code', sample: 'Sample', clear: 'Clear', copy: 'Copy', copied: 'Copied!', input_ph: 'Paste SVG code...', preview: 'Preview', zoom: 'Zoom',
+    bg_checker: 'Checker', bg_white: 'White', bg_black: 'Black', placeholder: 'Preview area', not_svg: 'Not a valid SVG', invalid: 'Invalid SVG',
+    size: (w, h) => `Size: ${w} × ${h}px`,
+  },
+};
+
 function renderSvgPreview(container) {
+  const T = makeToolI18n(_svgDict);
   container.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;height:500px">
       <div style="display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:12px;color:var(--text-muted)">SVG 代码</div>
+          <div style="font-size:12px;color:var(--text-muted)">${T('code')}</div>
           <div style="display:flex;gap:6px">
-            <button id="svg-sample" style="padding:4px 10px;border:1px solid var(--glass-border);background:none;border-radius:6px;color:var(--text-muted);font-size:12px;cursor:pointer">示例</button>
-            <button id="svg-clear" style="padding:4px 10px;border:1px solid var(--glass-border);background:none;border-radius:6px;color:var(--text-muted);font-size:12px;cursor:pointer">清空</button>
-            <button id="svg-copy" style="padding:4px 10px;border:1px solid var(--glass-border);background:none;border-radius:6px;color:var(--text);font-size:12px;cursor:pointer">复制</button>
+            <button id="svg-sample" style="padding:4px 10px;border:1px solid var(--glass-border);background:none;border-radius:6px;color:var(--text-muted);font-size:12px;cursor:pointer">${T('sample')}</button>
+            <button id="svg-clear" style="padding:4px 10px;border:1px solid var(--glass-border);background:none;border-radius:6px;color:var(--text-muted);font-size:12px;cursor:pointer">${T('clear')}</button>
+            <button id="svg-copy" style="padding:4px 10px;border:1px solid var(--glass-border);background:none;border-radius:6px;color:var(--text);font-size:12px;cursor:pointer">${T('copy')}</button>
           </div>
         </div>
         <textarea id="svg-input" style="flex:1;resize:none;
           background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);
           border-radius:10px;padding:12px;color:var(--text);font-size:12px;
-          font-family:monospace;line-height:1.5" placeholder="粘贴 SVG 代码..."></textarea>
+          font-family:monospace;line-height:1.5" placeholder="${T('input_ph')}"></textarea>
         <div id="svg-info" style="font-size:11px;color:var(--text-muted);min-height:16px"></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <div style="font-size:12px;color:var(--text-muted)">预览</div>
+          <div style="font-size:12px;color:var(--text-muted)">${T('preview')}</div>
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:11px;color:var(--text-muted)">缩放</span>
+            <span style="font-size:11px;color:var(--text-muted)">${T('zoom')}</span>
             <input type="range" id="svg-scale" min="10" max="300" value="100" style="width:80px">
             <span id="svg-scale-val" style="font-size:12px;color:var(--accent);min-width:36px">100%</span>
           </div>
         </div>
         <div id="svg-bg-toggle" style="display:flex;gap:6px;margin-bottom:2px">
-          <button data-bg="checker" style="padding:3px 8px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:11px;cursor:pointer">格子</button>
-          <button data-bg="white" style="padding:3px 8px;border-radius:6px;border:1px solid var(--glass-border);background:none;color:var(--text-muted);font-size:11px;cursor:pointer">白色</button>
-          <button data-bg="black" style="padding:3px 8px;border-radius:6px;border:1px solid var(--glass-border);background:none;color:var(--text-muted);font-size:11px;cursor:pointer">黑色</button>
+          <button data-bg="checker" style="padding:3px 8px;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:11px;cursor:pointer">${T('bg_checker')}</button>
+          <button data-bg="white" style="padding:3px 8px;border-radius:6px;border:1px solid var(--glass-border);background:none;color:var(--text-muted);font-size:11px;cursor:pointer">${T('bg_white')}</button>
+          <button data-bg="black" style="padding:3px 8px;border-radius:6px;border:1px solid var(--glass-border);background:none;color:var(--text-muted);font-size:11px;cursor:pointer">${T('bg_black')}</button>
         </div>
         <div id="svg-preview-box" style="flex:1;
           background:repeating-conic-gradient(rgba(128,128,128,0.1) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px;
           border:1px solid var(--glass-border);border-radius:10px;
           overflow:auto;display:flex;align-items:center;justify-content:center;padding:16px">
-          <div style="color:var(--text-muted);font-size:13px">预览区域</div>
+          <div style="color:var(--text-muted);font-size:13px">${T('placeholder')}</div>
         </div>
       </div>
     </div>
@@ -61,12 +75,12 @@ function renderSvgPreview(container) {
   function render() {
     const code = input.value.trim();
     if (!code) {
-      preview.innerHTML = '<div style="color:var(--text-muted);font-size:13px">预览区域</div>';
+      preview.innerHTML = `<div style="color:var(--text-muted);font-size:13px">${T('placeholder')}</div>`;
       info.textContent = '';
       return;
     }
     if (!code.includes('<svg')) {
-      preview.innerHTML = '<div style="color:#ef4444;font-size:13px">不是有效的 SVG</div>';
+      preview.innerHTML = `<div style="color:#ef4444;font-size:13px">${T('not_svg')}</div>`;
       info.textContent = '';
       return;
     }
@@ -76,7 +90,7 @@ function renderSvgPreview(container) {
     const parsed = new DOMParser().parseFromString(code, 'image/svg+xml');
     const svgEl = parsed.documentElement;
     if (parsed.querySelector('parsererror') || svgEl.localName !== 'svg') {
-      preview.textContent = typeof getCurrentLang === 'function' && getCurrentLang() === 'en' ? 'Invalid SVG' : 'SVG 格式无效';
+      preview.textContent = T('invalid');
       info.textContent = '';
       return;
     }
@@ -88,7 +102,7 @@ function renderSvgPreview(container) {
     if (svgEl) {
       const w = svgEl.getAttribute('width') || svgEl.viewBox?.baseVal?.width || '?';
       const h = svgEl.getAttribute('height') || svgEl.viewBox?.baseVal?.height || '?';
-      info.textContent = `尺寸: ${w} × ${h}px`;
+      info.textContent = T('size', w, h);
     }
     preview.innerHTML = '';
     preview.appendChild(wrapper);
@@ -109,7 +123,7 @@ function renderSvgPreview(container) {
     navigator.clipboard.writeText(input.value);
     const btn = container.querySelector('#svg-copy');
     const orig = btn.textContent;
-    btn.textContent = '已复制!';
+    btn.textContent = T('copied');
     setTimeout(() => btn.textContent = orig, 1500);
   };
 

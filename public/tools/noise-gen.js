@@ -1,24 +1,36 @@
+const _noiseDict = {
+  zh: {
+    title: '白噪音生成器', white: '🌊 白噪音', pink: '🌸 粉红噪音', brown: '☕ 棕色噪音', rain: '🌧️ 雨声', volume: '音量',
+    play: '▶ 播放', pause: '⏸ 暂停', stop: '⏹ 停止', hint: '选择音效后点击播放', playing: '正在播放...', stopped: '已停止',
+  },
+  en: {
+    title: 'White noise generator', white: '🌊 White noise', pink: '🌸 Pink noise', brown: '☕ Brown noise', rain: '🌧️ Rain', volume: 'Volume',
+    play: '▶ Play', pause: '⏸ Pause', stop: '⏹ Stop', hint: 'Pick a sound, then press Play', playing: 'Playing...', stopped: 'Stopped',
+  },
+};
+
 window.renderNoiseGen = function(el) {
+  const T = makeToolI18n(_noiseDict);
   window._activeCleanup = ngStop;
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div class="panel-label">白噪音生成器</div>
+      <div class="panel-label">${T('title')}</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px" id="ngTypes">
-        <button class="btn btn-secondary" onclick="ngSelect('white')" id="ngBtn-white">🌊 白噪音</button>
-        <button class="btn btn-secondary" onclick="ngSelect('pink')" id="ngBtn-pink">🌸 粉红噪音</button>
-        <button class="btn btn-secondary" onclick="ngSelect('brown')" id="ngBtn-brown">☕ 棕色噪音</button>
-        <button class="btn btn-secondary" onclick="ngSelect('rain')" id="ngBtn-rain">🌧️ 雨声</button>
+        <button class="btn btn-secondary" onclick="ngSelect('white')" id="ngBtn-white">${T('white')}</button>
+        <button class="btn btn-secondary" onclick="ngSelect('pink')" id="ngBtn-pink">${T('pink')}</button>
+        <button class="btn btn-secondary" onclick="ngSelect('brown')" id="ngBtn-brown">${T('brown')}</button>
+        <button class="btn btn-secondary" onclick="ngSelect('rain')" id="ngBtn-rain">${T('rain')}</button>
       </div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-        <span style="font-size:13px;color:var(--text-muted)">音量</span>
+        <span style="font-size:13px;color:var(--text-muted)">${T('volume')}</span>
         <input type="range" id="ngVol" min="0" max="1" step="0.01" value="0.5" oninput="ngSetVol()" style="flex:1">
         <span id="ngVolLabel" style="font-size:13px;color:var(--text-muted);min-width:36px">50%</span>
       </div>
       <div class="tool-actions">
-        <button class="btn btn-primary" id="ngPlayBtn" onclick="ngToggle()">▶ 播放</button>
-        <button class="btn btn-secondary" onclick="ngStop()">⏹ 停止</button>
+        <button class="btn btn-primary" id="ngPlayBtn" onclick="ngToggle()">${T('play')}</button>
+        <button class="btn btn-secondary" onclick="ngStop()">${T('stop')}</button>
       </div>
-      <div id="ngStatus" style="margin-top:10px;font-size:13px;color:var(--text-muted)">选择音效后点击播放</div>
+      <div id="ngStatus" style="margin-top:10px;font-size:13px;color:var(--text-muted)">${T('hint')}</div>
     </div>`;
   window._ng = {ctx: null, source: null, gain: null, type: 'white', playing: false};
   ngSelect('white');
@@ -71,8 +83,9 @@ function ngPlay() {
   ng.playing = true;
   const btn = document.getElementById('ngPlayBtn');
   const status = document.getElementById('ngStatus');
-  if (btn) btn.textContent = '⏸ 暂停';
-  if (status) status.textContent = '正在播放...';
+  const T = makeToolI18n(_noiseDict);
+  if (btn) btn.textContent = T('pause');
+  if (status) status.textContent = T('playing');
 }
 
 function ngStop() {
@@ -83,8 +96,9 @@ function ngStop() {
   ng.playing = false;
   const btn = document.getElementById('ngPlayBtn');
   const status = document.getElementById('ngStatus');
-  if (btn) btn.textContent = '▶ 播放';
-  if (status) status.textContent = '已停止';
+  const T = makeToolI18n(_noiseDict);
+  if (btn) btn.textContent = T('play');
+  if (status) status.textContent = T('stopped');
 }
 
 function ngToggle() {

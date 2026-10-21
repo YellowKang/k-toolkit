@@ -1,7 +1,13 @@
+const _fxDict = {
+  zh: { preview: '预览', css: 'CSS 代码', copy: '复制代码' },
+  en: { preview: 'Preview', css: 'CSS code', copy: 'Copy code' },
+};
+
 function renderFlexbox(el) {
+  const T = makeToolI18n(_fxDict);
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div class="panel-label">预览</div>
+      <div class="panel-label">${T('preview')}</div>
       <div class="flex-preview" id="flexPreview">
         <div class="flex-item">1</div>
         <div class="flex-item">2</div>
@@ -43,9 +49,9 @@ function renderFlexbox(el) {
       </div>
     </div>
     <div class="tool-card-panel">
-      <div class="panel-label">CSS 代码</div>
+      <div class="panel-label">${T('css')}</div>
       <div class="result-box" id="flexCode"></div>
-      <div class="tool-actions"><button class="btn btn-primary" onclick="copyText(document.getElementById('flexCode').textContent, this)">复制代码</button></div>
+      <div class="tool-actions"><button class="btn btn-primary" onclick="copyText(document.getElementById('flexCode').textContent, this)">${T('copy')}</button></div>
     </div>`;
   updateFlex();
 }

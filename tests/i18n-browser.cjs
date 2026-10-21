@@ -10,14 +10,13 @@ const express = require('express');
 
 // Tools still waiting for their English UI; remove an id as soon as it is translated.
 const PENDING = [
-  'aes', 'ascii-art', 'aspect-ratio', 'clip-path', 'color', 'countdown', 'emoji-picker', 'favicon-gen', 'flexbox', 'img-exif',
-  'jwt', 'loan-calc', 'lunar-calendar', 'meeting-cost', 'morse', 'noise-gen', 'note', 'number-chinese', 'palette-gen',
-  'password-gen', 'pomodoro', 'shadow', 'stopwatch', 'svg-preview', 'timezone', 'todo', 'typing-speed', 'unit-convert',
-  'world-clock', 'xml-format',
+  'aes', 'color', 'countdown', 'favicon-gen', 'jwt', 'loan-calc', 'lunar-calendar', 'meeting-cost', 'note', 'number-chinese',
+  'password-gen', 'pomodoro', 'stopwatch', 'timezone', 'todo', 'typing-speed', 'unit-convert', 'world-clock', 'xml-format',
 ];
 // Buttons that wipe samples or end a run go last, so every other button acts on the default data.
 const LAST = 'clear|reset|delete|remove|stop|清空|重置|删除|停止';
-const CJK = '[\\u3000-\\u303f\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uff00-\\uffef]';
+// Han ideographs plus CJK and fullwidth punctuation; fullwidth Latin letters and digits (ASCII art) are not Chinese.
+const CJK = '[\\u3000-\\u303f\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uff00-\\uff0f\\uff1a-\\uff20\\uff3b-\\uff40\\uff5b-\\uffef]';
 
 (async () => {
   const root = path.resolve(__dirname, '..');
