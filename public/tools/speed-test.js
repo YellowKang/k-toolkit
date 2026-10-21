@@ -1,4 +1,18 @@
+const _stDict = {
+  zh: {
+    download_speed: '下载速度', upload_speed: '上传速度', ping: '延迟', download: '下载', upload: '上传', start: '开始测速', stop: '停止',
+    testing_ping: '正在测试延迟...', timeout: '超时', testing_dl: '正在测试下载速度...', unreachable: '网络不可达，请检查连接',
+    testing_ul: '正在测试上传速度...', done: '测速完成',
+  },
+  en: {
+    download_speed: 'Download speed', upload_speed: 'Upload speed', ping: 'Ping', download: 'Download', upload: 'Upload', start: 'Start test', stop: 'Stop',
+    testing_ping: 'Measuring ping...', timeout: 'Timeout', testing_dl: 'Measuring download speed...', unreachable: 'Network unreachable. Check your connection.',
+    testing_ul: 'Measuring upload speed...', done: 'Test complete',
+  },
+};
+
 window.renderSpeedTest = function(el) {
+  const T = makeToolI18n(_stDict);
   window._activeCleanup = stStop;
   el.innerHTML = `
     <div class="tool-card-panel">
@@ -20,23 +34,23 @@ window.renderSpeedTest = function(el) {
           <div style="text-align:center;z-index:1">
             <div id="stVal" style="font-size:36px;font-weight:700;color:var(--text);line-height:1">--</div>
             <div id="stUnit" style="font-size:13px;color:var(--text-muted);margin-top:4px">Mbps</div>
-            <div id="stLabel" style="font-size:11px;color:var(--text-muted);margin-top:2px">下载速度</div>
+            <div id="stLabel" style="font-size:11px;color:var(--text-muted);margin-top:2px">${T('download_speed')}</div>
           </div>
         </div>
       </div>
       <div style="display:flex;justify-content:center;gap:32px;margin-bottom:20px">
         <div style="text-align:center">
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">延迟</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${T('ping')}</div>
           <div id="stPing" style="font-size:20px;font-weight:700;color:var(--text)">--</div>
           <div style="font-size:11px;color:var(--text-muted)">ms</div>
         </div>
         <div style="text-align:center">
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">下载</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${T('download')}</div>
           <div id="stDl" style="font-size:20px;font-weight:700;color:#10b981">--</div>
           <div style="font-size:11px;color:var(--text-muted)">Mbps</div>
         </div>
         <div style="text-align:center">
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">上传</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${T('upload')}</div>
           <div id="stUl" style="font-size:20px;font-weight:700;color:var(--accent)">--</div>
           <div style="font-size:11px;color:var(--text-muted)">Mbps</div>
         </div>
@@ -45,8 +59,8 @@ window.renderSpeedTest = function(el) {
         <div id="stStatus" style="font-size:12px;color:var(--text-muted);min-height:18px"></div>
       </div>
       <div style="display:flex;justify-content:center;gap:10px">
-        <button class="btn btn-primary" id="stStartBtn" onclick="stStart()">开始测速</button>
-        <button class="btn btn-secondary" id="stStopBtn" onclick="stStop()" style="display:none">停止</button>
+        <button class="btn btn-primary" id="stStartBtn" onclick="stStart()">${T('start')}</button>
+        <button class="btn btn-secondary" id="stStopBtn" onclick="stStop()" style="display:none">${T('stop')}</button>
       </div>
     </div>`;
 };
@@ -75,26 +89,28 @@ function stStop() {
 }
 
 function _stReset() {
+  const T = makeToolI18n(_stDict);
   ['stPing','stDl','stUl'].forEach(id => { const e = document.getElementById(id); if(e) e.textContent='--'; });
-  _stSetGauge(0, '--', 'Mbps', '下载速度');
+  _stSetGauge(0, '--', 'Mbps', T('download_speed'));
 }
 
 async function _stRunSeq() {
+  const T = makeToolI18n(_stDict);
   // 1. 延迟测试
-  _stStatus('正在测试延迟...');
+  _stStatus(T('testing_ping'));
   const ping = await _stMeasurePing();
   if (!_stRunning) return;
   const pe = document.getElementById('stPing');
-  if (pe) pe.textContent = ping < 0 ? '超时' : ping;
+  if (pe) pe.textContent = ping < 0 ? T('timeout') : ping;
 
   // 2. 下载测试
-  _stStatus('正在测试下载速度...');
-  _stSetGauge(0, '0', 'Mbps', '下载速度');
+  _stStatus(T('testing_dl'));
+  _stSetGauge(0, '0', 'Mbps', T('download_speed'));
   const dl = await _stMeasureDownload();
   if (!_stRunning) return;
   if (dl < 0) {
-    _stStatus('网络不可达，请检查连接');
-    _stSetGauge(0, '--', 'Mbps', '下载速度');
+    _stStatus(T('unreachable'));
+    _stSetGauge(0, '--', 'Mbps', T('download_speed'));
     const sb = document.getElementById('stStartBtn');
     const tb = document.getElementById('stStopBtn');
     if (sb) sb.style.display = '';
@@ -104,18 +120,18 @@ async function _stRunSeq() {
   }
   const de = document.getElementById('stDl');
   if (de) de.textContent = dl.toFixed(1);
-  _stSetGauge(Math.min(dl / 100, 1), dl.toFixed(1), 'Mbps', '下载速度');
+  _stSetGauge(Math.min(dl / 100, 1), dl.toFixed(1), 'Mbps', T('download_speed'));
 
   // 3. 上传测试
-  _stStatus('正在测试上传速度...');
-  _stSetGauge(0, '0', 'Mbps', '上传速度');
+  _stStatus(T('testing_ul'));
+  _stSetGauge(0, '0', 'Mbps', T('upload_speed'));
   const ul = await _stMeasureUpload();
   if (!_stRunning) return;
   const ue = document.getElementById('stUl');
   if (ue) ue.textContent = ul < 0 ? '--' : ul.toFixed(1);
-  if (ul >= 0) _stSetGauge(Math.min(ul / 100, 1), ul.toFixed(1), 'Mbps', '上传速度');
+  if (ul >= 0) _stSetGauge(Math.min(ul / 100, 1), ul.toFixed(1), 'Mbps', T('upload_speed'));
 
-  _stStatus('测速完成');
+  _stStatus(T('done'));
   const sb2 = document.getElementById('stStartBtn');
   const tb2 = document.getElementById('stStopBtn');
   if (sb2) sb2.style.display = '';
@@ -146,6 +162,7 @@ async function _stMeasurePing() {
 }
 
 async function _stMeasureDownload() {
+  const T = makeToolI18n(_stDict);
   const sizes = [1e6, 5e6]; // 1MB, 5MB
   let totalBits = 0, totalMs = 0;
   for (const size of sizes) {
@@ -162,7 +179,7 @@ async function _stMeasureDownload() {
       totalBits += size * 8;
       totalMs += ms;
       const cur = (totalBits / totalMs / 1000).toFixed(1);
-      _stSetGauge(Math.min(+cur / 100, 1), cur, 'Mbps', '下载速度');
+      _stSetGauge(Math.min(+cur / 100, 1), cur, 'Mbps', T('download_speed'));
     } catch (err) {
       clearTimeout(timer);
       if (totalBits === 0) { _stAbort = null; return -1; }
@@ -174,6 +191,7 @@ async function _stMeasureDownload() {
 }
 
 async function _stMeasureUpload() {
+  const T = makeToolI18n(_stDict);
   const sizes = [500e3, 2e6]; // 500KB, 2MB
   let totalBits = 0, totalMs = 0;
   for (const size of sizes) {
@@ -190,7 +208,7 @@ async function _stMeasureUpload() {
       totalBits += size * 8;
       totalMs += ms;
       const cur = (totalBits / totalMs / 1000).toFixed(1);
-      _stSetGauge(Math.min(+cur / 100, 1), cur, 'Mbps', '上传速度');
+      _stSetGauge(Math.min(+cur / 100, 1), cur, 'Mbps', T('upload_speed'));
     } catch (err) {
       clearTimeout(timer);
       if (totalBits === 0) { _stAbort = null; return -1; }

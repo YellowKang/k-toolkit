@@ -1,10 +1,16 @@
+const _dgDict = {
+  zh: { config: '配置', lang: '语言/框架', port: '端口', app_name: '应用名称', generate: '生成 Dockerfile', copy: '复制', generated: (lang, port) => '✓ 已生成 Dockerfile (' + lang + ', port ' + port + ')' },
+  en: { config: 'Settings', lang: 'Language / framework', port: 'Port', app_name: 'App name', generate: 'Generate Dockerfile', copy: 'Copy', generated: (lang, port) => `✓ Dockerfile generated (${lang}, port ${port})` },
+};
+
 window.renderDockerGen = function(el) {
+  const T = makeToolI18n(_dgDict);
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div class="panel-label">配置</div>
+      <div class="panel-label">${T('config')}</div>
       <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:12px">
         <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:12px;color:#6b7280;font-weight:500">语言/框架</label>
+          <label style="font-size:12px;color:#6b7280;font-weight:500">${T('lang')}</label>
           <select class="tool-input" id="dgLang" onchange="dgUpdatePort()" style="min-width:140px">
             <option value="node">Node.js</option>
             <option value="python">Python</option>
@@ -14,22 +20,22 @@ window.renderDockerGen = function(el) {
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:12px;color:#6b7280;font-weight:500">端口</label>
+          <label style="font-size:12px;color:#6b7280;font-weight:500">${T('port')}</label>
           <input class="tool-input" id="dgPort" type="number" value="3000" style="width:90px">
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
-          <label style="font-size:12px;color:#6b7280;font-weight:500">应用名称</label>
+          <label style="font-size:12px;color:#6b7280;font-weight:500">${T('app_name')}</label>
           <input class="tool-input" id="dgAppName" type="text" value="myapp" placeholder="myapp" style="width:130px">
         </div>
       </div>
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="dgGenerate()">生成 Dockerfile</button>
+        <button class="btn btn-primary" onclick="dgGenerate()">${T('generate')}</button>
       </div>
     </div>
     <div class="tool-card-panel" id="dgResult" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div class="panel-label" style="margin:0" id="dgStatus"></div>
-        <button class="btn btn-secondary" onclick="copyText(document.getElementById('dgOutput').value,this)">复制</button>
+        <button class="btn btn-secondary" onclick="copyText(document.getElementById('dgOutput').value,this)">${T('copy')}</button>
       </div>
       <textarea class="tool-textarea" id="dgOutput" rows="22" readonly style="font-family:monospace;font-size:13px;background:#1e1e2e;color:#cdd6f4;border-color:#313244"></textarea>
     </div>`;
@@ -50,7 +56,7 @@ function dgGenerate() {
   if (!tpl) return;
   var out = tpl(app, port);
   document.getElementById('dgOutput').value = out;
-  document.getElementById('dgStatus').textContent = '✓ 已生成 Dockerfile (' + lang + ', port ' + port + ')';
+  document.getElementById('dgStatus').textContent = makeToolI18n(_dgDict)('generated', lang, port);
   document.getElementById('dgStatus').style.color = '#10b981';
   document.getElementById('dgResult').style.display = '';
 }

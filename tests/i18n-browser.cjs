@@ -10,10 +10,10 @@ const express = require('express');
 
 // Tools still waiting for their English UI; remove an id as soon as it is translated.
 const PENDING = [
-  'aes', 'ascii-art', 'aspect-ratio', 'clip-path', 'color', 'countdown', 'curl-gen', 'dns-lookup', 'docker-gen', 'emoji-picker',
-  'favicon-gen', 'flexbox', 'git-commit', 'http-status', 'img-exif', 'ip-info', 'jwt', 'loan-calc', 'lunar-calendar', 'meeting-cost',
-  'morse', 'nginx-gen', 'noise-gen', 'note', 'number-chinese', 'palette-gen', 'password-gen', 'pomodoro', 'shadow', 'speed-test',
-  'stopwatch', 'svg-preview', 'terminal-color', 'timezone', 'todo', 'typing-speed', 'unit-convert', 'user-agent', 'world-clock', 'xml-format',
+  'aes', 'ascii-art', 'aspect-ratio', 'clip-path', 'color', 'countdown', 'emoji-picker', 'favicon-gen', 'flexbox', 'img-exif',
+  'jwt', 'loan-calc', 'lunar-calendar', 'meeting-cost', 'morse', 'noise-gen', 'note', 'number-chinese', 'palette-gen',
+  'password-gen', 'pomodoro', 'shadow', 'stopwatch', 'svg-preview', 'timezone', 'todo', 'typing-speed', 'unit-convert',
+  'world-clock', 'xml-format',
 ];
 // Buttons that wipe samples or end a run go last, so every other button acts on the default data.
 const LAST = 'clear|reset|delete|remove|stop|清空|重置|删除|停止';

@@ -1,7 +1,25 @@
+const _cgDict = {
+  zh: {
+    request: '请求配置', headers: '请求头', header_name: 'Header名', header_value: 'Header值', add_header: '+ 添加 Header', body: '请求体', none: '无',
+    generate: '生成代码', clear: '清空', sample: '示例', import: '导入 cURL 命令', import_btn: '解析导入', copy: '复制',
+    import_ph: "粘贴 cURL 命令，如：curl -X POST -H 'Content-Type: application/json' -d '{&quot;key&quot;:&quot;value&quot;}' https://api.example.com/data",
+    need_url: '请输入 URL', need_curl: '请粘贴 cURL 命令', imported: 'cURL 命令已解析',
+    sample_user: { name: '张三', email: 'zhangsan@example.com' },
+  },
+  en: {
+    request: 'Request', headers: 'Headers', header_name: 'Header name', header_value: 'Header value', add_header: '+ Add header', body: 'Body', none: 'None',
+    generate: 'Generate code', clear: 'Clear', sample: 'Sample', import: 'Import a cURL command', import_btn: 'Parse and import', copy: 'Copy',
+    import_ph: "Paste a cURL command, e.g. curl -X POST -H 'Content-Type: application/json' -d '{&quot;key&quot;:&quot;value&quot;}' https://api.example.com/data",
+    need_url: 'Enter a URL', need_curl: 'Paste a cURL command', imported: 'cURL command imported',
+    sample_user: { name: 'Alice', email: 'alice@example.com' },
+  },
+};
+
 function renderCurlGen(el) {
+  const T = makeToolI18n(_cgDict);
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div class="panel-label">请求配置</div>
+      <div class="panel-label">${T('request')}</div>
       <div style="display:grid;grid-template-columns:120px 1fr;gap:10px;margin-bottom:10px">
         <select id="cgMethod" class="tool-input">
           <option>GET</option><option>POST</option><option>PUT</option>
@@ -9,20 +27,20 @@ function renderCurlGen(el) {
         </select>
         <input class="tool-input" id="cgUrl" placeholder="https://api.example.com/users">
       </div>
-      <div class="panel-label" style="margin-bottom:8px">请求头</div>
+      <div class="panel-label" style="margin-bottom:8px">${T('headers')}</div>
       <div id="cgHeaders">
         <div class="cg-header-row" style="display:flex;gap:8px;margin-bottom:6px">
-          <input class="tool-input" placeholder="Header名" style="flex:1">
-          <input class="tool-input" placeholder="Header值" style="flex:2">
+          <input class="tool-input" placeholder="${T('header_name')}" style="flex:1">
+          <input class="tool-input" placeholder="${T('header_value')}" style="flex:2">
           <button class="copy-inline" onclick="cgRemoveRow(this)">✕</button>
         </div>
       </div>
-      <button class="btn btn-secondary" onclick="cgAddHeader()" style="margin-bottom:14px;font-size:12px">+ 添加 Header</button>
+      <button class="btn btn-secondary" onclick="cgAddHeader()" style="margin-bottom:14px;font-size:12px">${T('add_header')}</button>
       <div id="cgBodyWrap">
-        <div class="panel-label" style="margin-bottom:8px">请求体</div>
+        <div class="panel-label" style="margin-bottom:8px">${T('body')}</div>
         <div style="display:flex;gap:8px;margin-bottom:8px">
           <select id="cgBodyType" class="tool-input" style="width:auto" onchange="cgBodyTypeChange()">
-            <option value="none">无</option>
+            <option value="none">${T('none')}</option>
             <option value="json">JSON</option>
             <option value="form">Form Data</option>
             <option value="raw">Raw</option>
@@ -31,22 +49,22 @@ function renderCurlGen(el) {
         <textarea class="tool-textarea" id="cgBody" rows="5" placeholder="{}" style="display:none"></textarea>
       </div>
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="cgGenerate()">生成代码</button>
-        <button class="btn btn-secondary" onclick="cgClear()">清空</button>
-        <button class="btn btn-secondary" onclick="cgLoadSample()">示例</button>
+        <button class="btn btn-primary" onclick="cgGenerate()">${T('generate')}</button>
+        <button class="btn btn-secondary" onclick="cgClear()">${T('clear')}</button>
+        <button class="btn btn-secondary" onclick="cgLoadSample()">${T('sample')}</button>
       </div>
     </div>
     <div class="tool-card-panel">
-      <div class="panel-label" style="margin-bottom:8px">导入 cURL 命令</div>
-      <textarea class="tool-textarea" id="cgImportInput" rows="4" placeholder="粘贴 cURL 命令，如：curl -X POST -H 'Content-Type: application/json' -d '{&quot;key&quot;:&quot;value&quot;}' https://api.example.com/data"></textarea>
+      <div class="panel-label" style="margin-bottom:8px">${T('import')}</div>
+      <textarea class="tool-textarea" id="cgImportInput" rows="4" placeholder="${T('import_ph')}"></textarea>
       <div class="tool-actions" style="margin-top:8px">
-        <button class="btn btn-secondary" onclick="cgImportParse()">解析导入</button>
+        <button class="btn btn-secondary" onclick="cgImportParse()">${T('import_btn')}</button>
       </div>
     </div>
     <div class="tool-card-panel" id="cgResultPanel" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div style="display:flex;gap:6px" id="cgTabs"></div>
-        <button class="btn btn-secondary" onclick="cgCopyResult(this)">复制</button>
+        <button class="btn btn-secondary" onclick="cgCopyResult(this)">${T('copy')}</button>
       </div>
       <pre class="result-box" id="cgOutput" style="max-height:360px;overflow-y:auto;color:#93c5fd;white-space:pre-wrap"></pre>
     </div>`;
@@ -58,7 +76,8 @@ function cgAddHeader() {
   const row = document.createElement('div');
   row.className = 'cg-header-row';
   row.style.cssText = 'display:flex;gap:8px;margin-bottom:6px';
-  row.innerHTML = '<input class="tool-input" placeholder="Header名" style="flex:1"><input class="tool-input" placeholder="Header值" style="flex:2"><button class="copy-inline" onclick="cgRemoveRow(this)">✕</button>';
+  const T = makeToolI18n(_cgDict);
+  row.innerHTML = `<input class="tool-input" placeholder="${T('header_name')}" style="flex:1"><input class="tool-input" placeholder="${T('header_value')}" style="flex:2"><button class="copy-inline" onclick="cgRemoveRow(this)">✕</button>`;
   document.getElementById('cgHeaders').appendChild(row);
 }
 
@@ -86,7 +105,7 @@ function _cgGetHeaders() {
 function cgGenerate() {
   const method  = document.getElementById('cgMethod').value;
   const url     = document.getElementById('cgUrl').value.trim();
-  if (!url) { showToast('请输入 URL', 'error'); return; }
+  if (!url) { showToast(makeToolI18n(_cgDict)('need_url'), 'error'); return; }
   const headers = _cgGetHeaders();
   const btype   = document.getElementById('cgBodyType').value;
   const body    = btype !== 'none' ? document.getElementById('cgBody').value.trim() : '';
@@ -167,7 +186,7 @@ function cgLoadSample() {
   document.getElementById('cgUrl').value='https://api.example.com/users';
   document.getElementById('cgBodyType').value='json';
   cgBodyTypeChange();
-  document.getElementById('cgBody').value=JSON.stringify({name:'张三',email:'zhangsan@example.com'},null,2);
+  document.getElementById('cgBody').value=JSON.stringify(makeToolI18n(_cgDict)('sample_user'),null,2);
   const rows = document.querySelectorAll('.cg-header-row');
   if (rows.length>0){
     rows[0].querySelectorAll('input')[0].value='Authorization';
@@ -208,8 +227,9 @@ function parseCurlCommand(str) {
 }
 
 function cgImportParse() {
+  const T = makeToolI18n(_cgDict);
   const input = document.getElementById('cgImportInput').value.trim();
-  if (!input) { showToast('请粘贴 cURL 命令', 'error'); return; }
+  if (!input) { showToast(T('need_curl'), 'error'); return; }
   const parsed = parseCurlCommand(input);
   // Fill form
   document.getElementById('cgMethod').value = parsed.method;
@@ -240,6 +260,6 @@ function cgImportParse() {
     document.getElementById('cgBodyType').value = 'none';
     cgBodyTypeChange();
   }
-  showToast('cURL 命令已解析', 'success');
+  showToast(T('imported'), 'success');
   cgGenerate();
 }

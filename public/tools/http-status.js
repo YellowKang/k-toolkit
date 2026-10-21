@@ -1,4 +1,30 @@
+const _hsDict = {
+  zh: {
+    search_ph: '输入状态码或关键词...', all: '全部', copied: (code, name) => `已复制 ${code} ${name}`,
+    descs: {
+      200:'请求成功，服务器返回所求数据。',404:'请求的资源不存在。',500:'服务器发生内部错误。',
+      301:'资源已永久移至新 URL。',302:'资源临时重定向。',304:'资源未修改，使用缓存。',
+      400:'客户端发送了错误的请求。',401:'需要身份验证。',403:'服务器拒绝访问，权限不足。',
+      429:'请求过于频繁，触发限流。',408:'请求超时，客户端未及时发送完请求。',
+      201:'请求成功且资源已创建。',204:'请求成功但无响应体。',503:'服务器暂时不可用（维护/过载）。',
+      502:'网关从上游收到无效响应。',504:'网关等待上游超时。',422:'请求格式正确但语义错误。',
+    },
+  },
+  en: {
+    search_ph: 'Status code or keyword...', all: 'All', copied: (code, name) => `Copied ${code} ${name}`,
+    descs: {
+      200:'The request succeeded and the server returned the requested data.',404:'The requested resource does not exist.',500:'The server hit an internal error.',
+      301:'The resource moved permanently to a new URL.',302:'The resource is temporarily redirected.',304:'Not modified; use the cached copy.',
+      400:'The client sent a malformed request.',401:'Authentication is required.',403:'The server refuses access: insufficient permissions.',
+      429:'Too many requests; the rate limit was hit.',408:'The client did not finish sending the request in time.',
+      201:'The request succeeded and a resource was created.',204:'The request succeeded with no response body.',503:'The server is temporarily unavailable (maintenance or overload).',
+      502:'The gateway got an invalid response from upstream.',504:'The gateway timed out waiting for upstream.',422:'The request is well-formed but semantically invalid.',
+    },
+  },
+};
+
 function renderHttpStatus(el) {
+  const T = makeToolI18n(_hsDict);
   const STATUS = [
     [100,'Continue'],[101,'Switching Protocols'],[102,'Processing'],[103,'Early Hints'],
     [200,'OK'],[201,'Created'],[202,'Accepted'],[203,'Non-Authoritative Information'],[204,'No Content'],[205,'Reset Content'],[206,'Partial Content'],[207,'Multi-Status'],[208,'Already Reported'],[226,'IM Used'],
@@ -6,20 +32,13 @@ function renderHttpStatus(el) {
     [400,'Bad Request'],[401,'Unauthorized'],[402,'Payment Required'],[403,'Forbidden'],[404,'Not Found'],[405,'Method Not Allowed'],[406,'Not Acceptable'],[407,'Proxy Authentication Required'],[408,'Request Timeout'],[409,'Conflict'],[410,'Gone'],[411,'Length Required'],[412,'Precondition Failed'],[413,'Content Too Large'],[414,'URI Too Long'],[415,'Unsupported Media Type'],[416,'Range Not Satisfiable'],[417,'Expectation Failed'],[418,"I'm a Teapot"],[421,'Misdirected Request'],[422,'Unprocessable Content'],[423,'Locked'],[424,'Failed Dependency'],[425,'Too Early'],[426,'Upgrade Required'],[428,'Precondition Required'],[429,'Too Many Requests'],[431,'Request Header Fields Too Large'],[451,'Unavailable For Legal Reasons'],
     [500,'Internal Server Error'],[501,'Not Implemented'],[502,'Bad Gateway'],[503,'Service Unavailable'],[504,'Gateway Timeout'],[505,'HTTP Version Not Supported'],[506,'Variant Also Negotiates'],[507,'Insufficient Storage'],[508,'Loop Detected'],[510,'Not Extended'],[511,'Network Authentication Required'],
   ];
-  const DESCS = {
-    200:'请求成功，服务器返回所求数据。',404:'请求的资源不存在。',500:'服务器发生内部错误。',
-    301:'资源已永久移至新 URL。',302:'资源临时重定向。',304:'资源未修改，使用缓存。',
-    400:'客户端发送了错误的请求。',401:'需要身份验证。',403:'服务器拒绝访问，权限不足。',
-    429:'请求过于频繁，触发限流。',408:'请求超时，客户端未及时发送完请求。',
-    201:'请求成功且资源已创建。',204:'请求成功但无响应体。',503:'服务器暂时不可用（维护/过载）。',
-    502:'网关从上游收到无效响应。',504:'网关等待上游超时。',422:'请求格式正确但语义错误。',
-  };
+  const DESCS = T('descs');
   const COLORS = {1:'#67e8f9',2:'#34d399',3:'#fbbf24',4:'#f87171',5:'#f87171'};
 
   el.innerHTML = `
     <div class="tool-card-panel">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <input class="tool-input" id="hsSearch" placeholder="输入状态码或关键词..." style="flex:1" oninput="hsFilter(this.value)">
+        <input class="tool-input" id="hsSearch" placeholder="${T('search_ph')}" style="flex:1" oninput="hsFilter(this.value)">
         <div style="display:flex;gap:6px" id="hsCatBtns"></div>
       </div>
     </div>
@@ -31,7 +50,7 @@ function renderHttpStatus(el) {
   const catEl = document.getElementById('hsCatBtns');
   ['all','1xx','2xx','3xx','4xx','5xx'].forEach(cat => {
     const btn = document.createElement('button');
-    btn.textContent = cat==='all'?'全部':cat;
+    btn.textContent = cat==='all'?T('all'):cat;
     btn.className = 'copy-inline';
     btn.style.fontFamily = 'monospace';
     btn.onclick = () => { window._hsCat=cat; hsFilter(document.getElementById('hsSearch').value); };
@@ -40,7 +59,7 @@ function renderHttpStatus(el) {
 
   window.hsFilter = function(q) {
     const cat = window._hsCat;
-    const query = q.toLowerCase();
+    const query = String(q ?? document.getElementById('hsSearch')?.value ?? '').toLowerCase(); // the Agent calls it without arguments
     const filtered = STATUS.filter(([code,name]) => {
       const catMatch = cat==='all' || String(code).startsWith(cat[0]);
       const qMatch = !query || String(code).includes(query) || name.toLowerCase().includes(query);
@@ -64,7 +83,7 @@ function renderHttpStatus(el) {
 
   window.hsCopy = function(code) {
     const name = STATUS.find(item => item[0] === code)?.[1] || '';
-    navigator.clipboard.writeText(String(code)).then(() => showToast(`已复制 ${code} ${name}`));
+    navigator.clipboard.writeText(String(code)).then(() => showToast(T('copied', code, name)));
   };
   hsFilter('');
 }

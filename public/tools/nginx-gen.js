@@ -1,53 +1,66 @@
+const _ngDict = {
+  zh: {
+    scene: '场景模板', domain: '域名', root: '根目录 / 代理地址', root_ph: '/var/www/html 或 http://127.0.0.1:3000', port: '监听端口',
+    gzip: '开启 Gzip', cache: '静态缓存', access_log: '访问日志', ssl: 'SSL 配置', output: '生成的配置', download: '⬇ 下载', copy: '复制', copied: '✓ 已复制',
+    scenes: { static: '静态网站', spa: '单页应用（SPA）', proxy: '反向代理', https: 'HTTPS + 重定向', loadbalance: '负载均衡' },
+    redirect_comment: '# HTTP → HTTPS 重定向', server_comment: '# HTTPS 主服务',
+  },
+  en: {
+    scene: 'Scenario', domain: 'Domain', root: 'Root directory / upstream', root_ph: '/var/www/html or http://127.0.0.1:3000', port: 'Listen port',
+    gzip: 'Enable gzip', cache: 'Cache static assets', access_log: 'Access log', ssl: 'SSL settings', output: 'Generated config', download: '⬇ Download', copy: 'Copy', copied: '✓ Copied',
+    scenes: { static: 'Static site', spa: 'Single-page app (SPA)', proxy: 'Reverse proxy', https: 'HTTPS + redirect', loadbalance: 'Load balancer' },
+    redirect_comment: '# Redirect HTTP → HTTPS', server_comment: '# HTTPS server',
+  },
+};
+
 function renderNginxGen(el) {
+  const T = makeToolI18n(_ngDict);
+  const scenes = T('scenes');
   el.innerHTML = `
     <div class="tool-card-panel">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
-          <div class="panel-label">场景模板</div>
+          <div class="panel-label">${T('scene')}</div>
           <select class="tool-input" id="ngScene" onchange="ngApplyScene()">
-            <option value="static">静态网站</option>
-            <option value="spa">单页应用（SPA）</option>
-            <option value="proxy">反向代理</option>
-            <option value="https">HTTPS + 重定向</option>
-            <option value="loadbalance">负载均衡</option>
+            ${Object.keys(scenes).map(scene => `<option value="${scene}">${scenes[scene]}</option>`).join('')}
           </select>
         </div>
         <div>
-          <div class="panel-label">域名</div>
+          <div class="panel-label">${T('domain')}</div>
           <input class="tool-input" id="ngDomain" value="example.com" oninput="ngGen()" placeholder="example.com">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
         <div>
-          <div class="panel-label">根目录 / 代理地址</div>
-          <input class="tool-input" id="ngRoot" value="/var/www/html" oninput="ngGen()" placeholder="/var/www/html 或 http://127.0.0.1:3000">
+          <div class="panel-label">${T('root')}</div>
+          <input class="tool-input" id="ngRoot" value="/var/www/html" oninput="ngGen()" placeholder="${T('root_ph')}">
         </div>
         <div>
-          <div class="panel-label">监听端口</div>
+          <div class="panel-label">${T('port')}</div>
           <input class="tool-input" id="ngPort" value="80" oninput="ngGen()" placeholder="80">
         </div>
       </div>
       <div style="margin-top:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer">
-          <input type="checkbox" id="ngGzip" checked onchange="ngGen()"> 开启 Gzip
+          <input type="checkbox" id="ngGzip" checked onchange="ngGen()"> ${T('gzip')}
         </label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer">
-          <input type="checkbox" id="ngCache" checked onchange="ngGen()"> 静态缓存
+          <input type="checkbox" id="ngCache" checked onchange="ngGen()"> ${T('cache')}
         </label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer">
-          <input type="checkbox" id="ngAccessLog" onchange="ngGen()"> 访问日志
+          <input type="checkbox" id="ngAccessLog" onchange="ngGen()"> ${T('access_log')}
         </label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer">
-          <input type="checkbox" id="ngSsl" onchange="ngGen()"> SSL 配置
+          <input type="checkbox" id="ngSsl" onchange="ngGen()"> ${T('ssl')}
         </label>
       </div>
     </div>
     <div class="tool-card-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div class="panel-label" style="margin:0">生成的配置</div>
+        <div class="panel-label" style="margin:0">${T('output')}</div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-secondary" onclick="ngDownload()">⬇ 下载</button>
-          <button class="btn btn-primary" id="ngCopyBtn" onclick="ngCopy()">复制</button>
+          <button class="btn btn-secondary" onclick="ngDownload()">${T('download')}</button>
+          <button class="btn btn-primary" id="ngCopyBtn" onclick="ngCopy()">${T('copy')}</button>
         </div>
       </div>
       <pre class="result-box" id="ngOutput" style="white-space:pre;overflow-x:auto;max-height:420px"></pre>
@@ -73,6 +86,7 @@ function ngApplyScene() {
 }
 
 function ngGen() {
+  const T = makeToolI18n(_ngDict);
   const domain  = document.getElementById('ngDomain').value.trim() || 'example.com';
   const root    = document.getElementById('ngRoot').value.trim() || '/var/www/html';
   const port    = document.getElementById('ngPort').value.trim() || '80';
@@ -151,14 +165,14 @@ function ngGen() {
 
   let conf = '';
   if (scene === 'https') {
-    conf = `# HTTP → HTTPS 重定向
+    conf = `${T('redirect_comment')}
 server {
     listen      80;
     server_name ${domain} www.${domain};
     return 301 https://$host$request_uri;
 }
 
-# HTTPS 主服务
+${T('server_comment')}
 server {
     listen      443 ssl http2;
     server_name ${domain} www.${domain};${logLine}${sslBlock}${gzipBlock}${locationBlock}${cacheBlock}}`;
@@ -177,7 +191,7 @@ function ngCopy() {
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('ngCopyBtn');
     const orig = btn.textContent;
-    btn.textContent = '✓ 已复制';
+    btn.textContent = makeToolI18n(_ngDict)('copied');
     btn.classList.add('copied');
     setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
   });
