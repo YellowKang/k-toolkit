@@ -1,29 +1,49 @@
 var _unicodeTab = 'unicode';
 
+const _unicodeDict = {
+  zh: {
+    tab_unicode: 'Unicode 转义', tab_html: 'HTML 实体',
+    unicode_label: '文本 ↔ Unicode 转义序列', unicode_ph: '输入文本或 \\uXXXX 序列...', escape: '转义 →', unescape: '← 还原',
+    html_label: '文本 ↔ HTML 实体', html_ph: '输入文本或 HTML 实体...', html_encode: 'HTML 编码 →', html_decode: '← HTML 解码',
+    clear: '清空', result: '结果', copy: '复制',
+  },
+  en: {
+    tab_unicode: 'Unicode escape', tab_html: 'HTML entities',
+    unicode_label: 'Text ↔ Unicode escape sequences', unicode_ph: 'Enter text or \\uXXXX sequences...', escape: 'Escape →', unescape: '← Unescape',
+    html_label: 'Text ↔ HTML entities', html_ph: 'Enter text or HTML entities...', html_encode: 'HTML encode →', html_decode: '← HTML decode',
+    clear: 'Clear', result: 'Result', copy: 'Copy',
+  },
+};
+
 function renderUnicode(el) {
-  el.innerHTML =
-    '<div class="tool-card-panel">' +
-    '<div style="display:flex;gap:8px;margin-bottom:14px">' +
-    '<button class="btn btn-primary" id="uTabUnicode" onclick="switchUnicodeTab(\"unicode\")">Unicode 转义</button>' +
-    '<button class="btn btn-secondary" id="uTabHtml" onclick="switchUnicodeTab(\"html\")">HTML 实体</button>' +
-    '</div>' +
-    '<div id="uPaneUnicode">' +
-    '<div class="panel-label">文本 ↔ Unicode 转义序列</div>' +
-    '<textarea class="tool-textarea" id="unicodeInput" rows="4" placeholder="输入文本或 \\uXXXX 序列..."></textarea>' +
-    '<div style="display:flex;gap:8px;margin-top:10px">' +
-    '<button class="btn btn-primary" onclick="encodeUnicode()">转义 →</button>' +
-    '<button class="btn btn-secondary" onclick="decodeUnicode()">← 还原</button>' +
-    '<button class="btn btn-secondary" onclick="document.getElementById(\"unicodeInput\").value=\"\";showUnicodeOutput(\"\")">清空</button>' +
-    '</div></div>' +
-    '<div id="uPaneHtml" style="display:none">' +
-    '<div class="panel-label">文本 ↔ HTML 实体</div>' +
-    '<textarea class="tool-textarea" id="htmlEntityInput" rows="4" placeholder="输入文本或 HTML 实体..."></textarea>' +
-    '<div style="display:flex;gap:8px;margin-top:10px">' +
-    '<button class="btn btn-primary" onclick="encodeHtmlEntity()">HTML 编码 →</button>' +
-    '<button class="btn btn-secondary" onclick="decodeHtmlEntity()">← HTML 解码</button>' +
-    '<button class="btn btn-secondary" onclick="document.getElementById(\"htmlEntityInput\").value=\"\";showUnicodeOutput(\"\")">清空</button>' +
-    '</div></div></div>' +
-    '<div class="tool-card-panel" id="unicodeOutput" style="display:none"></div>';
+  const T = makeToolI18n(_unicodeDict);
+  _unicodeTab = 'unicode';
+  el.innerHTML = `
+    <div class="tool-card-panel">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn btn-primary" id="uTabUnicode" onclick="switchUnicodeTab('unicode')">${T('tab_unicode')}</button>
+        <button class="btn btn-secondary" id="uTabHtml" onclick="switchUnicodeTab('html')">${T('tab_html')}</button>
+      </div>
+      <div id="uPaneUnicode">
+        <div class="panel-label">${T('unicode_label')}</div>
+        <textarea class="tool-textarea" id="unicodeInput" rows="4" placeholder="${T('unicode_ph')}"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-primary" onclick="encodeUnicode()">${T('escape')}</button>
+          <button class="btn btn-secondary" onclick="decodeUnicode()">${T('unescape')}</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('unicodeInput').value='';showUnicodeOutput('')">${T('clear')}</button>
+        </div>
+      </div>
+      <div id="uPaneHtml" style="display:none">
+        <div class="panel-label">${T('html_label')}</div>
+        <textarea class="tool-textarea" id="htmlEntityInput" rows="4" placeholder="${T('html_ph')}"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-primary" onclick="encodeHtmlEntity()">${T('html_encode')}</button>
+          <button class="btn btn-secondary" onclick="decodeHtmlEntity()">${T('html_decode')}</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('htmlEntityInput').value='';showUnicodeOutput('')">${T('clear')}</button>
+        </div>
+      </div>
+    </div>
+    <div class="tool-card-panel" id="unicodeOutput" style="display:none"></div>`;
 }
 
 function switchUnicodeTab(tab) {
@@ -71,6 +91,7 @@ function decodeHtmlEntity() {
 }
 
 function showUnicodeOutput(text) {
+  const T = makeToolI18n(_unicodeDict);
   var el = document.getElementById('unicodeOutput');
   if (!text) { el.style.display = 'none'; return; }
   el.style.display = '';
@@ -79,9 +100,9 @@ function showUnicodeOutput(text) {
     var b = document.getElementById(id);
     if (b) b.onclick = function(){ copyText(text, b); };
   }, 0);
-  el.innerHTML = '<div class="panel-label">结果</div>' +
+  el.innerHTML = '<div class="panel-label">' + T('result') + '</div>' +
     '<div style="display:flex;align-items:flex-start;gap:10px">' +
     '<pre style="flex:1;font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;margin:0;color:var(--text)">' + escHtml(text) + '</pre>' +
-    '<button class="copy-inline" id="' + id + '">复制</button>' +
+    '<button class="copy-inline" id="' + id + '">' + T('copy') + '</button>' +
     '</div>';
 }

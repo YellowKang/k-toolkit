@@ -1,29 +1,37 @@
+const _loremDict = {
+  zh: { language: '语言', count: '段落数：', generate: '生成', result: '生成结果', regenerate: '重新生成', copy: '复制' },
+  en: { language: 'Language', count: 'Paragraphs: ', generate: 'Generate', result: 'Generated text', regenerate: 'Regenerate', copy: 'Copy' },
+};
+
 function renderLorem(el) {
+  const T = makeToolI18n(_loremDict);
+  // Placeholder text follows the interface language until the user picks one.
+  _loremLang = getCurrentLang() === 'en' ? 'en' : 'zh';
   el.innerHTML = `
     <div class="tool-card-panel">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
         <div>
-          <div class="panel-label" style="margin-bottom:8px">语言</div>
+          <div class="panel-label" style="margin-bottom:8px">${T('language')}</div>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-primary" id="loremLangZh" onclick="loremSetLang('zh',this)">中文</button>
-            <button class="btn btn-secondary" id="loremLangEn" onclick="loremSetLang('en',this)">English</button>
+            <button class="btn ${_loremLang === 'zh' ? 'btn-primary' : 'btn-secondary'}" id="loremLangZh" lang="zh" onclick="loremSetLang('zh',this)">中文</button>
+            <button class="btn ${_loremLang === 'en' ? 'btn-primary' : 'btn-secondary'}" id="loremLangEn" lang="en" onclick="loremSetLang('en',this)">English</button>
           </div>
         </div>
         <div>
-          <div class="panel-label" style="margin-bottom:8px">段落数：<span id="loremCountLabel">3</span></div>
+          <div class="panel-label" style="margin-bottom:8px">${T('count')}<span id="loremCountLabel">3</span></div>
           <input type="range" min="1" max="10" value="3" style="width:100%" oninput="document.getElementById('loremCountLabel').textContent=this.value" id="loremCount">
         </div>
       </div>
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="loremGen()">生成</button>
+        <button class="btn btn-primary" onclick="loremGen()">${T('generate')}</button>
       </div>
     </div>
     <div class="tool-card-panel" id="loremResult" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div class="panel-label" style="margin:0">生成结果</div>
+        <div class="panel-label" style="margin:0">${T('result')}</div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-secondary" onclick="loremGen()">重新生成</button>
-          <button class="btn btn-secondary" onclick="copyText(document.getElementById('loremOutput').textContent,this)">复制</button>
+          <button class="btn btn-secondary" onclick="loremGen()">${T('regenerate')}</button>
+          <button class="btn btn-secondary" onclick="copyText(document.getElementById('loremOutput').textContent,this)">${T('copy')}</button>
         </div>
       </div>
       <div id="loremOutput" style="line-height:1.8;color:var(--text);font-size:14px"></div>
@@ -56,6 +64,8 @@ function loremGen() {
       html += `<p style="margin-bottom:12px">${para}</p>`;
     }
   }
-  document.getElementById('loremOutput').innerHTML = html;
+  const out = document.getElementById('loremOutput');
+  out.innerHTML = html;
+  if (_loremLang === 'zh') out.lang = 'zh'; else out.removeAttribute('lang');
   document.getElementById('loremResult').style.display = '';
 }

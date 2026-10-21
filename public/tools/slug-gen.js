@@ -1,19 +1,31 @@
+const _sgDict = {
+  zh: {
+    title: 'Slug 生成器', input_ph: '输入标题或文本（支持中文、英文、数字）...', separator: '分隔符：',
+    sep_dash: '横线 -', sep_underscore: '下划线 _', sep_dot: '点 .', result: '生成结果', copy: '复制',
+  },
+  en: {
+    title: 'Slug generator', input_ph: 'Enter a title or text (Chinese, English and digits)...', separator: 'Separator:',
+    sep_dash: 'Hyphen -', sep_underscore: 'Underscore _', sep_dot: 'Dot .', result: 'Result', copy: 'Copy',
+  },
+};
+
 window.renderSlugGen = function(el) {
+  const T = makeToolI18n(_sgDict);
   el.innerHTML = `
     <div class="tool-card-panel">
-      <div class="panel-label">Slug 生成器</div>
-      <input class="tool-input" id="sgInput" placeholder="输入标题或文本（支持中文、英文、数字）..." oninput="doSlugGen()" style="margin-bottom:12px">
+      <div class="panel-label">${T('title')}</div>
+      <input class="tool-input" id="sgInput" placeholder="${T('input_ph')}" oninput="doSlugGen()" style="margin-bottom:12px">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
-        <span style="font-size:12px;color:var(--text-muted)">分隔符：</span>
-        <button class="btn btn-secondary" id="sgSep-" onclick="setSgSep('-')">横线 -</button>
-        <button class="btn btn-secondary" id="sgSep_" onclick="setSgSep('_')">下划线 _</button>
-        <button class="btn btn-secondary" id="sgSepd" onclick="setSgSep('.')">点 .</button>
+        <span style="font-size:12px;color:var(--text-muted)">${T('separator')}</span>
+        <button class="btn btn-secondary" id="sgSep-" onclick="setSgSep('-')">${T('sep_dash')}</button>
+        <button class="btn btn-secondary" id="sgSep_" onclick="setSgSep('_')">${T('sep_underscore')}</button>
+        <button class="btn btn-secondary" id="sgSepd" onclick="setSgSep('.')">${T('sep_dot')}</button>
       </div>
     </div>
     <div class="tool-card-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span class="panel-label" style="margin:0">生成结果</span>
-        <button class="btn btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('sgResult').textContent).then(()=>showToast('已复制'))">复制</button>
+        <span class="panel-label" style="margin:0">${T('result')}</span>
+        <button class="btn btn-secondary" onclick="copyText(document.getElementById('sgResult').textContent,this)">${T('copy')}</button>
       </div>
       <div class="result-box" id="sgResult" style="min-height:40px;word-break:break-all"></div>
     </div>`;

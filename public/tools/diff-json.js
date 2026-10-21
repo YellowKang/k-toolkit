@@ -1,16 +1,30 @@
+const _djDict = {
+  zh: {
+    paste: name => `粘贴 ${name}...`, compare: '对比', clear: '清空', invalid: (name, msg) => `✗ ${name} 格式错误: ${msg}`,
+    same: '✓ 两个 JSON 完全相同', no_diff: '未发现差异。', found: n => `发现 ${n} 处差异`,
+    added: '+ 新增', removed: '- 删除', changed: '~ 修改',
+  },
+  en: {
+    paste: name => `Paste ${name}...`, compare: 'Compare', clear: 'Clear', invalid: (name, msg) => `✗ ${name} is not valid JSON: ${msg}`,
+    same: '✓ Both JSON documents are identical', no_diff: 'No differences found.', found: n => `Found ${n} difference${n === 1 ? '' : 's'}`,
+    added: '+ Added', removed: '- Removed', changed: '~ Changed',
+  },
+};
+
 window.renderDiffJson = function(el) {
+  const T = makeToolI18n(_djDict);
   el.innerHTML = `
     <div class="tool-card-panel">
       <div class="panel-label">JSON A</div>
-      <textarea class="tool-textarea" id="djInputA" rows="10" placeholder="粘贴 JSON A..."></textarea>
+      <textarea class="tool-textarea" id="djInputA" rows="10" placeholder="${T('paste', 'JSON A')}"></textarea>
     </div>
     <div class="tool-card-panel">
       <div class="panel-label">JSON B</div>
-      <textarea class="tool-textarea" id="djInputB" rows="10" placeholder="粘贴 JSON B..."></textarea>
+      <textarea class="tool-textarea" id="djInputB" rows="10" placeholder="${T('paste', 'JSON B')}"></textarea>
     </div>
     <div style="text-align:center;margin:8px 0">
-      <button class="btn btn-primary" onclick="djCompare()">Compare</button>
-      <button class="btn btn-secondary" onclick="djClear()">清空</button>
+      <button class="btn btn-primary" onclick="djCompare()">${T('compare')}</button>
+      <button class="btn btn-secondary" onclick="djClear()">${T('clear')}</button>
     </div>
     <div class="tool-card-panel" id="djResult" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -21,6 +35,7 @@ window.renderDiffJson = function(el) {
 };
 
 function djCompare() {
+  const T = makeToolI18n(_djDict);
   var a = document.getElementById('djInputA').value.trim();
   var b = document.getElementById('djInputB').value.trim();
   var status = document.getElementById('djStatus');
@@ -28,16 +43,16 @@ function djCompare() {
   var out = document.getElementById('djOutput');
   result.style.display = '';
   var objA, objB;
-  try { objA = JSON.parse(a); } catch(e) { status.textContent = '✗ JSON A 格式错误: ' + e.message; status.style.color='#e74c3c'; out.innerHTML=''; return; }
-  try { objB = JSON.parse(b); } catch(e) { status.textContent = '✗ JSON B 格式错误: ' + e.message; status.style.color='#e74c3c'; out.innerHTML=''; return; }
+  try { objA = JSON.parse(a); } catch(e) { status.textContent = T('invalid', 'JSON A', e.message); status.style.color='#e74c3c'; out.innerHTML=''; return; }
+  try { objB = JSON.parse(b); } catch(e) { status.textContent = T('invalid', 'JSON B', e.message); status.style.color='#e74c3c'; out.innerHTML=''; return; }
   var lines = [];
   djDiff(objA, objB, '', lines);
   if (lines.length === 0) {
-    status.textContent = '✓ 两个 JSON 完全相同';
+    status.textContent = T('same');
     status.style.color = '#10b981';
-    out.innerHTML = '<div style="color:#10b981;padding:8px">No differences found.</div>';
+    out.innerHTML = '<div style="color:#10b981;padding:8px">' + T('no_diff') + '</div>';
   } else {
-    status.textContent = '发现 ' + lines.length + ' 处差异';
+    status.textContent = T('found', lines.length);
     status.style.color = '#f59e0b';
     out.innerHTML = lines.join('');
   }
@@ -79,7 +94,8 @@ function djType(v) {
 function djLine(path, a, b, type) {
   var colors = { added: '#10b981', removed: '#e74c3c', changed: '#f59e0b' };
   var bg = { added: 'rgba(16,185,129,0.08)', removed: 'rgba(231,76,60,0.08)', changed: 'rgba(245,158,11,0.08)' };
-  var labels = { added: '+ 新增', removed: '- 删除', changed: '~ 修改' };
+  const T = makeToolI18n(_djDict);
+  var labels = { added: T('added'), removed: T('removed'), changed: T('changed') };
   var color = colors[type];
   var valA = a === undefined ? '' : JSON.stringify(a);
   var valB = b === undefined ? '' : JSON.stringify(b);

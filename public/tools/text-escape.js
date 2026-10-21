@@ -1,4 +1,10 @@
+const _escDict = {
+  zh: { regex: '正则', input: '输入', input_ph: '输入内容...', escape: '转义', unescape: '反转义', result: '结果', copy_result: '复制结果', copied: '已复制!' },
+  en: { regex: 'Regex', input: 'Input', input_ph: 'Enter text...', escape: 'Escape', unescape: 'Unescape', result: 'Result', copy_result: 'Copy result', copied: 'Copied!' },
+};
+
 function renderTextEscape(container) {
+  const T = makeToolI18n(_escDict);
   container.innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
       <button class="esc-mode-btn active" data-mode="json"
@@ -12,30 +18,30 @@ function renderTextEscape(container) {
         background:none;color:var(--text-muted);font-size:13px;cursor:pointer">URL</button>
       <button class="esc-mode-btn" data-mode="regex"
         style="padding:6px 14px;border-radius:8px;border:1px solid var(--glass-border);
-        background:none;color:var(--text-muted);font-size:13px;cursor:pointer">正则</button>
+        background:none;color:var(--text-muted);font-size:13px;cursor:pointer">${T('regex')}</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="font-size:12px;color:var(--text-muted)">输入</div>
+        <div style="font-size:12px;color:var(--text-muted)">${T('input')}</div>
         <textarea id="esc-input" style="height:300px;resize:none;
           background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);
           border-radius:10px;padding:12px;color:var(--text);font-size:13px;
-          font-family:monospace" placeholder="输入内容..."></textarea>
+          font-family:monospace" placeholder="${T('input_ph')}"></textarea>
         <div style="display:flex;gap:8px">
           <button id="esc-btn" style="flex:1;padding:8px;background:var(--accent);
-            border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px">转义</button>
+            border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px">${T('escape')}</button>
           <button id="unesc-btn" style="flex:1;padding:8px;border:1px solid var(--glass-border);
-            background:none;border-radius:8px;color:var(--text);cursor:pointer;font-size:13px">反转义</button>
+            background:none;border-radius:8px;color:var(--text);cursor:pointer;font-size:13px">${T('unescape')}</button>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="font-size:12px;color:var(--text-muted)">结果</div>
+        <div style="font-size:12px;color:var(--text-muted)">${T('result')}</div>
         <textarea id="esc-output" readonly style="height:300px;resize:none;
           background:rgba(255,255,255,0.02);border:1px solid var(--glass-border);
           border-radius:10px;padding:12px;color:var(--text);font-size:13px;
           font-family:monospace"></textarea>
         <button id="esc-copy" style="padding:8px;border:1px solid var(--glass-border);
-          background:none;border-radius:8px;color:var(--text);cursor:pointer;font-size:13px">复制结果</button>
+          background:none;border-radius:8px;color:var(--text);cursor:pointer;font-size:13px">${T('copy_result')}</button>
       </div>
     </div>
   `;
@@ -82,7 +88,7 @@ function renderTextEscape(container) {
     navigator.clipboard.writeText(output.value);
     const btn = container.querySelector('#esc-copy');
     const orig = btn.textContent;
-    btn.textContent = '已复制!';
+    btn.textContent = T('copied');
     setTimeout(() => btn.textContent = orig, 1500);
   };
 };

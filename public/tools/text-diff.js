@@ -1,46 +1,66 @@
+const _diffDict = {
+  zh: {
+    title: '文本在线比对', realtime: '实时对比', mode_line: '逐行对比', mode_word: '逐词对比', mode_char: '逐字对比',
+    view_split: '并排视图', view_unified: '合并视图', compare: '对比', copy_result: '复制结果', clear: '清空',
+    original: '原始文本', modified: '修改文本', original_ph: '粘贴原始文本...', modified_ph: '粘贴修改后文本...', result: '差异结果',
+    count: (lines, chars) => `${lines} 行 / ${chars} 字`,
+    stat: (added, removed) => `+${added} 增加  −${removed} 删除  ${added + removed === 0 ? '✓ 无差异' : ''}`,
+    run_first: '请先执行对比', copied: '已复制差异结果',
+  },
+  en: {
+    title: 'Compare texts', realtime: 'Live diff', mode_line: 'By line', mode_word: 'By word', mode_char: 'By character',
+    view_split: 'Side by side', view_unified: 'Unified', compare: 'Compare', copy_result: 'Copy result', clear: 'Clear',
+    original: 'Original', modified: 'Modified', original_ph: 'Paste the original text...', modified_ph: 'Paste the modified text...', result: 'Differences',
+    count: (lines, chars) => `${lines} line${lines === 1 ? '' : 's'} / ${chars} char${chars === 1 ? '' : 's'}`,
+    stat: (added, removed) => `+${added} added  −${removed} removed  ${added + removed === 0 ? '✓ No differences' : ''}`,
+    run_first: 'Run a comparison first', copied: 'Diff copied',
+  },
+};
+
 function renderTextDiff(el) {
+  const T = makeToolI18n(_diffDict);
   el.innerHTML = `
     <div class="tool-card-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-        <div class="panel-label" style="margin:0">文本在线比对</div>
+        <div class="panel-label" style="margin:0">${T('title')}</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px">
-            <input type="checkbox" id="diffRealtime" onchange="diffRealtimeToggle()"> 实时对比
+            <input type="checkbox" id="diffRealtime" onchange="diffRealtimeToggle()"> ${T('realtime')}
           </label>
           <select id="diffMode" class="tool-input" style="width:auto;font-size:12px">
-            <option value="line">逐行对比</option>
-            <option value="word">逐词对比</option>
-            <option value="char">逐字对比</option>
+            <option value="line">${T('mode_line')}</option>
+            <option value="word">${T('mode_word')}</option>
+            <option value="char">${T('mode_char')}</option>
           </select>
           <select id="diffView" class="tool-input" style="width:auto;font-size:12px" onchange="diffChangeView()">
-            <option value="split">并排视图</option>
-            <option value="unified">合并视图</option>
+            <option value="split">${T('view_split')}</option>
+            <option value="unified">${T('view_unified')}</option>
           </select>
-          <button class="btn btn-primary" onclick="runDiff()">对比</button>
-          <button class="btn btn-secondary" onclick="diffCopyResult()">复制结果</button>
-          <button class="btn btn-secondary" onclick="diffClear()">清空</button>
+          <button class="btn btn-primary" onclick="runDiff()">${T('compare')}</button>
+          <button class="btn btn-secondary" onclick="diffCopyResult()">${T('copy_result')}</button>
+          <button class="btn btn-secondary" onclick="diffClear()">${T('clear')}</button>
         </div>
       </div>
       <div class="diff-panels" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <span style="font-size:11px;color:var(--text-muted);font-weight:600">原始文本</span>
+            <span style="font-size:11px;color:var(--text-muted);font-weight:600">${T('original')}</span>
             <span id="diffCountA" style="font-size:11px;color:var(--text-muted)"></span>
           </div>
-          <textarea class="tool-textarea" id="diffA" rows="12" placeholder="粘贴原始文本..." oninput="diffOnInput()"></textarea>
+          <textarea class="tool-textarea" id="diffA" rows="12" placeholder="${T('original_ph')}" oninput="diffOnInput()"></textarea>
         </div>
         <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <span style="font-size:11px;color:var(--text-muted);font-weight:600">修改文本</span>
+            <span style="font-size:11px;color:var(--text-muted);font-weight:600">${T('modified')}</span>
             <span id="diffCountB" style="font-size:11px;color:var(--text-muted)"></span>
           </div>
-          <textarea class="tool-textarea" id="diffB" rows="12" placeholder="粘贴修改后文本..." oninput="diffOnInput()"></textarea>
+          <textarea class="tool-textarea" id="diffB" rows="12" placeholder="${T('modified_ph')}" oninput="diffOnInput()"></textarea>
         </div>
       </div>
     </div>
     <div class="tool-card-panel" id="diffResultPanel" style="display:none">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
-        <div class="panel-label" style="margin:0">差异结果</div>
+        <div class="panel-label" style="margin:0">${T('result')}</div>
         <span id="diffStat" style="font-size:12px;color:var(--text-muted)"></span>
       </div>
       <div id="diffOutput" style="font-family:monospace;font-size:13px;line-height:1.8;overflow-x:auto"></div>
@@ -50,12 +70,13 @@ function renderTextDiff(el) {
 }
 
 function diffOnInput() {
+  const T = makeToolI18n(_diffDict);
   const a = document.getElementById('diffA');
   const b = document.getElementById('diffB');
   const ca = document.getElementById('diffCountA');
   const cb = document.getElementById('diffCountB');
-  if (a && ca) ca.textContent = `${a.value.split('\n').length} 行 / ${a.value.length} 字`;
-  if (b && cb) cb.textContent = `${b.value.split('\n').length} 行 / ${b.value.length} 字`;
+  if (a && ca) ca.textContent = T('count', a.value.split('\n').length, a.value.length);
+  if (b && cb) cb.textContent = T('count', b.value.split('\n').length, b.value.length);
   if (window._diffRT) runDiff();
 }
 
@@ -94,7 +115,7 @@ function runDiff() {
   diff.forEach(([t]) => { if (t === 1) added++; else if (t === -1) removed++; });
 
   const statEl = document.getElementById('diffStat');
-  if (statEl) statEl.textContent = `+${added} 增加  −${removed} 删除  ${added + removed === 0 ? '✓ 无差异' : ''}`;
+  if (statEl) statEl.textContent = makeToolI18n(_diffDict)('stat', added, removed);
 
   const out = document.getElementById('diffOutput');
   if (view === 'split' && mode === 'line') {
@@ -106,6 +127,7 @@ function runDiff() {
 }
 
 function _renderSplitView(tokensA, tokensB, diff) {
+  const T = makeToolI18n(_diffDict);
   // 构建左右行对应
   const left = [], right = [];
   diff.forEach(([t, v]) => {
@@ -133,9 +155,9 @@ function _renderSplitView(tokensA, tokensB, diff) {
   }
   return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden">`
     + `<div style="border-right:1px solid var(--border)">`
-    + `<div style="padding:4px 8px 4px 48px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);font-weight:600">原始文本</div>`
+    + `<div style="padding:4px 8px 4px 48px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);font-weight:600">${T('original')}</div>`
     + leftHtml + `</div>`
-    + `<div><div style="padding:4px 8px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);font-weight:600">修改文本</div>`
+    + `<div><div style="padding:4px 8px;font-size:11px;color:var(--text-muted);border-bottom:1px solid var(--border);font-weight:600">${T('modified')}</div>`
     + rightHtml + `</div></div>`;
 }
 
@@ -167,9 +189,10 @@ function _renderUnifiedView(diff, mode) {
 }
 
 function diffCopyResult() {
+  const T = makeToolI18n(_diffDict);
   const out = document.getElementById('diffOutput');
-  if (!out || !out.textContent.trim()) { showToast('请先执行对比', 'info'); return; }
-  navigator.clipboard.writeText(out.innerText).then(() => showToast('已复制差异结果'));
+  if (!out || !out.textContent.trim()) { showToast(T('run_first'), 'info'); return; }
+  navigator.clipboard.writeText(out.innerText).then(() => showToast(T('copied')));
 }
 
 function _escD(s) {

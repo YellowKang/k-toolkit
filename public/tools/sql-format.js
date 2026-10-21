@@ -1,30 +1,42 @@
+const _sqlDict = {
+  zh: {
+    input: '输入 SQL', generic: '通用 SQL', sample: '示例', input_ph: '粘贴 SQL 语句...', format: '格式化', compress: '压缩', clear: '清空',
+    copy_result: '复制结果', download: '下载', formatted: '格式化完成', compressed: '已压缩', downloaded: 'SQL 文件已下载',
+  },
+  en: {
+    input: 'SQL input', generic: 'Generic SQL', sample: 'Sample', input_ph: 'Paste a SQL statement...', format: 'Format', compress: 'Minify', clear: 'Clear',
+    copy_result: 'Copy result', download: 'Download', formatted: 'Formatted', compressed: 'Minified', downloaded: 'SQL file downloaded',
+  },
+};
+
 function renderSQLFormat(el) {
+  const T = makeToolI18n(_sqlDict);
   el.innerHTML = `
     <div class="tool-card-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div class="panel-label" style="margin:0">输入 SQL</div>
+        <div class="panel-label" style="margin:0">${T('input')}</div>
         <div style="display:flex;gap:6px">
           <select id="sqlDialect" class="tool-input" style="width:auto;font-size:12px">
-            <option value="sql">通用 SQL</option>
+            <option value="sql">${T('generic')}</option>
             <option value="mysql">MySQL</option>
             <option value="pgsql">PostgreSQL</option>
           </select>
-          <button class="btn btn-secondary" onclick="sqlLoadSample()">示例</button>
+          <button class="btn btn-secondary" onclick="sqlLoadSample()">${T('sample')}</button>
         </div>
       </div>
-      <textarea class="tool-textarea" id="sqlInput" rows="10" placeholder="粘贴 SQL 语句..." oninput="_sqlRealtime()"></textarea>
+      <textarea class="tool-textarea" id="sqlInput" rows="10" placeholder="${T('input_ph')}" oninput="_sqlRealtime()"></textarea>
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="formatSQL()">格式化</button>
-        <button class="btn btn-secondary" onclick="compressSQL()">压缩</button>
-        <button class="btn btn-secondary" onclick="clearSQL()">清空</button>
+        <button class="btn btn-primary" onclick="formatSQL()">${T('format')}</button>
+        <button class="btn btn-secondary" onclick="compressSQL()">${T('compress')}</button>
+        <button class="btn btn-secondary" onclick="clearSQL()">${T('clear')}</button>
       </div>
     </div>
     <div class="tool-card-panel" id="sqlResultPanel" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div class="panel-label" style="margin:0" id="sqlStatus"></div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-secondary" onclick="sqlCopy(this)">复制结果</button>
-          <button class="btn btn-secondary" onclick="sqlDownload()">下载</button>
+          <button class="btn btn-secondary" onclick="sqlCopy(this)">${T('copy_result')}</button>
+          <button class="btn btn-secondary" onclick="sqlDownload()">${T('download')}</button>
         </div>
       </div>
       <pre class="result-box" id="sqlOutput" style="max-height:400px;overflow-y:auto;color:#93c5fd"></pre>
@@ -53,14 +65,14 @@ function formatSQL() {
   // commas
   sql = sql.replace(/,\s*/g, ',\n  ');
   sql = sql.replace(/^\s*\n/,'').trim();
-  _sqlShow(sql, '格式化完成');
+  _sqlShow(sql, makeToolI18n(_sqlDict)('formatted'));
 }
 
 function compressSQL() {
   const raw = document.getElementById('sqlInput').value.trim();
   if (!raw) return;
   const compressed = raw.replace(/\s+/g,' ').trim();
-  _sqlShow(compressed, '已压缩');
+  _sqlShow(compressed, makeToolI18n(_sqlDict)('compressed'));
 }
 
 function _sqlShow(text, label) {
@@ -78,7 +90,7 @@ function sqlDownload() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text],{type:'text/sql'}));
   a.download = 'query.sql'; a.click();
-  showToast('SQL 文件已下载');
+  showToast(makeToolI18n(_sqlDict)('downloaded'));
 }
 
 let _sqlTimer = null;
