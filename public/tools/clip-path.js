@@ -21,7 +21,7 @@ window.renderClipPath = function(el) {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div class="panel-label" style="margin:0">${T('title')}</div>
         <div style="display:flex;gap:8px">
-          <select id="cpShape" class="tool-input" style="width:auto;font-size:12px" onchange="_cpRender()">
+          <select id="cpShapeType" class="tool-input" style="width:auto;font-size:12px" onchange="_cpRender()">
             ${Object.keys(shapes).map(shape => `<option value="${shape}">${shapes[shape]}</option>`).join('')}
           </select>
           <button class="btn btn-secondary" onclick="_cpReset()">${T('reset')}</button>
@@ -32,7 +32,7 @@ window.renderClipPath = function(el) {
           <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;font-weight:600">${T('preview')}</div>
           <div style="position:relative;width:100%;aspect-ratio:1;background:rgba(0,0,0,0.25);border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;touch-action:none" id="cpCanvas">
             <div id="cpShape" style="position:absolute;inset:0;background:linear-gradient(135deg,var(--accent),var(--accent-blue));transition:clip-path 0.15s"></div>
-            <svg id="cpSvg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none" id="cpSvgEl"></svg>
+            <svg id="cpSvgEl" viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible"></svg>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:12px">
@@ -69,7 +69,7 @@ let _cpPts = [], _cpMode = 'polygon', _cpDrag = -1;
 
 function _cpInit() {
   _cpMode = 'polygon';
-  document.getElementById('cpShape').value = 'polygon';
+  document.getElementById('cpShapeType').value = 'polygon';
   _cpPts = _CP_PRESETS.polygon.map(p => [...p]);
   _cpRenderControls();
   _cpUpdate();
@@ -77,14 +77,14 @@ function _cpInit() {
 }
 
 function _cpReset() {
-  _cpMode = document.getElementById('cpShape').value;
+  _cpMode = document.getElementById('cpShapeType').value;
   if (_cpMode === 'polygon') _cpPts = _CP_PRESETS.polygon.map(p=>[...p]);
   _cpRenderControls();
   _cpUpdate();
 }
 
 function _cpRender() {
-  _cpMode = document.getElementById('cpShape').value;
+  _cpMode = document.getElementById('cpShapeType').value;
   if (_cpMode === 'polygon') {
     _cpPts = _CP_PRESETS.polygon.map(p=>[...p]);
   }
@@ -159,8 +159,9 @@ function _cpUpdate() {
     shapeEl.style.clipPath = `polygon(${pts})`;
     if (svg) {
       const pStr = _cpPts.map(p=>`${p[0]},${p[1]}`).join(' ');
-      svg.innerHTML = `<polygon points="${pStr}" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="0.5" vector-effect="non-scaling-stroke" style="transform:scale(0.01) translate(0,0);transform-box:fill-box"/>`
-      + _cpPts.map((p,i)=>`<circle cx="${p[0]}%" cy="${p[1]}%" r="5" fill="white" fill-opacity="0.8" stroke="var(--accent)" stroke-width="1.5" style="cursor:pointer" data-idx="${i}"/>`).join('');
+      // viewBox 0–100 matches the percentage points; handles opt back into pointer events for dragging.
+      svg.innerHTML = `<polygon points="${pStr}" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1" vector-effect="non-scaling-stroke"/>`
+      + _cpPts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.6" fill="white" fill-opacity="0.85" stroke="var(--accent)" stroke-width="1.5" vector-effect="non-scaling-stroke" style="cursor:grab;pointer-events:all;touch-action:none" data-idx="${i}"/>`).join('');
     }
   } else if (_cpMode === 'circle') {
     const r  = document.getElementById('cpCRv')?.value  || 50;
@@ -168,13 +169,13 @@ function _cpUpdate() {
     const cy = document.getElementById('cpCYv')?.value || 50;
     css = `clip-path: circle(${r}% at ${cx}% ${cy}%);`;
     shapeEl.style.clipPath = `circle(${r}% at ${cx}% ${cy}%)`;
-    if (svg) svg.innerHTML = `<ellipse cx="${cx}%" cy="${cy}%" rx="${r}%" ry="${r}%" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>`;
+    if (svg) svg.innerHTML = `<ellipse cx="${cx}%" cy="${cy}%" rx="${r}%" ry="${r}%" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
   } else if (_cpMode === 'ellipse') {
     const rx = document.getElementById('cpERxv')?.value || 50;
     const ry = document.getElementById('cpERyv')?.value || 35;
     css = `clip-path: ellipse(${rx}% ${ry}% at 50% 50%);`;
     shapeEl.style.clipPath = `ellipse(${rx}% ${ry}% at 50% 50%)`;
-    if (svg) svg.innerHTML = `<ellipse cx="50%" cy="50%" rx="${rx}%" ry="${ry}%" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>`;
+    if (svg) svg.innerHTML = `<ellipse cx="50%" cy="50%" rx="${rx}%" ry="${ry}%" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
   } else if (_cpMode === 'inset') {
     const t = document.getElementById('cpITv')?.value || 10;
     const r = document.getElementById('cpIRv')?.value || 10;
@@ -182,7 +183,7 @@ function _cpUpdate() {
     const l = document.getElementById('cpILv')?.value || 10;
     css = `clip-path: inset(${t}% ${r}% ${b}% ${l}%);`;
     shapeEl.style.clipPath = `inset(${t}% ${r}% ${b}% ${l}%)`;
-    if (svg) svg.innerHTML = `<rect x="${l}%" y="${t}%" width="${100-+l-+r}%" height="${100-+t-+b}%" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>`;
+    if (svg) svg.innerHTML = `<rect x="${l}%" y="${t}%" width="${100-+l-+r}%" height="${100-+t-+b}%" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
   }
   out.textContent = css;
 }
@@ -232,5 +233,7 @@ function _cpBindCanvas() {
     _cpRenderControls();
     _cpUpdate();
   });
-  canvas.addEventListener('pointerup', () => { _cpDrag = -1; });
+  const end = e => { if (_cpDrag >= 0 && canvas.hasPointerCapture?.(e.pointerId)) canvas.releasePointerCapture(e.pointerId); _cpDrag = -1; };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
 }

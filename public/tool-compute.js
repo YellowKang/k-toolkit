@@ -73,6 +73,27 @@
     return count;
   }
 
+  /** Wall-clock fields of an instant in an IANA time zone. */
+  function zonedParts(ms, timeZone) {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(ms));
+    const get = type => +parts.find(p => p.type === type).value;
+    return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute'), second: get('second') };
+  }
+  const zoneOffset = (ms, timeZone) => {
+    const p = zonedParts(ms, timeZone);
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(ms / 1000) * 1000;
+  };
+  /** UTC milliseconds for wall-clock fields in a time zone; DST overlaps take the earlier instant, gaps move forward. */
+  function zonedTimeToUtc({ year, month, day, hour = 0, minute = 0, second = 0 }, timeZone) {
+    const wall = Date.UTC(year, month - 1, day, hour, minute, second);
+    const o1 = zoneOffset(wall, timeZone), t1 = wall - o1;
+    const o2 = zoneOffset(t1, timeZone);
+    if (o1 === o2) return t1;
+    const t2 = wall - o2;
+    return zoneOffset(t2, timeZone) === o2 ? t2 : Math.max(t1, t2);
+  }
+
   // Shared DOM-free modules in compute/<name>.js register on window.KCompute; pages and Agent load the same code.
   const moduleLoads = new Map();
   function load(name) {
@@ -109,6 +130,6 @@
 
   window.ToolCompute = Object.freeze({ words, formatWords, base64Encode, base64Decode, processLines,
     caseConvert: (text, style) => style === 'upper' ? text.toUpperCase() : style === 'lower' ? text.toLowerCase() : formatWords(words(text), style),
-    localDate, parseLocalDate, addMonths, calendarDiff, weekdaysBetween, load, loadVendor,
+    localDate, parseLocalDate, addMonths, calendarDiff, weekdaysBetween, zonedParts, zonedTimeToUtc, load, loadVendor,
   });
 })();

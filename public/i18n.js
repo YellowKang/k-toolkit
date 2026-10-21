@@ -287,7 +287,10 @@ const TOOLS_EN = {
 };
 
 // ── 核心 i18n 函数 ──
-let _currentLang = localStorage.getItem('dtb_lang') || 'zh';
+let _currentLang = (() => { try { return localStorage.getItem('dtb_lang') || 'zh'; } catch { return 'zh'; } })();
+// Keep <html lang> in sync so screen readers, hyphenation and translation tools use the right language.
+const _syncDocumentLang = () => { document.documentElement.lang = _currentLang === 'en' ? 'en' : 'zh-CN'; };
+_syncDocumentLang();
 
 function t(key, ...args) {
   const pack = _currentLang === 'en' ? LANG_EN : LANG_ZH;
@@ -315,8 +318,9 @@ function setLang(lang) {
     window._activeCleanup(); window._activeCleanup = null;
   }
   _currentLang = lang;
+  _syncDocumentLang();
   _ltCache = null; // invalidate localized tools cache
-  localStorage.setItem('dtb_lang', lang);
+  try { localStorage.setItem('dtb_lang', lang); } catch {}
   window.dispatchEvent(new Event('toolkit-language-change'));
   // 更新语言按钮文字
   const btn = document.getElementById('langBtn');

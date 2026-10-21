@@ -290,17 +290,21 @@ const DevActions = [
     },
     execute({ time, from, to }) {
       try {
-        // Parse input time
-        let date;
-        const hhmm = time.match(/^(\d{1,2}):(\d{2})$/);
+        // A time without an explicit offset is a wall-clock time in the source zone (not this browser's zone).
+        const text = String(time).trim();
+        const hhmm = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(text);
+        const wall = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(text);
+        let ms;
         if (hhmm) {
-          // HH:mm format — use today's date
-          date = new Date();
-          date.setHours(parseInt(hhmm[1], 10), parseInt(hhmm[2], 10), 0, 0);
+          const today = ToolCompute.zonedParts(Date.now(), from);
+          ms = ToolCompute.zonedTimeToUtc({ ...today, hour: +hhmm[1], minute: +hhmm[2], second: +(hhmm[3] || 0) }, from);
+        } else if (wall) {
+          ms = ToolCompute.zonedTimeToUtc({ year: +wall[1], month: +wall[2], day: +wall[3], hour: +(wall[4] || 0), minute: +(wall[5] || 0), second: +(wall[6] || 0) }, from);
         } else {
-          date = new Date(time);
+          ms = Date.parse(text);
         }
-        if (isNaN(date.getTime())) throw new Error('无效时间格式');
+        if (!Number.isFinite(ms)) throw new Error('无效时间格式');
+        const date = new Date(ms);
 
         const fmtOpts = { timeZone: '', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
 

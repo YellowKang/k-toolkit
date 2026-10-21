@@ -41,11 +41,13 @@ const express = require('express');
       }, category);
     }
     await page.evaluate(() => setLang('en'));
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
     assert.ok((await page.locator('.nav-cat-label').allTextContents()).includes('Data & Formats'));
     await page.evaluate(() => setCatFilter('数据格式'));
     await page.waitForFunction(() => document.querySelector('[data-lazy-cat="数据格式"] .tool-card-name')?.textContent === 'JSON Formatter');
     assert.equal(await page.locator('[data-lazy-cat] .tool-card').count(), 9);
     await page.evaluate(() => setLang('zh'));
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'zh-CN');
     const route = async (id, selector) => {
       await page.evaluate(id => navigateTo(id), id);
       await page.locator(selector).first().waitFor({ state: 'attached' });
@@ -159,6 +161,23 @@ const express = require('express');
     await page.locator('#yjInput').fill('base: &b\n  image: nginx\nweb:\n  <<: *b\n  ports: [80]\n');
     await page.evaluate(() => yjToJSON());
     assert.deepEqual(JSON.parse(await page.locator('#yjOutput').textContent()), { base: { image: 'nginx' }, web: { image: 'nginx', ports: [80] } });
+    // The entered time belongs to the chosen source zone, whatever the browser's own zone is.
+    await route('timezone', '#tzInput');
+    await page.locator('#tzFrom').selectOption('Asia/Tokyo');
+    await page.locator('#tzInput').fill('2026-10-21T09:00');
+    await page.evaluate(() => tzConvert());
+    assert.match(await page.locator('#tzOutput .result-row').first().textContent(), /2026\/10\/21 00:00:00/); // first row is UTC
+    // clip-path handles render inside the preview and drag the polygon point.
+    await route('clip-path', '#cpCanvas');
+    await page.locator('#cpSvgEl circle[data-idx="0"]').waitFor({ state: 'attached' });
+    assert.equal(await page.locator('#cpSvgEl circle[data-idx]').count(), 5);
+    const handle = await page.locator('#cpSvgEl circle[data-idx="0"]').boundingBox();
+    const canvasBox = await page.locator('#cpCanvas').boundingBox();
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(canvasBox.x + canvasBox.width * 0.25, canvasBox.y + canvasBox.height * 0.25, { steps: 4 });
+    await page.mouse.up();
+    assert.match(await page.locator('#cpOutput').textContent(), /^clip-path: polygon\((2[4-6])% (2[4-6])%,/);
     // AES: page round trip, Node/OpenSSL ciphertext, the old page's IV:data output, and Chrome's missing AES-192.
     await route('aes', '#aesInput');
     const aesRun = async () => {

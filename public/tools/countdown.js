@@ -16,18 +16,19 @@ const _cdDict = {
 function renderCountdown(el) {
   const T = makeToolI18n(_cdDict);
   const names = T('presets');
+  // Fixed-date holidays use the next local occurrence; the Spring Festival comes from the lunar calendar module.
   const PRESETS = [
-    { label: names[0], date: () => { const y = new Date().getFullYear(); return `${y+1}-01-01T00:00`; } },
-    { label: names[1], date: () => { const y = new Date().getFullYear(); return `${y+1}-01-29T00:00`; } },
-    { label: names[2], date: () => { const n=new Date(),y=n.getFullYear(); const d=new Date(`${y}-05-01`); return `${d>n?y:y+1}-05-01T00:00`; } },
-    { label: names[3], date: () => { const n=new Date(),y=n.getFullYear(); const d=new Date(`${y}-10-01`); return `${d>n?y:y+1}-10-01T00:00`; } },
-    { label: names[4], date: () => { const n=new Date(),y=n.getFullYear(); const d=new Date(`${y}-12-25`); return `${d>n?y:y+1}-12-25T00:00`; } },
+    { label: names[0], date: () => cdNextDate(1, 1) },
+    { label: names[1], spring: true },
+    { label: names[2], date: () => cdNextDate(5, 1) },
+    { label: names[3], date: () => cdNextDate(10, 1) },
+    { label: names[4], date: () => cdNextDate(12, 25) },
   ];
   el.innerHTML = `
     <div class="tool-card-panel">
       <div class="panel-label" style="margin-bottom:10px">${T('title')}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-        ${PRESETS.map(p => `<button class="btn btn-secondary" style="font-size:12px" onclick="cdPreset('${p.label}','${p.date()}')">&#128197; ${p.label}</button>`).join('')}
+        ${PRESETS.map(p => `<button class="btn btn-secondary" style="font-size:12px" data-label="${escHtml(p.label)}" ${p.spring ? 'onclick="cdPresetSpring(this.dataset.label)"' : `data-date="${p.date()}" onclick="cdPreset(this.dataset.label,this.dataset.date)"`}>&#128197; ${p.label}</button>`).join('')}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
         <div><label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px">${T('target')}</label><input class="tool-input" id="cdTarget" type="datetime-local"></div>
@@ -58,6 +59,25 @@ function renderCountdown(el) {
 }
 
 let _cdTimer = null;
+
+/** "YYYY-MM-DDT00:00" of the next local occurrence of month/day strictly after now. */
+function cdNextDate(month, day, now = new Date()) {
+  let y = now.getFullYear();
+  if (new Date(y, month - 1, day) <= now) y++;
+  return `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00`;
+}
+
+/** Next Spring Festival (lunar 1/1) after `now`, from the shared lunar calendar. */
+async function cdNextSpringFestival(now = new Date()) {
+  const lunar = await ToolCompute.load('lunar');
+  let d = lunar.lunarToSolar(now.getFullYear(), 1, 1);
+  if (!d || d <= now) d = lunar.lunarToSolar(now.getFullYear() + 1, 1, 1);
+  return `${ToolCompute.localDate(d)}T00:00`;
+}
+
+async function cdPresetSpring(name) {
+  try { cdPreset(name, await cdNextSpringFestival()); } catch (e) { showToast(e.message, 'error'); }
+}
 
 function cdPreset(name, date) {
   document.getElementById('cdTarget').value = date;

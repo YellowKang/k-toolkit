@@ -34,6 +34,26 @@ test('financial uppercase follows the payment settlement writing rules', () => {
   assert.equal(ncParseAmount('1.005').cents, 101n);
 });
 
+test('wall-clock times convert from their own time zone, including DST gaps and overlaps', () => {
+  const { ToolCompute: C } = load('tool-compute.js');
+  const iso = (fields, zone) => new Date(C.zonedTimeToUtc(fields, zone)).toISOString();
+  assert.equal(iso({ year: 2026, month: 10, day: 21, hour: 9 }, 'Asia/Tokyo'), '2026-10-21T00:00:00.000Z');
+  assert.equal(iso({ year: 2026, month: 7, day: 1, hour: 12 }, 'America/New_York'), '2026-07-01T16:00:00.000Z');
+  assert.equal(iso({ year: 2026, month: 1, day: 15, hour: 12 }, 'Australia/Sydney'), '2026-01-15T01:00:00.000Z');
+  assert.equal(iso({ year: 2026, month: 3, day: 8, hour: 2, minute: 30 }, 'America/New_York'), '2026-03-08T07:30:00.000Z'); // gap → 03:30 EDT
+  assert.equal(iso({ year: 2026, month: 11, day: 1, hour: 1, minute: 30 }, 'America/New_York'), '2026-11-01T05:30:00.000Z'); // overlap → earlier EDT
+  assert.deepEqual(plain(C.zonedParts(Date.UTC(2026, 9, 20, 16, 30), 'Asia/Shanghai')), { year: 2026, month: 10, day: 21, hour: 0, minute: 30, second: 0 });
+});
+
+test('countdown presets point at the next real holiday dates', async () => {
+  const ctx = load('tool-compute.js', 'compute/lunar.js', 'tools/countdown.js');
+  assert.equal(ctx.cdNextDate(1, 1, local(2026, 10, 21)), '2027-01-01T00:00');
+  assert.equal(ctx.cdNextDate(10, 1, local(2026, 10, 1, 8)), '2027-10-01T00:00');
+  assert.equal(ctx.cdNextDate(12, 25, local(2026, 10, 21)), '2026-12-25T00:00');
+  assert.equal(await ctx.cdNextSpringFestival(local(2026, 10, 21)), '2027-02-06T00:00');
+  assert.equal(await ctx.cdNextSpringFestival(local(2027, 2, 7)), '2028-01-26T00:00');
+});
+
 test('calendar helpers use local days, clamp month ends and count weekdays inclusively', () => {
   const { ToolCompute: C } = load('tool-compute.js');
   assert.equal(ymd(C.parseLocalDate('2024-02-29')), '2024-02-29');

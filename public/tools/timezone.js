@@ -5,7 +5,7 @@ const _tzDict = {
       'Asia/Dubai': '迪拜 (UTC+4)', 'Europe/London': '伦敦', 'Europe/Paris': '巴黎/柏林', 'Europe/Moscow': '莫斯科 (UTC+3)', 'America/New_York': '纽约 (UTC-5/-4)',
       'America/Chicago': '芝加哥', 'America/Los_Angeles': '洛杉矶 (UTC-8/-7)', 'America/Sao_Paulo': '圣保罗 (UTC-3)', 'Australia/Sydney': '悉尼' },
     places: { UTC: 'UTC', 'Asia/Shanghai': '中国', 'Asia/Tokyo': '日本', 'Asia/Seoul': '韩国', 'Asia/Singapore': '新加坡', 'Asia/Dubai': '迪拜',
-      'Europe/London': '伦敦', 'Europe/Paris': '巴黎', 'Europe/Moscow': '莫斯科', 'America/New_York': '纽约', 'America/Los_Angeles': '洛杉矶',
+      'Europe/London': '伦敦', 'Europe/Paris': '巴黎', 'Europe/Moscow': '莫斯科', 'America/New_York': '纽约', 'America/Chicago': '芝加哥', 'America/Los_Angeles': '洛杉矶',
       'America/Sao_Paulo': '圣保罗', 'Australia/Sydney': '悉尼' },
   },
   en: {
@@ -14,7 +14,7 @@ const _tzDict = {
       'Asia/Dubai': 'Dubai (UTC+4)', 'Europe/London': 'London', 'Europe/Paris': 'Paris / Berlin', 'Europe/Moscow': 'Moscow (UTC+3)', 'America/New_York': 'New York (UTC-5/-4)',
       'America/Chicago': 'Chicago', 'America/Los_Angeles': 'Los Angeles (UTC-8/-7)', 'America/Sao_Paulo': 'São Paulo (UTC-3)', 'Australia/Sydney': 'Sydney' },
     places: { UTC: 'UTC', 'Asia/Shanghai': 'China', 'Asia/Tokyo': 'Japan', 'Asia/Seoul': 'Korea', 'Asia/Singapore': 'Singapore', 'Asia/Dubai': 'Dubai',
-      'Europe/London': 'London', 'Europe/Paris': 'Paris', 'Europe/Moscow': 'Moscow', 'America/New_York': 'New York', 'America/Los_Angeles': 'Los Angeles',
+      'Europe/London': 'London', 'Europe/Paris': 'Paris', 'Europe/Moscow': 'Moscow', 'America/New_York': 'New York', 'America/Chicago': 'Chicago', 'America/Los_Angeles': 'Los Angeles',
       'America/Sao_Paulo': 'São Paulo', 'Australia/Sydney': 'Sydney' },
   },
 };
@@ -57,12 +57,16 @@ function tzConvert() {
   const T = makeToolI18n(_tzDict);
   const zones = Object.entries(T('places'));
   try {
-    const date = new Date(val + ':00');
+    // The entered wall-clock time belongs to the selected source zone, not to this browser's zone.
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(val);
+    if (!m) return;
+    const date = new Date(ToolCompute.zonedTimeToUtc({ year: +m[1], month: +m[2], day: +m[3], hour: +m[4], minute: +m[5], second: +(m[6] || 0) }, fromZone));
     const html = zones.map(([tz,label]) => {
       try {
         const str = date.toLocaleString('zh-CN',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-        const offset = new Intl.DateTimeFormat('en',{timeZone:tz,timeZoneName:'short'}).format(date).split(' ').pop();
-        return `<div class="result-row" style="margin-bottom:8px"><span style="color:var(--text-muted);min-width:80px">${label}</span><span style="color:var(--neon);font-weight:600;flex:1">${str}</span><span style="color:var(--text-muted);font-size:11px">${offset}</span><button class="copy-inline" onclick="copyText('${str}',this)">${T('copy')}</button></div>`;
+        const offset = new Intl.DateTimeFormat('en',{timeZone:tz,timeZoneName:'shortOffset'}).format(date).split(' ').pop();
+        const source = tz === fromZone ? 'border-color:var(--accent)' : '';
+        return `<div class="result-row" style="margin-bottom:8px;${source}"><span style="color:var(--text-muted);min-width:80px">${label}${tz === fromZone ? ' ◀' : ''}</span><span style="color:var(--neon);font-weight:600;flex:1">${str}</span><span style="color:var(--text-muted);font-size:11px">${offset}</span><button class="copy-inline" data-copy="${str}" onclick="copyText(this.dataset.copy,this)">${T('copy')}</button></div>`;
       } catch(e) { return ''; }
     }).join('');
     document.getElementById('tzOutput').innerHTML = html;
