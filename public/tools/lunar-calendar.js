@@ -69,6 +69,8 @@ const _lcDict = {
   },
 };
 
+// Lunar dates, stem-branch names and solar terms are Chinese data in either interface language.
+const _lcZh = text => `<span lang="zh">${text}</span>`;
 const _LC_ANIMALS = { zh: '鼠牛虎兔龙蛇马羊猴鸡狗猪'.split(''), en: ['Rat','Ox','Tiger','Rabbit','Dragon','Snake','Horse','Goat','Monkey','Rooster','Dog','Pig'] };
 
 window.renderLunarCalendar = function(el) {
@@ -92,8 +94,8 @@ window.renderLunarCalendar = function(el) {
       <div class="panel-label">${T('reverse_title')}</div>
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
         <label style="font-size:12px;color:var(--text-muted)">${T('lunar_year')}<input class="tool-input" id="lcRevYear" type="number" min="1901" max="2099" value="${new Date().getFullYear()}" style="width:110px;margin-top:6px"></label>
-        <label style="font-size:12px;color:var(--text-muted)">${T('lunar_month')}<select class="tool-input" id="lcRevMonth" style="width:100px;margin-top:6px"></select></label>
-        <label style="font-size:12px;color:var(--text-muted)">${T('lunar_day')}<select class="tool-input" id="lcRevDay" style="width:100px;margin-top:6px"></select></label>
+        <label style="font-size:12px;color:var(--text-muted)">${T('lunar_month')}<select class="tool-input" id="lcRevMonth" lang="zh" style="width:100px;margin-top:6px"></select></label>
+        <label style="font-size:12px;color:var(--text-muted)">${T('lunar_day')}<select class="tool-input" id="lcRevDay" lang="zh" style="width:100px;margin-top:6px"></select></label>
         <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px;padding-bottom:10px"><input type="checkbox" id="lcRevLeap">${T('leap')}</label>
         <button class="btn btn-primary" onclick="doLunarReverse()">${T('convert')}</button>
       </div>
@@ -103,8 +105,9 @@ window.renderLunarCalendar = function(el) {
     <div class="tool-card-panel" style="font-size:12px;color:var(--text-muted);line-height:1.6">${T('note')}</div>`;
   ToolCompute.load('lunar').then(lunar => {
     const now = lunar.solarToLunar(new Date());
-    document.getElementById('lcRevMonth').innerHTML = lunar.monthNames.map((m, i) => `<option value="${i + 1}"${now?.month === i + 1 ? ' selected' : ''}>${m}月</option>`).join('');
-    document.getElementById('lcRevDay').innerHTML = Array.from({ length: 30 }, (_, i) => `<option value="${i + 1}"${now?.day === i + 1 ? ' selected' : ''}>${lunar.dayName(i + 1)}</option>`).join('');
+    const num = i => getCurrentLang() === 'en' ? `${i + 1} · ` : ''; // English readers get the month/day number too
+    document.getElementById('lcRevMonth').innerHTML = lunar.monthNames.map((m, i) => `<option value="${i + 1}"${now?.month === i + 1 ? ' selected' : ''}>${num(i)}${m}月</option>`).join('');
+    document.getElementById('lcRevDay').innerHTML = Array.from({ length: 30 }, (_, i) => `<option value="${i + 1}"${now?.day === i + 1 ? ' selected' : ''}>${num(i)}${lunar.dayName(i + 1)}</option>`).join('');
     if (now) { document.getElementById('lcRevYear').value = now.year; document.getElementById('lcRevLeap').checked = now.leap; }
   }).catch(() => {});
   doLunar();
@@ -125,12 +128,12 @@ async function doLunar() {
   const next = lunar.nextSolarTerm(d);
   const cards = [
     { label: T('solar'), val: lang === 'en' ? `${ToolCompute.localDate(d)} (${week})` : `${y}年${d.getMonth() + 1}月${d.getDate()}日 星期${week}` },
-    { label: T('lunar'), val: `${info.yearName}年 ${info.monthName}${info.dayName}` },
-    { label: T('ganzhi'), val: `${info.yearName} · ${(_LC_ANIMALS[lang] || _LC_ANIMALS.zh)[info.animalIndex]}` },
-    { label: T('day_gz'), val: lunar.dayCycle(d) + (lang === 'en' ? '' : '日') },
+    { label: T('lunar'), val: _lcZh(`${info.yearName}年 ${info.monthName}${info.dayName}`) },
+    { label: T('ganzhi'), val: `${_lcZh(info.yearName)} · ${(_LC_ANIMALS[lang] || _LC_ANIMALS.zh)[info.animalIndex]}` },
+    { label: T('day_gz'), val: _lcZh(lunar.dayCycle(d) + (lang === 'en' ? '' : '日')) },
     { label: T('month_len_label'), val: T('month_len', info.monthDays) },
-    { label: T('term'), val: lunar.solarTerm(d) || T('no_term') },
-    { label: T('next_term'), val: next ? T('next_term_val', next.name, ToolCompute.localDate(next.date), next.days) : '—' },
+    { label: T('term'), val: lunar.solarTerm(d) ? _lcZh(lunar.solarTerm(d)) : T('no_term') },
+    { label: T('next_term'), val: next ? T('next_term_val', _lcZh(next.name), ToolCompute.localDate(next.date), next.days) : '—' },
     { label: T('day_of_year'), val: T('day_of_year_val', ToolCompute.calendarDiff(new Date(y, 0, 1), d).totalDays + 1) },
     { label: T('to_new_year'), val: T('to_new_year_val', ToolCompute.calendarDiff(d, new Date(y + 1, 0, 1)).totalDays) },
   ];

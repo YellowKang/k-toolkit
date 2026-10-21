@@ -1,5 +1,5 @@
 // ── i18n: 中/英双语支持 ──
-// 仅覆盖 Dashboard 框架层文字；工具内部 UI 暂不多语言化
+// 这里是 Dashboard 框架层文字；各工具的界面文案用 makeToolI18n 维护自己的 { zh, en } 字典
 
 const LANG_ZH = {
   greet_late:    '夜深了',
@@ -28,6 +28,8 @@ const LANG_ZH = {
   toast_fav_add: '已收藏',
   toast_fav_remove:'已取消收藏',
   toast_cleared: '已清除',
+  toast_link_copied: '链接已复制 🔗',
+  toast_copy_failed: '复制失败',
   toast_online:  '网络已恢复',
   toast_offline: '已离线，本地工具仍可使用',
   toast_sw_update:'已更新，点击刷新',
@@ -108,6 +110,8 @@ const LANG_EN = {
   toast_fav_add: 'Added to favorites',
   toast_fav_remove:'Removed from favorites',
   toast_cleared: 'Cleared',
+  toast_link_copied: 'Link copied 🔗',
+  toast_copy_failed: 'Copy failed',
   toast_online:  'Back online',
   toast_offline: 'Offline — local tools still available',
   toast_sw_update:'Updated, click to refresh',

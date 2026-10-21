@@ -146,8 +146,8 @@ function _favGenAll() {
   codePanel.innerHTML = '<div class="panel-label">' + T('link_tag') + '</div>' +
     '<div class="result-box" style="position:relative"><pre style="margin:0;white-space:pre-wrap;font-size:12px;color:var(--text)">' +
     code.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>' +
-    '<button class="btn btn-secondary" style="position:absolute;top:8px;right:8px;font-size:11px;padding:2px 10px" onclick="copyText(\'' +
-    code.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\',this)">' + T('copy') + '</button></div>';
+    '<button class="btn btn-secondary" style="position:absolute;top:8px;right:8px;font-size:11px;padding:2px 10px" data-code="' + escHtml(code) +
+    '" onclick="copyText(this.dataset.code,this)">' + T('copy') + '</button></div>';
 }
 
 /* ── Download PNG / SVG ── */

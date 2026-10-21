@@ -34,6 +34,7 @@ var _colorI18nDict = {
     light:            '浅色',
     dark:             '深色',
     luminance:        '亮度',
+    luminance_note:   pct => `（亮度 ${pct}%）`,
     contrast_text:    '对比文字',
     sample_text:      '示例文字',
     wcag_title:       '色彩对比度检测 (WCAG)',
@@ -75,6 +76,7 @@ var _colorI18nDict = {
     light:            'Light',
     dark:             'Dark',
     luminance:        'Luminance',
+    luminance_note:   pct => ` (luminance ${pct}%)`,
     contrast_text:    'Contrast Text',
     sample_text:      'Sample text',
     wcag_title:       'Color Contrast Check (WCAG)',
@@ -420,7 +422,7 @@ function convertColor() {
 
   document.getElementById('cvPreview').style.background = `rgba(${r},${g},${b},${a})`;
   document.getElementById('cvLuminance').innerHTML =
-    `<span style="font-size:12px;padding:3px 10px;border-radius:20px;background:rgba(${r},${g},${b},0.2);color:${luminance>0.5?'var(--text)':'var(--neon)'}">${luminance>0.5 ? tl('light') : tl('dark')}（${tl('luminance')} ${(luminance*100).toFixed(1)}%）</span>`;
+    `<span style="font-size:12px;padding:3px 10px;border-radius:20px;background:rgba(${r},${g},${b},0.2);color:${luminance>0.5?'var(--text)':'var(--neon)'}">${luminance>0.5 ? tl('light') : tl('dark')}${tl('luminance_note', (luminance*100).toFixed(1))}</span>`;
 
   const rows = [
     {label:'HEX',    val: hex.toUpperCase()},

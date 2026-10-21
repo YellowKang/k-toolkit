@@ -920,7 +920,7 @@ function shareTool(id) {
   if (navigator.share) {
     navigator.share({ title: tool.name, text: tool.desc, url }).catch(() => {});
   } else {
-    navigator.clipboard.writeText(url).then(() => showToast('链接已复制 🔗')).catch(() => showToast('复制失败', 'error'));
+    navigator.clipboard.writeText(url).then(() => showToast(t('toast_link_copied'))).catch(() => showToast(t('toast_copy_failed'), 'error'));
   }
 }
 

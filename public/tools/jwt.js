@@ -36,6 +36,7 @@ function renderJWT(el) {
       gen_ok:         '生成成功',
       sign_fail:      '签名失败',
       na:             '无',
+      payload_json:   'Payload（JSON）',
     },
     en: {
       tab_decode:     'Decode',
@@ -69,6 +70,7 @@ function renderJWT(el) {
       gen_ok:         'Generated',
       sign_fail:      'Signing failed',
       na:             'N/A',
+      payload_json:   'Payload (JSON)',
     }
   };
   const tl = makeToolI18n(dict);
@@ -120,7 +122,7 @@ function renderJWT(el) {
           </div>
         </div>
         <div style="margin-top:16px">
-          <div class="panel-label" style="margin-bottom:8px">Payload（JSON）</div>
+          <div class="panel-label" style="margin-bottom:8px">${tl('payload_json')}</div>
           <textarea class="tool-textarea" id="jwtGenPayload" rows="6">{\n  "sub": "1234567890",\n  "name": "John Doe",\n  "role": "admin"\n}</textarea>
         </div>
         <div class="tool-actions">

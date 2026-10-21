@@ -4,8 +4,8 @@ const _UC_CATS = {
   length: { base: 'm', units: [
     ['m', 1, '米', 'Meter'], ['km', 1000, '千米', 'Kilometer'], ['cm', 0.01, '厘米', 'Centimeter'], ['mm', 0.001, '毫米', 'Millimeter'],
     ['um', 1e-6, '微米', 'Micrometer'], ['in', 0.0254, '英寸', 'Inch'], ['ft', 0.3048, '英尺', 'Foot'], ['yd', 0.9144, '码', 'Yard'],
-    ['mi', 1609.344, '英里', 'Mile'], ['nmi', 1852, '海里', 'Nautical mile'], ['li', 500, '里（市制）', 'Li (市里)'],
-    ['chi', 1 / 3, '尺（市制）', 'Chi (市尺)'], ['cun', 1 / 30, '寸（市制）', 'Cun (市寸)'] ] },
+    ['mi', 1609.344, '英里', 'Mile'], ['nmi', 1852, '海里', 'Nautical mile'], ['li', 500, '里（市制）', 'Li (Chinese mile)'],
+    ['chi', 1 / 3, '尺（市制）', 'Chi (Chinese foot)'], ['cun', 1 / 30, '寸（市制）', 'Cun (Chinese inch)'] ] },
   mass: { units: [
     ['kg', 1, '千克', 'Kilogram'], ['g', 0.001, '克', 'Gram'], ['mg', 1e-6, '毫克', 'Milligram'], ['t', 1000, '吨', 'Tonne'],
     ['lb', 0.45359237, '磅', 'Pound'], ['oz', 0.028349523125, '盎司', 'Ounce'], ['jin', 0.5, '斤', 'Jin (斤)'], ['liang', 0.05, '两', 'Liang (两)'] ] },

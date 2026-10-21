@@ -56,7 +56,7 @@ TEST_BROWSER=firefox TEST_BUILD=1 npm run test:browser
 npm run build
 ```
 
-`npm test` 检查 Agent 行为、工具目录、构建、CSS、缓存版本、第三方库摘要，以及财务大写、农历、Cron、CSV、单位换算等工具的计算结果。浏览器回归检查图片选择/处理/下载、分类、工作台、旧链接、收藏、脚本重复加载、SVG 预览隔离、Agent 工作流、版本更新，并对全部工具做 XSS 注入检查（用户输入、本地存储记录、DNS/IP 接口返回、Markdown 原始 HTML）。测试自动启动本地服务，生成测试图片，不连接模型服务。
+`npm test` 检查 Agent 行为、工具目录、构建、CSS、缓存版本、第三方库摘要，以及财务大写、农历、Cron、CSV、单位换算等工具的计算结果。浏览器回归检查图片选择/处理/下载、分类、工作台、旧链接、收藏、脚本重复加载、SVG 预览隔离、Agent 工作流、版本更新，并对全部工具做 XSS 注入检查（用户输入、本地存储记录、DNS/IP 接口返回、Markdown 原始 HTML），以及英文界面检查：切到 English 后逐个打开工具、点击按钮、切换下拉选项，界面文字、提示和弹窗中不能出现中文。测试自动启动本地服务，生成测试图片，不连接模型服务。
 
 可用 `TEST_BROWSER_CHANNEL=chrome` 使用已安装的 Chrome。375px / 768px 检查是桌面浏览器视口模拟，不代替手机真机测试。
 
@@ -100,7 +100,7 @@ tests/               单元测试与浏览器回归
 docs/                工具目录、架构与 AES 格式说明
 ```
 
-新增工具时，在 `public/tools/` 实现界面（文案用 `makeToolI18n` 提供中英文），在 `public/tool-catalog.js` 注册元数据，并在 `public/i18n.js` 添加英文标签。使用独立作用域隔离工具内部状态，提供页面离开时的清理逻辑。页面与 Agent 都要用的计算逻辑放进 `public/compute/`，通过 `ToolCompute.load()` 按需加载；第三方库放进 `public/vendor/` 并更新 `manifest.json` 摘要，不从 CDN 加载。用户输入、存储记录和网络返回一律经 `escHtml` 或 `textContent` 输出，不拼进内联事件。需要 Agent 调用时，在 `public/agent/` 注册相应能力和参数约束。
+新增工具时，在 `public/tools/` 实现界面（文案、示例、提示都用 `makeToolI18n` 提供中英文，农历、财务大写等中文数据放在 `lang="zh"` 元素里），在 `public/tool-catalog.js` 注册元数据，并在 `public/i18n.js` 添加英文标签。使用独立作用域隔离工具内部状态，提供页面离开时的清理逻辑。页面与 Agent 都要用的计算逻辑放进 `public/compute/`，通过 `ToolCompute.load()` 按需加载；第三方库放进 `public/vendor/` 并更新 `manifest.json` 摘要，不从 CDN 加载。用户输入、存储记录和网络返回一律经 `escHtml` 或 `textContent` 输出，不拼进内联事件。需要 Agent 调用时，在 `public/agent/` 注册相应能力和参数约束。
 
 修改目录后运行 `npm run docs:catalog`，提交生成的目录文档，并运行相关测试。修改分类或入口时保留现有工具 ID，避免破坏历史链接和收藏。
 
@@ -114,7 +114,7 @@ Local tools process inputs in the browser. Network tools contact external servic
 
 Use `/workflows` in the assistant for local templates that require no model or API key. Typed result references chain validated actions, stop on errors, and keep intermediate data in the browser. See [workflow usage and roadmap](docs/agent-workflows.md).
 
-Use Node.js 20.13+ and `npm ci`, then `npm run dev`. Run `npm test` for unit/build/catalog checks. Install Playwright browsers with `npx playwright install chromium firefox`, then run `TEST_BUILD=1 npm run test:browser`; set `TEST_BROWSER=firefox` for Firefox. The browser suite includes an XSS fuzz pass over every tool. `npm run build` writes the static site to `dist/`.
+Use Node.js 20.13+ and `npm ci`, then `npm run dev`. Run `npm test` for unit/build/catalog checks. Install Playwright browsers with `npx playwright install chromium firefox`, then run `TEST_BUILD=1 npm run test:browser`; set `TEST_BROWSER=firefox` for Firefox. The browser suite includes an XSS fuzz pass over every tool and an English-mode pass that opens every tool, clicks its buttons and cycles its selects, failing on any Chinese UI text, toast or dialog. Tool strings come from `makeToolI18n` dictionaries; Chinese data such as lunar dates is wrapped in `lang="zh"`. `npm run build` writes the static site to `dist/`.
 
 Pull requests run Chromium and Firefox checks. Successful pushes to `master` deploy through the official Pages artifact workflow. Set the repository’s Pages Source to **GitHub Actions**. The ↻ button checks for updates and refreshes only when requested; deployment/CDN propagation is not instantaneous. To host locally with Docker, run `docker compose up -d --build` and open port 8080.
 

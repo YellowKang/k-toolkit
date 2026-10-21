@@ -8,6 +8,7 @@ const _xmlDict = {
     error: '✗ XML 解析错误',
     at: (line, col) => line ? `第 ${line} 行${col ? `第 ${col} 列` : ''}：` : '',
     note: '压缩只移除标签间空白与注释，不改动文本和属性；转 JSON 时属性放在 "@"、文本放在 "#"，同名子元素合并为数组',
+    sample: `<?xml version="1.0" encoding="UTF-8"?><!-- 书店示例 --><bookstore><book id="1" category="fiction"><title lang="zh">JavaScript权威指南</title><author>David Flanagan</author><price currency="CNY">89.00</price></book><book id="2" category="tech"><title lang="en">Clean Code &amp; Craft</title><author>Robert Martin</author><price currency="USD">69.00</price><note><![CDATA[<b>二手</b> 九成新]]></note></book></bookstore>`,
   },
   en: {
     format: 'Format', minify: 'Minify', tojson: 'XML→JSON',
@@ -16,6 +17,7 @@ const _xmlDict = {
     error: '✗ XML parse error',
     at: (line, col) => line ? `Line ${line}${col ? `, column ${col}` : ''}: ` : '',
     note: 'Minify removes only whitespace between tags and comments; text and attributes are untouched. JSON puts attributes under "@", text under "#", repeated elements into arrays',
+    sample: `<?xml version="1.0" encoding="UTF-8"?><!-- Bookstore sample --><bookstore><book id="1" category="fiction"><title lang="en">JavaScript: The Definitive Guide</title><author>David Flanagan</author><price currency="CNY">89.00</price></book><book id="2" category="tech"><title lang="en">Clean Code &amp; Craft</title><author>Robert Martin</author><price currency="USD">69.00</price><note><![CDATA[<b>Used</b> like new]]></note></book></bookstore>`,
   },
 };
 
@@ -85,6 +87,6 @@ async function doXml() {
 }
 
 function xmlLoadDemo() {
-  document.getElementById('xmlInput').value = `<?xml version="1.0" encoding="UTF-8"?><!-- 书店示例 --><bookstore><book id="1" category="fiction"><title lang="zh">JavaScript权威指南</title><author>David Flanagan</author><price currency="CNY">89.00</price></book><book id="2" category="tech"><title lang="en">Clean Code &amp; Craft</title><author>Robert Martin</author><price currency="USD">69.00</price><note><![CDATA[<b>二手</b> 九成新]]></note></book></bookstore>`;
+  document.getElementById('xmlInput').value = makeToolI18n(_xmlDict)('sample');
   doXml();
 }

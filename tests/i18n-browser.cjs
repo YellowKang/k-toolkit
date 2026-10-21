@@ -8,11 +8,8 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const express = require('express');
 
-// Tools still waiting for their English UI; remove an id as soon as it is translated.
-const PENDING = [
-  'aes', 'color', 'favicon-gen', 'jwt', 'lunar-calendar', 'number-chinese', 'password-gen', 'typing-speed', 'unit-convert',
-  'xml-format',
-];
+// Tools still waiting for their English UI (none today); remove an id once it is translated.
+const PENDING = [];
 // Buttons that wipe samples or end a run go last, so every other button acts on the default data.
 const LAST = 'clear|reset|delete|remove|stop|清空|重置|删除|停止';
 // Han ideographs plus CJK and fullwidth punctuation; fullwidth Latin letters and digits (ASCII art) are not Chinese.
@@ -39,7 +36,12 @@ const CJK = '[\\u3000-\\u303f\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uff0
     page.setDefaultTimeout(8000);
     const errors = [], dialogs = [];
     let current = 'boot';
-    page.on('pageerror', error => { errors.push(`${current}: ${error.message}`); console.error(`Browser error in ${current}:`, error.stack); });
+    // Programming errors (a missing dictionary, a broken inline handler) fail the run; environment errors such as a
+    // headless browser refusing audio are only reported.
+    page.on('pageerror', error => {
+      console.error(`Browser error in ${current}:`, error.stack);
+      if (/^(Reference|Type|Syntax|Range)Error$/.test(error.name)) errors.push(`${current}: ${error.name}: ${error.message}`);
+    });
     page.on('dialog', dialog => { dialogs.push(dialog.message()); dialog.dismiss().catch(() => {}); });
     await page.route(/^https?:\/\/(?!127\.0\.0\.1)/, route => route.abort());
     await page.addInitScript(cjk => {
@@ -66,6 +68,7 @@ const CJK = '[\\u3000-\\u303f\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uff0
     await page.waitForFunction(() => typeof TOOLS !== 'undefined');
     await page.evaluate(() => {
       Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => {} } });
+      Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }); // share links via the clipboard toast
       window.open = () => null;
     });
     // Scripts load while the page is Chinese, so labels frozen at load time would surface after the switch.
@@ -112,6 +115,10 @@ const CJK = '[\\u3000-\\u303f\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uff0
       const leaks = { render, exercise: after.filter(text => !render.includes(text)), dialogs: dialogs.filter(text => new RegExp(CJK).test(text)) };
       if (Object.values(leaks).some(list => list.length)) findings[id] = Object.fromEntries(Object.entries(leaks).filter(([, list]) => list.length));
     }
+    // The tool page header outside #toolBody copies a share link with a toast.
+    await page.evaluate(() => { document.getElementById('toast-container')?.replaceChildren(); shareTool('uuid'); });
+    await page.waitForFunction(() => document.getElementById('toast-container')?.textContent.trim());
+    assert.doesNotMatch(await page.locator('#toast-container').textContent(), new RegExp(CJK), 'share toast');
     // Switching back must restore Chinese, proving tools read the language on every render.
     await page.evaluate(() => { setLang('zh'); navigateTo('uuid'); });
     await page.waitForFunction(() => currentPage === 'uuid' && /[\u4e00-\u9fff]/.test(document.querySelector('#toolBody')?.textContent || ''));

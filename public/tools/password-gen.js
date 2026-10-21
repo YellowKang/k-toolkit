@@ -166,8 +166,8 @@ function renderPasswordGen(el) {
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span style="color:var(--text-muted);font-size:13px">${T('language')}</span>
-            <button id="pwdDiceLangEN" class="btn btn-secondary pwd-lang-active" onclick="pwdDiceSetLang('en')" style="padding:4px 12px;font-size:12px">English</button>
-            <button id="pwdDiceLangCN" class="btn btn-secondary" onclick="pwdDiceSetLang('cn')" style="padding:4px 12px;font-size:12px">中文</button>
+            <button id="pwdDiceLangEN" class="btn btn-secondary pwd-lang-active" lang="en" onclick="pwdDiceSetLang('en')" style="padding:4px 12px;font-size:12px">English</button>
+            <button id="pwdDiceLangCN" class="btn btn-secondary" lang="zh" onclick="pwdDiceSetLang('cn')" style="padding:4px 12px;font-size:12px">中文</button>
           </div>
         </div>
         <button class="btn btn-primary" onclick="pwdDiceGenerate()" style="margin-bottom:16px">${T('gen_passphrase')}</button>
@@ -264,7 +264,7 @@ function pwdDiceGenerate() {
   const phrase = words.join(sep);
   const entropy = (count * Math.log2(list.length)).toFixed(1);
   document.getElementById('pwdDiceOutput').innerHTML = `
-    <div style="font-family:monospace;font-size:18px;color:var(--neon);word-break:break-all;margin-bottom:8px">${phrase}</div>
+    <div lang="${lang === 'cn' ? 'zh' : 'en'}" style="font-family:monospace;font-size:18px;color:var(--neon);word-break:break-all;margin-bottom:8px">${phrase}</div>
     <div style="font-size:12px;color:var(--text-muted)">${T('combo_entropy')}: ${entropy} bits &middot; ${list.length}^${count} ${T('possibilities')}</div>
     <button class="btn btn-secondary" onclick="copyText('${phrase.replace(/'/g, "\\'")}',this)" style="margin-top:8px">${T('copy')}</button>`;
 }

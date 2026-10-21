@@ -274,7 +274,7 @@ function tsReset() {
   const wpmEl = document.getElementById('tsWpm');
   const accEl = document.getElementById('tsAcc');
   const timeEl = document.getElementById('tsTime');
-  if (target) target.innerHTML = s.text.split('').map(c => `<span>${c}</span>`).join('');
+  if (target) { target.lang = s.mode === 'cn' ? 'zh' : 'en'; target.innerHTML = s.text.split('').map(c => `<span>${c}</span>`).join(''); }
   if (input) { input.value = ''; input.disabled = true; }
   if (startBtn) startBtn.textContent = tl('start');
   if (wpmEl) wpmEl.textContent = '0';
@@ -364,6 +364,7 @@ function tgRender() {
   const s = window._tg;
   const el = document.getElementById('tgWords');
   if (!el) return;
+  el.lang = s.mode === 'cn' ? 'zh' : 'en';
   el.innerHTML = s.words.map((w, i) => {
     let cls = '';
     if (i < s.curIdx) cls = 'color:#10b981';

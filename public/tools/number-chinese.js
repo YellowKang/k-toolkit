@@ -1,5 +1,7 @@
 /* ── 数字大写（财务）：按《支付结算办法》书写规则 ── */
 
+// Chinese terms quoted in the English UI are data, tagged so they keep Chinese typography.
+const _ncZh = text => `<span lang="zh">${text}</span>`;
 const _ncDict = {
   zh: {
     title: '数字大写转换（财务）',
@@ -19,13 +21,13 @@ const _ncDict = {
     input_ph: 'Amount, e.g. 12345.67 (commas or ¥ allowed)',
     convert: 'Convert',
     clear: 'Clear',
-    upper: 'Financial uppercase (大写)',
-    lower: 'Chinese lowercase (小写)',
+    upper: `Financial uppercase (${_ncZh('大写')})`,
+    lower: `Chinese lowercase (${_ncZh('小写')})`,
     copy_upper: 'Copy uppercase',
     rounded: v => `Rounded to cents: ${v}`,
     err_invalid: 'Enter a valid amount, e.g. 12345.67',
     err_large: 'Amount too large: at most 16 integer digits',
-    rules: 'Rules: write 零 for inner zeros, 零 after 元 when jiao is 0 but fen is not, and 整 when the amount ends at 元.',
+    rules: `Rules: write ${_ncZh('零')} for inner zeros, ${_ncZh('零')} after ${_ncZh('元')} when jiao is 0 but fen is not, and ${_ncZh('整')} when the amount ends at ${_ncZh('元')}.`,
   },
 };
 
@@ -110,11 +112,11 @@ function renderNumberChinese(el) {
     <div class="tool-card-panel" id="ncResult" style="display:none">
       <div style="margin-bottom:10px">
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${T('upper')}</div>
-        <div id="ncOutput" style="font-size:18px;font-weight:700;color:var(--neon);word-break:break-all"></div>
+        <div id="ncOutput" lang="zh" style="font-size:18px;font-weight:700;color:var(--neon);word-break:break-all"></div>
       </div>
       <div>
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${T('lower')}</div>
-        <div id="ncSmall" style="font-size:16px;color:var(--accent)"></div>
+        <div id="ncSmall" lang="zh" style="font-size:16px;color:var(--accent)"></div>
       </div>
       <div id="ncNote" style="font-size:12px;color:var(--text-muted);margin-top:10px"></div>
       <button class="btn btn-secondary" style="margin-top:12px" onclick="copyText(document.getElementById('ncOutput').textContent,this)">${T('copy_upper')}</button>
