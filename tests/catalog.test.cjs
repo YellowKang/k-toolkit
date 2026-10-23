@@ -11,14 +11,14 @@ function load() {
 }
 test('all stable capabilities exist, have unique IDs and valid category/file metadata', () => {
   const catalog = load();
-  assert.equal(catalog.tools.length, 91); assert.equal(new Set(catalog.tools.map(tool => tool.id)).size, 91);
+  assert.equal(catalog.tools.length, 92); assert.equal(new Set(catalog.tools.map(tool => tool.id)).size, 92);
   for (const tool of catalog.tools) {
     assert.ok(tool.id === 'ai-chat' || catalog.categories[tool.category], tool.id);
     assert.ok(fs.existsSync(path.join(root, 'public/tools', tool.file)), tool.file);
     assert.ok(['local', 'network', 'model', 'optional-network'].includes(tool.execution));
   }
   assert.equal(Object.keys(catalog.categories).length, 10);
-  assert.equal(catalog.entries.length, 85);
+  assert.equal(catalog.entries.length, 86);
 });
 test('workbenches have one primary entry and preserve every child capability', () => {
   const catalog = load(); const members = new Set();
@@ -37,6 +37,8 @@ test('representative classifications and processing labels match actual tool rol
   for (const id of ['json','yaml-json','toml-json','xml-format','json-csv']) assert.equal(tool(id).category, '数据格式');
   assert.equal(tool('timestamp').category, '时间效率');
   assert.equal(tool('hash').category, '编码加密');
+  assert.equal(tool('totp').category, '编码加密');
+  assert.equal(tool('totp').execution, 'local');
   assert.equal(tool('curl-gen').category, '网络工具');
   assert.equal(tool('http-tester').execution, 'network');
   assert.equal(tool('img-compress').requiresFile, true);

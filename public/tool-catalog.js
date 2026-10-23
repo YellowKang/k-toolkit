@@ -39,6 +39,7 @@
   { id: 'qrcode', render: 'renderQrCode',        icon: '📱', color: '#0f172a', name: '二维码生成',    desc: '文本/URL 转二维码，自定义颜色和尺寸', category: '图片工具', file: 'qrcode.js', tags: ['qr','qrcode','二维码','扫码','generate'] },
   { id: 'qrcode-decode', render: 'renderQRCodeDecode', icon: '🔭', color: '#1d4ed8', name: '二维码解析',    desc: '上传图片识别二维码内容，支持拖拽', category: '图片工具', file: 'qrcode-decode.js', tags: ['qr','qrcode','二维码','解析','识别','scan','decode'] },
   // 编码与加密
+  { id: 'totp', render: 'renderTotp',           icon: '🛡️', color: '#0ea5e9', name: '2FA 工具',       desc: '多账号 2FA 验证码看板（主密码加密保存），快速计算与生成密钥，支持 Google Authenticator 导入导出', category: '编码加密', file: 'totp.js', isNew: true, tags: ['2fa','otp','totp','hotp','mfa','authenticator','google authenticator','aegis','2fas','验证码','双因素','二次验证','动态口令','身份验证器'] },
   { id: 'aes', render: 'renderAES',            icon: '🔒', color: '#7c3aed', name: 'AES 加解密',     desc: 'AES-GCM/CBC/CTR 加解密，可与 OpenSSL / Java / Python 互通', category: '编码加密', file: 'aes.js', tags: ['aes','encrypt','decrypt','加密','解密','对称','crypto','gcm','cbc','ctr','openssl','pbkdf2'] },
   { id: 'morse', render: 'renderMorse',          icon: '📡', color: '#b45309', name: '摩斯电码',       desc: '文本与摩斯电码互转，支持播放音频', category: '编码加密', file: 'morse.js', tags: ['morse','摩斯','电码','编码','点划'] },
   { id: 'xml-format', render: 'renderXmlFormat',     icon: '📰', color: '#0369a1', name: 'XML 格式化',     desc: 'XML 美化/压缩/转 JSON，保留注释与 CDATA', category: '数据格式', file: 'xml-format.js', tags: ['xml','format','格式化','美化','markup'] },

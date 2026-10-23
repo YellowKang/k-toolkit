@@ -34,6 +34,7 @@ AES 加解密支持 GCM/CBC/CTR、PBKDF2 口令、OpenSSL `enc -pbkdf2` 格式�
 - 本地计算工具在浏览器执行；第三方库（二维码、YAML、TOML）以固定版本放在 `public/vendor/`，随站点校验和缓存，离线可用。
 - 网络工具向相应服务发送请求；AI 助手会把对话、页面上下文和工具结果发送到配置的模型接口。
 - 收藏、偏好和部分工具内容保存在浏览器。当前 API Key 配置使用浏览器存储，不应在共享设备上保存长期密钥，也不要把密钥写入仓库。
+- 2FA 工具的账号密钥用主密码加密（PBKDF2 60 万次 + AES-GCM）后保存在本机，主密码不保存、无法找回；闲置自动锁定，Agent 不读取该工具。支持 Google Authenticator 迁移二维码、otpauth 链接、Aegis / 2FAS 明文导出的导入，以及加密备份导出。重要账号仍建议使用手机或硬件验证器。
 - GitHub Pages 提供静态站点。需要隐藏服务端密钥或统一鉴权时，应单独配置后端代理。
 
 工具脚本按需加载，同一页面会话内只执行一次。Agent 对工具参数做校验，按顺序执行操作，支持任务取消、工具超时和迭代上限。取消会阻止后续步骤；已完成的页面操作不会被撤销，执行中的工具需要配合取消信号才能中止。
@@ -110,7 +111,7 @@ K Toolkit is a static developer toolbox with an AI assistant, bilingual UI, them
 
 Ten categories organize the tools. Five workbenches group image compression/conversion, hashes/HMAC, QR generation/decoding, time zones/world clocks and HTTP tools. Existing child URLs and favorites remain valid; compression, WebP and Base64 can explicitly reuse files staged in the current tab’s memory. See the generated [tool catalog](docs/tool-catalog.md) for the current inventory.
 
-Local tools process inputs in the browser. Network tools contact external services, and AI requests send conversation context and tool results to the configured model provider. Third-party libraries (QR, YAML, TOML) are pinned under `public/vendor/` and cached with the site, so they work offline. AES (GCM/CBC/CTR, PBKDF2, OpenSSL `enc -pbkdf2`, raw keys) interoperates with OpenSSL, Java and Python; see [the AES notes](docs/aes.md). API keys are currently stored in browser storage; a separate backend is needed to keep service credentials off the client.
+Local tools process inputs in the browser. Network tools contact external services, and AI requests send conversation context and tool results to the configured model provider. Third-party libraries (QR, YAML, TOML) are pinned under `public/vendor/` and cached with the site, so they work offline. AES (GCM/CBC/CTR, PBKDF2, OpenSSL `enc -pbkdf2`, raw keys) interoperates with OpenSSL, Java and Python; see [the AES notes](docs/aes.md). API keys are currently stored in browser storage; a separate backend is needed to keep service credentials off the client. The 2FA tool encrypts account secrets with a master password (PBKDF2 ×600,000 + AES-GCM) that is never stored, locks after inactivity, is invisible to the Agent, and imports Google Authenticator transfer QR codes, otpauth links and Aegis / 2FAS plain exports; keep important accounts on a phone or hardware authenticator.
 
 Use `/workflows` in the assistant for local templates that require no model or API key. Typed result references chain validated actions, stop on errors, and keep intermediate data in the browser. See [workflow usage and roadmap](docs/agent-workflows.md).
 
