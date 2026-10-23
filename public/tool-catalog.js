@@ -98,6 +98,7 @@
   { id: 'lunar-calendar',  render: 'renderLunarCalendar',  icon: '🌙', color: '#8b5cf6', name: '农历查询',         desc: '公历农历互转，含干支、生肖、节气与日干支',               category: '时间效率', file: 'lunar-calendar.js',  isNew: true, tags: ['lunar','农历','日历','干支','节气','calendar','阴历'] },
   // 效率工具 - 新增
   { id: 'todo',            render: 'renderTodo',           icon: '✅', color: '#10b981', name: 'Todo 清单',        desc: '本地存储 Todo 清单，支持完成/删除/清空已完成',             category: '时间效率', file: 'todo.js',            isNew: true, tags: ['todo','待办','任务','task','checklist','清单'] },
+  { id: 'data-backup',     render: 'renderDataBackup',     icon: '📦', color: '#14b8a6', name: '数据备份与迁移',   desc: '一键导出/导入收藏、设置、便签、待办、AI 对话等本机数据，支持合并与加密 API 密钥', category: '时间效率', file: 'data-backup.js',     isNew: true, tags: ['backup','restore','export','import','migrate','sync','备份','恢复','导出','导入','迁移','同步','数据'] },
   { id: 'note',            render: 'renderNote',           icon: '📝', color: '#f59e0b', name: '临时便签',         desc: '自动保存文本便签，关闭不丢失，字数统计',                    category: '时间效率', file: 'note.js',            isNew: true, tags: ['note','便签','笔记','memo','记事','notepad'] },
   { id: 'typing-speed',    render: 'renderTypingSpeed',    icon: '⌨️', color: '#3b82f6', name: '打字速度测试',     desc: '句子/单词双模式，WPM 实时计算，60秒计时挑战',              category: '时间效率', file: 'typing-speed.js',    isNew: true, tags: ['typing','打字','速度','wpm','keyboard','练习','game','游戏','单词','word'] },
   // 图片工具 - 新增

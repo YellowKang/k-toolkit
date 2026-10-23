@@ -19,13 +19,14 @@
     "test": "node --test tests/*.test.cjs && node scripts/catalog-docs.js --check",
     "test:images": "node tests/image-tools.cjs",
     "test:catalog": "node tests/catalog-browser.cjs",
-    "test:browser": "npm run test:images && npm run test:catalog && npm run test:workflows && npm run test:updates && npm run test:xss && npm run test:i18n && npm run test:totp",
+    "test:browser": "npm run test:images && npm run test:catalog && npm run test:workflows && npm run test:updates && npm run test:xss && npm run test:i18n && npm run test:totp && npm run test:backup",
     "docs:catalog": "node scripts/catalog-docs.js",
     "test:updates": "node tests/updates-browser.cjs",
     "test:workflows": "node tests/workflow-browser.cjs",
     "test:xss": "node tests/xss-browser.cjs",
     "test:i18n": "node tests/i18n-browser.cjs",
-    "test:totp": "node tests/totp-browser.cjs"
+    "test:totp": "node tests/totp-browser.cjs",
+    "test:backup": "node tests/backup-browser.cjs"
   },
   "dependencies": {
     "express": "^4.18.3"

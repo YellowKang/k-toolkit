@@ -25,6 +25,7 @@ const TOOL_CAPS = {
   'img-webp':     { autoRun: false, note: '需要选择本地图片文件' },
   // 含 2FA 密钥：不登记 runner，Agent 不读取输入/验证码，只能引导用户手动操作
   'totp':         { autoRun: false, note: '2FA 工具包含账号密钥，需用户手动在页面操作；Agent 不读取看板和验证码' },
+  'data-backup':  { autoRun: false, note: '数据备份涉及本机全部数据与 API 密钥，需用户手动导出/导入' },
   'color':        { autoRun: true,  inputs: ['text','fg','bg'], actions: ['convert','check'], desc: '颜色工具：拾色器（需手动）、格式转换（text 输入颜色值）、对比度检查（fg/bg 为 HEX）' },
   // 以下工具有 TOOL_RUNNERS 或 SPECIAL_RUNNERS 配置，autoRun:true
   'gradient':     { autoRun: true,  inputs: ['colors','positions','angle','type'], actions: ['generate'], desc: '生成 CSS 渐变，colors 为颜色数组如["#00c6ff","#0072ff"]，angle 为角度，type 为 linear/radial' },

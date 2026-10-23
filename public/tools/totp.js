@@ -200,7 +200,7 @@ function _tfInjectStyles() {
     .tf-msg.err{color:#ef4444}.tf-msg.ok{color:#10b981}
     .tf-panel{margin-top:12px;padding-top:12px;border-top:1px solid var(--glass-border)}
     .tf-preview{max-height:280px;overflow:auto;margin:10px 0}
-    .tf-preview label{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--glass-border);font-size:13px;color:var(--text)}
+    .tf-preview label{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--glass-border);font-size:13px;color:var(--text);text-transform:none;letter-spacing:normal;font-weight:400;margin:0}
     .tf-preview .tf-st{margin-left:auto;font-size:11px;color:var(--text-muted)}
     .tf-qr{background:#fff;padding:10px;border-radius:10px;display:inline-block;line-height:0}
     .tf-empty{text-align:center;padding:28px 12px;color:var(--text-muted);font-size:13px}
@@ -755,8 +755,8 @@ function _tfPanelExport(panel) {
     <div style="font-weight:600;font-size:13px;margin-top:6px">${T('export_backup')}</div>
     <p style="font-size:12px;color:var(--text-muted);margin:6px 0">${T('export_backup_desc')}</p>
     <div class="tf-row" style="font-size:13px;color:var(--text)">
-      <label><input type="radio" name="tfBackupPw" value="master" checked onchange="_tfBackupMode()"> ${T('use_master')}</label>
-      <label><input type="radio" name="tfBackupPw" value="other" onchange="_tfBackupMode()"> ${T('use_other')}</label>
+      <label class="opt-label"><input type="radio" name="tfBackupPw" value="master" checked onchange="_tfBackupMode()"> ${T('use_master')}</label>
+      <label class="opt-label"><input type="radio" name="tfBackupPw" value="other" onchange="_tfBackupMode()"> ${T('use_other')}</label>
     </div>
     <div class="tf-row" id="tfBackupOther" style="display:none;margin-top:8px">
       <label class="tf-field">${T('backup_pw1')}<input class="tool-input" type="password" id="tfBackupPw1" autocomplete="new-password"></label>
@@ -853,7 +853,7 @@ function _tfPanelSettings(panel) {
     <div class="panel-label">${T('settings_title')}</div>
     <div class="tf-row">
       <label class="tf-field">${T('auto_lock')}<select class="tool-input" id="tfAutoLock" onchange="_tfSaveSettings({autoLock:+this.value})">${_TF_LOCK_CHOICES.map(m => `<option value="${m}"${m === s.autoLock ? ' selected' : ''}>${T('minutes', m)}</option>`).join('')}</select></label>
-      <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text);flex:2;min-width:220px"><input type="checkbox" id="tfHideCodes"${s.hideCodes ? ' checked' : ''} onchange="_tfSaveSettings({hideCodes:this.checked});_tfRenderCards()"> ${T('hide_codes')}</label>
+      <label class="opt-label" style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--text);flex:2;min-width:220px"><input type="checkbox" id="tfHideCodes"${s.hideCodes ? ' checked' : ''} onchange="_tfSaveSettings({hideCodes:this.checked});_tfRenderCards()"> ${T('hide_codes')}</label>
     </div>
     <div style="font-weight:600;font-size:13px;margin-top:14px">${T('change_pw')}</div>
     <div class="tf-row" style="margin-top:8px">

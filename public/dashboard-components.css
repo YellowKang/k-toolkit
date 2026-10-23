@@ -212,6 +212,8 @@ select.tool-input { cursor: pointer; }
   .copy-inline:hover { color: var(--text); }
 }
 .copy-inline.active { color: var(--text); border-color: var(--accent); }
+/* Checkbox/radio option text reads as a sentence, unlike the uppercase field captions. */
+label.opt-label { text-transform: none; letter-spacing: normal; font-weight: 400; margin-bottom: 0; }
 
 /* ── 加载状态 ── */
 

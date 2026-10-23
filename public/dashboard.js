@@ -328,6 +328,7 @@ function init() {
   bindKeyboard();
   initScrollTop();
   initTopbarClock();
+  initBackupShortcut();
   // 给侧边栏 nav-item 设置 tooltip（折叠态悬停显示）
   document.querySelectorAll('.nav-item[data-page]').forEach(a => {
     const label = a.querySelector('.nav-label');
@@ -339,6 +340,16 @@ function init() {
     const h = location.hash.replace('#', '') || 'home';
     navigateTo(h, false);
   });
+}
+
+// ── 顶部“数据备份”快捷入口 ──
+function initBackupShortcut() {
+  const button = document.getElementById('dataBackupButton');
+  if (!button) return;
+  const label = () => { button.title = t('data_backup'); button.setAttribute('aria-label', t('data_backup')); };
+  label();
+  button.addEventListener('click', () => navigateTo('data-backup'));
+  window.addEventListener('toolkit-language-change', label);
 }
 
 // ── 顶部时钟 ──

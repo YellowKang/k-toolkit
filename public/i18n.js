@@ -15,6 +15,7 @@ const LANG_ZH = {
   stat_favs:     '收藏',
   stat_recent:   '最近',
   stat_ai_chat:  'AI 对话',
+  data_backup:   '数据备份与迁移',
   hero_hot:      '热门：',
   cat_all:       '全部',
   fav_title:     '我的收藏',
@@ -97,6 +98,7 @@ const LANG_EN = {
   stat_favs:     'Favorites',
   stat_recent:   'Recent',
   stat_ai_chat:  'AI Chat',
+  data_backup:   'Back up & restore data',
   hero_hot:      'Popular:',
   cat_all:       'All',
   fav_title:     'My Favorites',
@@ -235,6 +237,7 @@ const TOOLS_EN = {
   'img-webp':         { name:'Image to WebP',      desc:'Batch convert images to WebP with quality control',                          category:'Image' },
   'img-exif':         { name:'EXIF Viewer',        desc:'Read image EXIF data: camera model, ISO, exposure time and more',            category:'Image' },
   // Crypto (编码加密)
+  'data-backup':      { name:'Backup & Restore',   desc:'Export and import favorites, settings, notes, to-dos, AI chats and more, with merging and encrypted API keys', category:'Productivity' },
   'totp':             { name:'2FA Authenticator',  desc:'Encrypted multi-account 2FA codes, quick TOTP/HOTP checks and secret generation with Google Authenticator import/export', category:'Crypto' },
   'aes':              { name:'AES Encrypt',        desc:'AES-GCM/CBC/CTR encryption that interoperates with OpenSSL, Java and Python', category:'Crypto' },
   'morse':            { name:'Morse Code',         desc:'Convert text to Morse code and decode back',                                 category:'Crypto' },
