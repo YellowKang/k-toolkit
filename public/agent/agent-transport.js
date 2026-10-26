@@ -70,6 +70,12 @@ window.AgentTransport = (() => {
   function modelsEndpoint(adapter, baseUrl) {
     return endpoint(adapter, baseUrl).replace(/\/(?:chat\/completions|messages|responses)$/, '/models');
   }
+  function localNetworkHint(config) {
+    if (window.location?.protocol !== 'https:' || !config?.baseUrl) return '';
+    try { if (!['localhost', '127.0.0.1', '[::1]'].includes(new URL(config.baseUrl).hostname)) return ''; }
+    catch { return ''; }
+    return say('线上网页连接本地接口时，请在浏览器的站点权限中允许“本地网络访问”，然后重试。', 'To connect this hosted page to a local API, allow Local network access in the browser site permissions, then retry.');
+  }
   async function listModels(config) {
     const url = modelsEndpoint(config.adapter, config.baseUrl);
     const headers = config.adapter === 'claude'
@@ -83,7 +89,7 @@ window.AgentTransport = (() => {
     if (!models.length) throw issue('models', 'Empty model list');
     return models;
   }
-  function message(error) {
+  function message(error, config) {
     if (error?.code === 'config' || error?.code === 'context_budget') return error.message;
     if (error?.code === 'model_unavailable') return say('所选模型没有可用通道或当前账号无权使用。请切换模型，或检查网关的模型路由配置。', 'This model has no available route or access. Choose another model or check the gateway model routing.');
     if (error?.code === 'models') return say('接口未返回有效的模型列表，请手动填写模型名称。', 'The API returned no valid model list. Enter a model name manually.');
@@ -95,7 +101,7 @@ window.AgentTransport = (() => {
     if ([400, 404, 422].includes(error?.status)) return say('接口或模型参数不匹配，请检查协议、地址、模型名和输出上限。', 'Check the API protocol, URL, model name and output limit.');
     if (error?.status >= 500) return say('服务暂时不可用，请稍后重试。', 'The service is temporarily unavailable. Retry later.');
     if (error?.name === 'AbortError') return say('已停止。', 'Stopped.');
-    return say('连接失败，请检查网络、接口地址及服务端跨域配置（CORS）。', 'Connection failed. Check your network, API URL and server CORS settings.');
+    return [say('连接失败，请检查网络、接口地址及服务端跨域配置（CORS）。', 'Connection failed. Check your network, API URL and server CORS settings.'), localNetworkHint(config)].filter(Boolean).join(' ');
   }
   async function wait(operation, signal) {
     let cancel;
@@ -109,5 +115,5 @@ window.AgentTransport = (() => {
   function timeout(controller, ms) {
     return setTimeout(() => controller.abort(Object.assign(new Error('Request timed out'), { name: 'TimeoutError' })), ms);
   }
-  return { endpoint, modelsEndpoint, httpError, apiError, responseError, readJSON, listModels, message, wait, timeout };
+  return { endpoint, modelsEndpoint, localNetworkHint, httpError, apiError, responseError, readJSON, listModels, message, wait, timeout };
 })();

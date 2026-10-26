@@ -22,7 +22,7 @@ function openConfig({ modelsOnly = false } = {}) {
       <details id="cfgConnection" class="ag-config-connection" ${modelsOnly ? '' : 'open'}><summary><span>${t('models_connection')}</span><span id="cfgConnectionSummary"></span></summary>
       <div class="ag-config-row"><div class="ag-config-label">${t('models_protocol')}</div><div class="ag-adapter-btns" id="cfgAdapterBtns"></div><p class="ag-hint">${t('models_protocol_hint')}</p></div>
       <div class="ag-config-row"><label class="ag-config-label" for="cfgApiKey">API Key</label><div class="ag-key-wrap"><input type="password" id="cfgApiKey" autocomplete="off" spellcheck="false"><button class="ag-eye-btn" id="cfgEye" aria-label="${say('显示密钥', 'Show API key')}" aria-pressed="false">◉</button></div><div class="ag-hint">${say('保存在当前浏览器。自定义的无认证本地服务可留空。', 'Saved in this browser. Optional for a custom local server without authentication.')}</div></div>
-      <div class="ag-config-row"><label class="ag-config-label" for="cfgBaseUrl">Base URL</label><input type="url" id="cfgBaseUrl" placeholder="${say('留空使用官方地址', 'Leave blank for the official endpoint')}" spellcheck="false"><div class="ag-hint">${say('支持域名、/v1 或完整接口路径', 'Accepts an origin, /v1 or a full endpoint')}</div><code id="cfgEndpoint" class="ag-endpoint"></code></div>
+      <div class="ag-config-row"><label class="ag-config-label" for="cfgBaseUrl">Base URL</label><input type="url" id="cfgBaseUrl" placeholder="${say('留空使用官方地址', 'Leave blank for the official endpoint')}" spellcheck="false"><div class="ag-hint">${say('支持域名、/v1 或完整接口路径', 'Accepts an origin, /v1 or a full endpoint')}</div><code id="cfgEndpoint" class="ag-endpoint"></code><p id="cfgLocalNetworkHint" class="ag-hint"></p></div>
       </details>
       <div class="ag-config-row ag-model-section">
         <div class="ag-model-heading"><h4>${t('models_title')}</h4><button class="ag-btn" id="cfgFetchModels">${t('models_fetch')}</button></div>
@@ -71,6 +71,8 @@ function openConfig({ modelsOnly = false } = {}) {
       field('cfgModelsEndpoint').textContent = 'GET ' + window.AgentTransport.modelsEndpoint(selected, field('cfgBaseUrl').value);
     } catch (e) { field('cfgEndpoint').textContent = e.message; field('cfgModelsEndpoint').textContent = e.message; }
     field('cfgConnectionSummary').textContent = adapters.find(a => a.id === selected).name + (host ? ' · ' + host : '');
+    field('cfgLocalNetworkHint').textContent = window.AgentTransport.localNetworkHint(read());
+    field('cfgLocalNetworkHint').hidden = !field('cfgLocalNetworkHint').textContent;
   }
   function populate() {
     const draft = drafts.get(selected), p = draft?.config || AG.profile(selected);
@@ -109,7 +111,7 @@ function openConfig({ modelsOnly = false } = {}) {
       if (discovering !== run) return;
       catalog = { ...catalog, endpoint: window.AgentTransport.modelsEndpoint(config.adapter, config.baseUrl), models, fetchedAt: Date.now() }; picker.setCatalog(catalog);
       modelStatus(say('已获取 ', 'Fetched ') + models.length + say(' 个模型，选择后可测试连接。', ' models. Select one and test the connection.'));
-    } catch (error) { if (discovering === run) modelStatus(([404, 405].includes(error.status) ? t('models_route_error') : window.AgentTransport.message(error)) + ' ' + t('models_failed_hint'), true); }
+    } catch (error) { if (discovering === run) modelStatus(([404, 405].includes(error.status) ? t('models_route_error') : window.AgentTransport.message(error, config)) + ' ' + t('models_failed_hint'), true); }
     finally { clearTimeout(run.timer); if (discovering === run) stopDiscovery(false); }
   };
   field('cfgEye').onclick = () => { const show = field('cfgApiKey').type === 'password'; field('cfgApiKey').type = show ? 'text' : 'password'; field('cfgEye').setAttribute('aria-pressed', String(show)); field('cfgEye').setAttribute('aria-label', show ? say('隐藏密钥', 'Hide API key') : say('显示密钥', 'Show API key')); };
@@ -139,7 +141,7 @@ function openConfig({ modelsOnly = false } = {}) {
       if (testing !== run) return;
       if (!result?.message || typeof result.message.content !== 'string' || !result.message.content.trim()) throw new Error('Invalid response');
       status(say('连接成功', 'Connected') + ' · ' + ((performance.now() - started) / 1000).toFixed(1) + ' s · ' + say('已验证基础对话', 'Basic chat verified'));
-    } catch (e) { if (testing === run) status(window.AgentTransport.message(e), true); }
+    } catch (e) { if (testing === run) status(window.AgentTransport.message(e, config), true); }
     finally { clearTimeout(run.timer); if (testing === run) stopTest(); }
   };
   field('cfgSaveBtn').onclick = () => {

@@ -309,7 +309,7 @@ function _chatFinishRun(run, status, error) {
   }
   _chatRun = null; _chatBusy = false;
   _chatUpdateButtons(); _chatRefreshRetry();
-  if (error) _chatShowError(window.AgentTransport.message(error), true);
+  if (error) _chatShowError(window.AgentTransport.message(error, run.connection), true);
   _chatScrollBottom();
 }
 async function _chatDoSend(text, images, replace = null) {
@@ -318,7 +318,7 @@ async function _chatDoSend(text, images, replace = null) {
   if (!cfg.apiKey && cfg.adapter !== 'custom') { _chatShowNoKey(); return; }
   const adapter = window.AgentAdapters.getAdapter(cfg.adapter);
   const container = _chatGetMsgContainer(); if (!container) return;
-  const run = { controller: new AbortController(), container, text: '', replace, stream: null, renderTimer: null, finished: false };
+  const run = { controller: new AbortController(), container, text: '', replace, stream: null, renderTimer: null, finished: false, connection: { baseUrl: cfg.baseUrl } };
   _chatUndo = null; document.getElementById('_chatUndoBar')?.remove();
   _chatRun = run; _chatBusy = true; _chatUpdateButtons(); _chatRefreshRetry();
   container.querySelectorAll('._chat-msg-error, ._chat-welcome').forEach(el => el.remove());

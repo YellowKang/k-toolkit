@@ -95,6 +95,20 @@ test('mixed content is reported instead of silently rewriting user URL', () => {
   assert.equal(transport.endpoint('custom', 'http://localhost:8000/v1'), 'http://localhost:8000/v1/chat/completions');
 });
 
+test('hosted loopback connections explain browser network permission without exposing secrets', () => {
+  const { context, transport } = setup(); context.window.location.protocol = 'https:';
+  for (const baseUrl of ['http://localhost:8080', 'http://127.0.0.1:8080/v1', 'http://[::1]:8080']) {
+    const config = { baseUrl, apiKey: 'private-key' };
+    assert.match(transport.localNetworkHint(config), /Local network access/);
+    const text = transport.message(new TypeError('private-key'), config);
+    assert.match(text, /site permissions/); assert.doesNotMatch(text, /private-key/);
+  }
+  assert.equal(transport.localNetworkHint({ baseUrl: 'https://gateway.example' }), '');
+  assert.equal(transport.localNetworkHint({ baseUrl: 'invalid' }), '');
+  context.window.location.protocol = 'http:';
+  assert.equal(transport.localNetworkHint({ baseUrl: 'http://localhost:8080' }), '');
+});
+
 test('public errors are actionable and never echo upstream payloads', () => {
   const { transport } = setup();
   assert.match(transport.message(transport.httpError(401)), /Authentication/);

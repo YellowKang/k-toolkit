@@ -265,7 +265,7 @@ class AgentSession {
       if (e.name === 'AbortError' || this._run !== run) return;
       if (e.name === 'TimeoutError') run.controller.abort();
       this._retryState = { toolCalls: run.toolCalls, iterations: Math.max(0, this.iterations - 1) };
-      this.emit('error', { reason: 'network', message: window.AgentTransport?.message(e) || e.message });
+      this.emit('error', { reason: 'network', message: window.AgentTransport?.message(e, this.config) || e.message });
       return;
     }
 
