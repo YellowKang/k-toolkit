@@ -33,6 +33,20 @@ const AG = {
       size: AG.get('size', 'normal'), show_cards: AG.get('show_cards', true),
     };
   },
+  modelIds(values, limit = 500) {
+    if (!Array.isArray(values)) return [];
+    return [...new Set(values.slice(0, 500).filter(id => typeof id === 'string' && id.trim() && id.length <= 256 && !/[\x00-\x1f\x7f]/.test(id)).map(id => id.trim()))].slice(0, limit);
+  },
+  modelCatalog(cfg) {
+    const empty = { models: [], recent: [], fetchedAt: 0 };
+    try {
+      const endpoint = window.AgentTransport.modelsEndpoint(cfg.adapter, cfg.baseUrl);
+      const saved = AG.profile(cfg.adapter), catalogs = AG.get('model_catalogs', {});
+      const catalog = catalogs && Object.hasOwn(catalogs, cfg.adapter) ? catalogs[cfg.adapter] : null;
+      if (cfg.apiKey !== saved.apiKey || endpoint !== window.AgentTransport.modelsEndpoint(saved.adapter, saved.baseUrl) || catalog?.endpoint !== endpoint) return { ...empty, endpoint };
+      return { endpoint, models: AG.modelIds(catalog.models), recent: AG.modelIds(catalog.recent, 12), fetchedAt: Number(catalog.fetchedAt) || 0 };
+    } catch { return empty; }
+  },
   validate(cfg) {
     if (!window.AgentAdapters.listAdapters().some(a => a.id === cfg.adapter)) throw new Error('Unknown adapter');
     window.AgentTransport.endpoint(cfg.adapter, cfg.baseUrl);
@@ -40,8 +54,12 @@ const AG = {
     if (!Number.isFinite(cfg.temperature) || cfg.temperature < 0 || cfg.temperature > 1) throw new Error('Temperature: 0–1');
     if (!Number.isInteger(cfg.max_tokens) || cfg.max_tokens < 1 || cfg.max_tokens > 128000) throw new Error('Max tokens: 1–128000');
   },
-  save(cfg) {
+  save(cfg, catalog) {
     AG.validate(cfg);
+    const endpoint = window.AgentTransport.modelsEndpoint(cfg.adapter, cfg.baseUrl);
+    const current = catalog?.endpoint === endpoint ? catalog : AG.modelCatalog(cfg);
+    const catalogs = { ...AG.get('model_catalogs', {}) };
+    catalogs[cfg.adapter] = { endpoint, models: AG.modelIds(current.models), recent: AG.modelIds([cfg.model, ...AG.modelIds(current.recent, 12)], 12), fetchedAt: Number(current.fetchedAt) || 0 };
     const profiles = { ...AG.get('profiles', {}) };
     // Preserve the previous legacy profile before switching providers.
     const previous = AG.load().adapter;
@@ -49,7 +67,7 @@ const AG = {
       const profile = id === cfg.adapter ? cfg : AG.profile(id);
       profiles[id] = { baseUrl: profile.baseUrl, model: profile.model, temperature: profile.temperature, max_tokens: profile.max_tokens };
     }
-    const values = { profiles, adapter: cfg.adapter, ['key_' + cfg.adapter]: cfg.apiKey,
+    const values = { profiles, model_catalogs: catalogs, adapter: cfg.adapter, ['key_' + cfg.adapter]: cfg.apiKey,
       base_url: cfg.baseUrl, model: cfg.model, temperature: cfg.temperature, max_tokens: cfg.max_tokens,
       skin: cfg.skin, position: cfg.position, size: cfg.size, show_cards: cfg.show_cards };
     const before = new Map(Object.keys(values).map(key => [key, localStorage.getItem('ag_' + key)]));

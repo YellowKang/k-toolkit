@@ -67,16 +67,19 @@ window.AgentTransport = (() => {
     catch (error) { if (error.name === 'AbortError' || error.name === 'TimeoutError') throw error; }
     return apiError(response.status, payload);
   }
+  function modelsEndpoint(adapter, baseUrl) {
+    return endpoint(adapter, baseUrl).replace(/\/(?:chat\/completions|messages|responses)$/, '/models');
+  }
   async function listModels(config) {
-    const url = endpoint(config.adapter, config.baseUrl).replace(/\/(?:chat\/completions|messages|responses)$/, '/models');
+    const url = modelsEndpoint(config.adapter, config.baseUrl);
     const headers = config.adapter === 'claude'
       ? { 'x-api-key': config.apiKey || '', 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }
-      : { Authorization: 'Bearer ' + (config.apiKey || '') };
+      : config.apiKey ? { Authorization: 'Bearer ' + config.apiKey } : {};
     const response = await fetch(url, { headers, signal: config.signal });
     if (!response.ok) throw await responseError(response);
     const raw = await readJSON(response);
     if (!Array.isArray(raw?.data) || raw.data.length > 500) throw issue('models', 'Invalid model list');
-    const models = [...new Set(raw.data.map(item => item?.id).filter(id => typeof id === 'string' && id.trim() && id.length <= 256 && !/[\x00-\x1f\x7f]/.test(id)))];
+    const models = [...new Set(raw.data.map(item => item?.id).filter(id => typeof id === 'string' && id.trim() && id.length <= 256 && !/[\x00-\x1f\x7f]/.test(id)).map(id => id.trim()))];
     if (!models.length) throw issue('models', 'Empty model list');
     return models;
   }
@@ -106,5 +109,5 @@ window.AgentTransport = (() => {
   function timeout(controller, ms) {
     return setTimeout(() => controller.abort(Object.assign(new Error('Request timed out'), { name: 'TimeoutError' })), ms);
   }
-  return { endpoint, httpError, apiError, responseError, readJSON, listModels, message, wait, timeout };
+  return { endpoint, modelsEndpoint, httpError, apiError, responseError, readJSON, listModels, message, wait, timeout };
 })();

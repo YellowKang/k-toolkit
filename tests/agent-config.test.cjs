@@ -35,6 +35,49 @@ test('failed storage save rolls back settings without announcing a change', () =
   assert.deepEqual([...values], before); assert.equal(events, 0);
 });
 
+test('fetched and manual models persist together without credentials in the catalog', () => {
+  const { AG, values } = setup();
+  const cfg = { ...AG.load(), adapter: 'openai-chat', apiKey: 'private-fixture-key', baseUrl: 'https://gateway.example/v1/', model: 'gateway/fast' };
+  const catalog = { endpoint: 'https://gateway.example/v1/models', models: ['gateway/fast', 'gateway/reasoning'], fetchedAt: 123 };
+  AG.save(cfg, catalog);
+  AG.save({ ...AG.load(), model: 'my-private-deployment' });
+  const saved = AG.modelCatalog(AG.load());
+  assert.deepEqual([...saved.models], catalog.models);
+  assert.deepEqual([...saved.recent], ['my-private-deployment', 'gateway/fast']);
+  assert.equal(saved.fetchedAt, 123);
+  assert.doesNotMatch(values.get('ag_model_catalogs'), /private-fixture-key|apiKey/);
+});
+
+test('model catalogs are isolated by protocol, normalized endpoint and credential changes', () => {
+  const { AG } = setup();
+  const cfg = { ...AG.load(), adapter: 'openai-chat', apiKey: 'first-key', baseUrl: 'https://gateway.example', model: 'first-model' };
+  AG.save(cfg, { endpoint: 'https://gateway.example/v1/models', models: ['first-model'], fetchedAt: 1 });
+  assert.equal(AG.modelCatalog({ ...cfg, baseUrl: 'https://gateway.example/v1/chat/completions' }).models.length, 1);
+  for (const changed of [{ apiKey: 'second-key' }, { baseUrl: 'https://other.example' }, { adapter: 'openai-response' }]) {
+    assert.equal(AG.modelCatalog({ ...cfg, ...changed }).models.length, 0);
+  }
+  AG.save({ ...AG.load(), apiKey: 'second-key', model: 'second-model' });
+  assert.equal(AG.modelCatalog(AG.load()).models.length, 0);
+  assert.deepEqual([...AG.modelCatalog(AG.load()).recent], ['second-model']);
+  AG.save({ ...AG.load(), apiKey: 'first-key' });
+  assert.equal(AG.modelCatalog(AG.load()).models.length, 0, 'rotating back must not resurrect an obsolete directory');
+});
+
+test('model catalog rollback, bounds and untrusted stored data do not break configuration', () => {
+  const { AG, context, values } = setup();
+  const cfg = { ...AG.load(), adapter: 'custom', baseUrl: 'http://localhost:8080', model: 'local-model' };
+  AG.save(cfg, { endpoint: 'http://localhost:8080/v1/models', models: [' local-model ', 'local-model', '', null, 'bad\u0000model', 'x'.repeat(257)], fetchedAt: 1 });
+  assert.deepEqual([...AG.modelCatalog(AG.load()).models], ['local-model']);
+  for (let i = 0; i < 15; i++) AG.save({ ...AG.load(), model: 'local-' + i });
+  assert.equal(AG.modelCatalog(AG.load()).recent.length, 12);
+  const before = [...values]; const write = context.localStorage.setItem; let failed = false;
+  context.localStorage.setItem = (key, value) => { if (key === 'ag_model_catalogs' && !failed) { failed = true; throw new Error('quota'); } write(key, value); };
+  assert.throws(() => AG.save({ ...AG.load(), model: 'unsaved' }), /Could not save/);
+  assert.deepEqual([...values], before);
+  values.set('ag_model_catalogs', JSON.stringify({ custom: { endpoint: 'http://localhost:8080/v1/models', models: {}, recent: 'bad' } }));
+  assert.equal(AG.modelCatalog(AG.load()).models.length, 0);
+});
+
 test('endpoint normalization accepts origins, API prefixes and full paths without duplicate versions', () => {
   const { transport: { endpoint } } = setup();
   for (const base of ['https://api.example', 'https://api.example/v1/', 'https://api.example/v1/chat/completions']) assert.equal(endpoint('openai-chat', base), 'https://api.example/v1/chat/completions');

@@ -50,6 +50,7 @@ const AG_SCRIPT_GROUPS = [
     'agent/agent-ui.js',
     'agent/agent-ui-part2.js',
     'agent/agent-ui-part3.js',
+    'agent/agent-model-picker.js',
     'agent/agent-results.js',
   ],
 ];

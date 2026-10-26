@@ -554,6 +554,10 @@ async function _chatOpenSettings() {
   try { if (!window.AgentConfig && !await window._agEnsureLoaded()) return; window._agOpenConfig(); }
   catch { _chatShowError(_chatTl('no_adapter')); }
 }
+async function _chatOpenModels() {
+  try { if (!window.AgentConfig && !await window._agEnsureLoaded()) return; window._agOpenModelPicker(); }
+  catch { _chatShowError(_chatTl('no_adapter')); }
+}
 function _chatSyncConfig() {
   const cfg = window.AgentConfig?.AG.load(); if (!cfg) return;
   _chatAdapterId = cfg.adapter; _chatModel = cfg.model; _chatTemp = cfg.temperature;
@@ -751,7 +755,6 @@ function renderAiChat(container) {
     { id: 'custom', name: 'Custom' },
   ];
   const currentAdapter = window.AgentAdapters?.getAdapter?.(_chatAdapterId);
-  const models = currentAdapter?.models || [];
 
   // Styles
   const style = document.createElement('style');
@@ -1035,7 +1038,7 @@ function renderAiChat(container) {
 
   const modelBadge = document.createElement('button');
   modelBadge.className = '_chat-model-badge'; modelBadge.id = '_chatModelBadge';
-  modelBadge.textContent = _chatModel || currentAdapter?.defaultModel || '—'; modelBadge.title = _chatTl('model'); modelBadge.onclick = _chatOpenSettings;
+  modelBadge.textContent = _chatModel || currentAdapter?.defaultModel || '—'; modelBadge.title = _chatSay('切换模型', 'Switch model'); modelBadge.onclick = _chatOpenModels;
   toolbar.appendChild(modelBadge);
 
   // Separator

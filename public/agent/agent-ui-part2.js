@@ -245,7 +245,8 @@ function _handleMetaCmd(cmd, args) {
       appendBubble('assistant', window.CmdParser.getHelpText());
       break;
     case 'model':
-      if (args[0] && _session) {
+      if (!args[0]) window._agOpenModelPicker();
+      else if (_session) {
         try {
           const AG = window.AgentConfig.AG; AG.save({ ...AG.load(), model: args[0] });
           appendBubble('assistant', _agT('model_switched') + args[0]);
