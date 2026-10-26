@@ -1,0 +1,187 @@
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
+const express = require('express');
+const { chromium, firefox } = require('playwright');
+
+(async () => {
+  let browser, server, temp;
+  try {
+    const root = path.join(__dirname, '..');
+    let source = path.join(root, 'public');
+    if (process.env.TEST_BUILD === '1') {
+      temp = fs.mkdtempSync(path.join(os.tmpdir(), 'k-toolkit-ux-test-'));
+      for (const dir of ['public','scripts']) fs.cpSync(path.join(root, dir), path.join(temp, dir), { recursive: true });
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' });
+      source = path.join(temp, 'dist');
+    }
+    const app = express(); app.use('/k-toolkit', express.static(source));
+    server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    const options = { headless: true };
+    if (process.env.TEST_BROWSER_CHANNEL) options.channel = process.env.TEST_BROWSER_CHANNEL;
+    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch(options);
+    const page = await browser.newPage({ serviceWorkers: 'block', viewport: { width: 1440, height: 900 } });
+    page.setDefaultTimeout(8000);
+    const errors = [], requests = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.route(/^https:\/\//, route => {
+      if (route.request().url().startsWith('https://ux.invalid/')) {
+        requests.push({ method: route.request().method(), body: route.request().postData() });
+        return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+      }
+      return route.abort();
+    });
+    const go = async (id, selector) => {
+      await page.evaluate(id => navigateTo(id), id);
+      await page.waitForFunction(id => currentPage === id && (id === 'home' || document.querySelector('#toolBody')?.dataset.tool === id), id);
+      await page.locator(selector).waitFor({ state: 'attached' });
+    };
+    await page.goto(`http://127.0.0.1:${server.address().port}/k-toolkit/dashboard.html#http-tester`);
+    await page.locator('#htMethod').selectOption('POST');
+    assert.equal(await page.locator('#htCancelBtn').isVisible(), false, 'idle requests have no cancel action');
+    // A paste event fires before the browser inserts the clipboard text.
+    await page.locator('#htUrl').evaluate(el => {
+      el.dispatchEvent(new Event('paste', { bubbles: true }));
+      el.value = 'https://ux.invalid/orders';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await page.waitForTimeout(300);
+    assert.equal(requests.length, 0, 'pasting must not send a request');
+    const payload = '  {"message":"O\'Reilly  test","line":"a\\nb"}\n';
+    await page.locator('#htHeaders').fill('content-type: application/json\nX-Label: two  spaces');
+    await page.locator('#htBody').fill(payload);
+    await go('curl-gen', '#cgUrl');
+    assert.equal(await page.locator('#cgBody').inputValue(), payload);
+    await page.getByRole('button', { name: '生成代码', exact: true }).click();
+    const curl = await page.locator('#cgOutput').textContent();
+    assert.equal(await page.evaluate(code => parseCurlCommand(code).body, curl), payload);
+    assert.equal((curl.match(/content-type:/gi) || []).length, 1, 'header names are case insensitive');
+    await go('http-tester', '#htUrl');
+    assert.equal(await page.locator('#htBody').inputValue(), payload);
+    await page.locator('#htSendBtn').click();
+    await page.waitForFunction(() => document.querySelector('#htResBody').textContent.includes('"ok"'));
+    assert.deepEqual(requests, [{ method:'POST', body:payload }]);
+    await page.locator('details summary').click();
+    await page.locator('#htCurlInput').fill("curl 'https://ux.invalid/imported' --data-raw '  exact body  '");
+    await page.locator('#htCurlInput').press('Control+Enter');
+    await page.waitForFunction(() => document.querySelector('#htUrl').value.endsWith('/imported'));
+    assert.equal(await page.locator('#htBody').inputValue(), '  exact body  ');
+    assert.equal(requests.length, 1, 'import shortcut only parses; it must not send');
+    // A pending fetch observes AbortSignal on explicit cancel and on page departure.
+    await page.evaluate(() => {
+      const original = window.fetch; window.__aborts = 0;
+      window.fetch = (url, options) => String(url).endsWith('/slow') ? new Promise((resolve, reject) => {
+        options.signal.addEventListener('abort', () => { window.__aborts++; reject(new DOMException('Aborted','AbortError')); });
+      }) : original(url, options);
+    });
+    await page.locator('#htUrl').fill('https://ux.invalid/slow');
+    await page.locator('#htSendBtn').click(); await page.locator('#htCancelBtn').click();
+    await page.waitForFunction(() => window.__aborts === 1 && !document.querySelector('#htSendBtn').disabled);
+    assert.equal(await page.locator('#htResBody').textContent(), '请求已取消');
+    await page.locator('#htSendBtn').click();
+    await go('json', '#jsonInput');
+    assert.equal(await page.evaluate(() => window.__aborts), 2);
+    await page.locator('#jsonInput').fill('{"task":"keep this draft"}');
+    await page.getByRole('button', { name: '格式化', exact: true }).click();
+    const output = await page.locator('#jsonOutput').textContent();
+    await go('yaml-json', '#yjInput'); await go('json', '#jsonInput');
+    assert.equal(await page.locator('#jsonInput').inputValue(), '{"task":"keep this draft"}');
+    assert.equal(await page.locator('#jsonOutput').textContent(), output);
+    await page.locator('.tool-breadcrumb').click();
+    await page.locator('.home-hero').waitFor(); await go('json', '#jsonInput');
+    assert.equal(await page.locator('#jsonInput').inputValue(), '{"task":"keep this draft"}');
+    await page.evaluate(() => renderSearchResults('uuid'));
+    await page.locator('.search-results-header').waitFor(); await go('json', '#jsonInput');
+    assert.equal(await page.locator('#jsonOutput').textContent(), output);
+    await page.evaluate(() => setLang('en'));
+    await page.getByRole('button', { name: 'Format', exact: true }).waitFor();
+    assert.equal(await page.locator('#jsonInput').inputValue(), '{"task":"keep this draft"}');
+    await page.evaluate(() => setLang('zh'));
+    await page.getByRole('button', { name:'格式化', exact:true }).waitFor();
+    await page.evaluate(() => { const original = window.formatJSON; window.__formats = 0; window.formatJSON = () => { window.__formats++; original(); }; });
+    await page.locator('#jsonInput').press('Control+Enter');
+    assert.equal(await page.evaluate(() => window.__formats), 1, 'local and global shortcuts must not submit twice');
+    await page.locator('#jsonInput').evaluate(el => el.dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', ctrlKey:true, isComposing:true, bubbles:true })));
+    assert.equal(await page.evaluate(() => window.__formats), 1, 'IME composition must not submit');
+    await page.locator('#jsonInput').focus();
+    await page.evaluate(() => openCmdPalette());
+    await page.locator('#cmdInput').fill('b64');
+    assert.match(await page.locator('#cmdResults').textContent(), /Base64/);
+    await page.locator('#cmdInput').press('Escape');
+    assert.equal(await page.locator('#cmdPalette').count(), 0);
+    assert.equal(await page.evaluate(() => currentPage), 'json');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'jsonInput');
+    await page.locator('.workspace-actions select').last().selectOption('base64');
+    await page.locator('.workspace-actions button').click();
+    await page.locator('#b64Input').waitFor();
+    assert.equal(await page.locator('#b64Input').inputValue(), output);
+    await page.locator('#b64Input').fill('preserve target'); await go('json', '#jsonInput');
+    page.once('dialog', dialog => dialog.dismiss());
+    await page.locator('.workspace-actions button').click();
+    assert.equal(await page.evaluate(() => currentPage), 'json', 'declining replacement keeps both drafts');
+    await go('base64', '#b64Input');
+    assert.equal(await page.locator('#b64Input').inputValue(), 'preserve target');
+    await go('wordcount', '#wcInput'); await page.locator('#wcInput').fill('three simple words');
+    await page.evaluate(() => setLang('en'));
+    await page.waitForFunction(() => document.querySelector('#wcStats')?.style.display === '' && document.querySelector('#wcGrid')?.textContent.includes('Words'));
+    assert.equal(await page.locator('#wcInput').inputValue(), 'three simple words');
+    await page.evaluate(() => setLang('zh'));
+    await go('unit-convert', '#ucCats'); await page.locator('[data-cat="storage"]').click();
+    await page.locator('#bcVal').fill('2');
+    const bytes = await page.locator('#bcMain').textContent();
+    await go('byte-convert', '#bcVal');
+    assert.equal(await page.locator('#bcVal').inputValue(), '2');
+    assert.equal(await page.locator('#bcMain').textContent(), bytes);
+    await go('pomodoro', '#pomStartBtn'); await page.locator('#pomStartBtn').click();
+    await go('json', '#jsonInput'); await page.waitForTimeout(1100);
+    await go('pomodoro', '#pomStartBtn');
+    assert.equal(await page.locator('#pomStartBtn').textContent(), '暂停');
+    assert.notEqual(await page.locator('#pomTime').textContent(), '25:00');
+    await page.evaluate(() => pomReset());
+    await go('stopwatch', '#swBtnStart'); await page.locator('#swBtnStart').click();
+    await page.waitForTimeout(80); await page.locator('#swBtnLap').click();
+    await go('json', '#jsonInput');
+    await page.waitForFunction(() => !document.querySelector('#toolActivity [data-tool="stopwatch"]').textContent.endsWith('00:00'));
+    await go('stopwatch', '#swBtnStart');
+    assert.equal(await page.locator('#swBtnStart').textContent(), '暂停');
+    assert.equal(await page.locator('#swLapList > div').count(), 1);
+    await page.locator('#swBtnStart').click();
+    const stopped = await page.locator('#swDisplay').textContent();
+    await go('json', '#jsonInput'); await go('stopwatch', '#swBtnStart');
+    assert.equal(await page.locator('#swDisplay').textContent(), stopped);
+    await go('todo', '#todoInput'); await page.locator('#todoInput').fill('Undo me'); await page.locator('#todoInput').press('Enter');
+    await page.locator('#todoList button').click();
+    await page.getByRole('button', { name:'撤销', exact:true }).click();
+    assert.match(await page.locator('#todoList').textContent(), /Undo me/);
+    await go('home', '.home-hero');
+    await page.setViewportSize({ width: 375, height: 812 });
+    const geometry = await page.locator('#searchInput').evaluate(el => {
+      const s = getComputedStyle(el);
+      return el.getBoundingClientRect().width - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight) - parseFloat(s.borderLeftWidth) - parseFloat(s.borderRightWidth);
+    });
+    assert.ok(geometry >= 120, `search has only ${geometry}px for text`);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.locator('#topbarMore').click();
+    await page.locator('#langBtn').waitFor({ state:'visible' });
+    await page.locator('#themeBtn').click();
+    await page.locator('#themePicker').waitFor({ state:'visible' });
+    await page.locator('#themePicker').getByRole('button', { name:'纯白色', exact:true }).click();
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
+    await page.locator('#topbarMore').click();
+    await page.locator('#topbarMore').press('Escape');
+    assert.equal(await page.locator('#topbarMore').getAttribute('aria-expanded'), 'false');
+    const card = page.locator('.tool-card').first();
+    await card.locator('.fav-btn').evaluate(el => Promise.allSettled(el.getAnimations().map(animation => animation.finished)));
+    assert.equal(await card.locator('.fav-btn').evaluate(el => getComputedStyle(el).opacity), '1');
+    await card.focus(); await card.press('Enter');
+    await page.locator('#toolBody').waitFor();
+    assert.deepEqual(errors, []);
+    console.log('UX: PASS explicit requests, shared cURL, cancellation, drafts, result handoff, units, language, IME, search, Escape, timers, undo, mobile');
+  } finally {
+    if (browser) await browser.close();
+    if (server) await new Promise(resolve => server.close(resolve));
+    if (temp) fs.rmSync(temp, { recursive:true, force:true });
+  }
+})().catch(error => { console.error(error); process.exitCode = 1; });

@@ -38,6 +38,9 @@ const express = require('express');
       localStorage.setItem('dtb_usage', JSON.stringify({ hash: 4 }));
       localStorage.setItem('ag_key_openai', JSON.stringify('sk-test-secret-123'));
       localStorage.setItem('ag_model', JSON.stringify('gpt-test'));
+      localStorage.setItem('dtb_chat_history', JSON.stringify([{role:'user',content:'saved question'},{role:'assistant',content:'saved reply'}]));
+      localStorage.setItem('dtb_chat_history_meta', JSON.stringify({omitted:12}));
+      localStorage.setItem('dtb_context_preferences', JSON.stringify({budget:16000,note:'Keep ID 00123'}));
     });
     const base = `http://127.0.0.1:${server.address().port}/k-toolkit/dashboard.html`;
     await page.goto(base);
@@ -70,18 +73,35 @@ const express = require('express');
     await page.getByRole('button', { name: /解密|Decrypt/ }).click();
     await page.locator('#dbPreview input[data-import-group="apikeys"]').waitFor();
     await page.locator('#dbImportGo').click();
-    await page.getByRole('button', { name: /立即刷新|Reload now/ }).click();
-    await page.waitForLoadState('domcontentloaded');
-    const restored = await page.evaluate(() => Object.fromEntries(['dtb_favorites', 'dtb_todo', 'dtb_note', 'dtb_usage', 'ag_key_openai', 'ag_model'].map(k => [k, localStorage.getItem(k)])));
+    await Promise.all([page.waitForEvent('domcontentloaded'), page.getByRole('button', { name: /立即刷新|Reload now/ }).click()]);
+    await page.waitForFunction(() => window.currentPage === 'data-backup' && document.querySelector('#dbImportText'));
+    const restored = await page.evaluate(() => Object.fromEntries(['dtb_favorites', 'dtb_todo', 'dtb_note', 'dtb_usage', 'ag_key_openai', 'ag_model', 'dtb_chat_history', 'dtb_chat_history_meta', 'dtb_context_preferences'].map(k => [k, localStorage.getItem(k)])));
     assert.deepEqual(JSON.parse(restored.dtb_favorites), ['hash', 'uuid']);
     assert.equal(JSON.parse(restored.dtb_todo)[0].text, 'ship <b>backup</b>');
     assert.equal(restored.dtb_note, 'remember the milk');
     assert.equal(JSON.parse(restored.ag_key_openai), 'sk-test-secret-123');
+    assert.deepEqual(JSON.parse(restored.dtb_chat_history), [{role:'user',content:'saved question'},{role:'assistant',content:'saved reply'}]);
+    assert.deepEqual(JSON.parse(restored.dtb_chat_history_meta), {omitted:12});
+    assert.deepEqual(JSON.parse(restored.dtb_context_preferences), {budget:16000,note:'Keep ID 00123'});
 
-    // A second merge import is idempotent; foreign files are rejected with a message.
+    // Lists deduplicate, while usage counters add as documented. Visiting the backup page changes those counters.
     await page.evaluate(() => navigateTo('data-backup'));
     await page.locator('#dbImportText').fill(text);
     await page.getByRole('button', { name: /^(解析|Parse)$/ }).click();
+    const usageBefore = await page.evaluate(() => JSON.parse(localStorage.getItem('dtb_usage')));
+    await page.locator('#dbImportGo').click();
+    await page.waitForFunction(() => /已写入|Wrote|无需写入|nothing to write/.test(document.getElementById('dbPreview').textContent));
+    const expectedUsage = { ...usageBefore };
+    if (JSON.stringify(usageBefore) !== file.data.dtb_usage) {
+      for (const [key, count] of Object.entries(JSON.parse(file.data.dtb_usage))) expectedUsage[key] = (expectedUsage[key] || 0) + count;
+    }
+    assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('dtb_usage'))), expectedUsage);
+    assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('dtb_favorites'))), ['hash','uuid']);
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('dtb_todo')).length), 1);
+    // Importing unchanged tool data/settings alone has nothing to write.
+    await page.locator('#dbImportText').fill(text);
+    await page.getByRole('button', { name: /^(解析|Parse)$/ }).click();
+    await page.locator('#dbPreview input[data-import-group="history"]').uncheck();
     await page.locator('#dbImportGo').click();
     await page.waitForFunction(() => /无需写入|nothing to write/.test(document.getElementById('dbPreview').textContent));
     await page.locator('#dbImportText').fill('{"hello":1}');
@@ -90,7 +110,7 @@ const express = require('express');
     await page.evaluate(() => navigateTo('favorites'));
     await page.waitForFunction(() => document.querySelectorAll('.tool-card').length >= 2);
     assert.deepEqual(errors, []);
-    console.log('PASS: backup export with encrypted API keys, wipe, import with wrong/right password, reload restores data, idempotent merge, foreign file rejected');
+    console.log('PASS: backup export with encrypted API keys, wipe, import with wrong/right password, reload restores data, additive usage merge, deduplicated lists, unchanged tool data, foreign file rejected');
   } finally {
     if (browser) await browser.close();
     if (server) await new Promise(resolve => server.close(resolve));

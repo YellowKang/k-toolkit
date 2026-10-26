@@ -41,6 +41,13 @@ const PAYLOAD = `x"'><img src=x data-xss onerror="window.__xss=(window.__xss||[]
     await page.goto(`http://127.0.0.1:${server.address().port}/k-toolkit/dashboard.html`);
     await page.waitForFunction(() => typeof TOOLS !== 'undefined');
     await page.evaluate(() => { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => {} } }); window.open = () => null; });
+    // Parse/transport errors can include untrusted input; global feedback is plain text.
+    const toast = await page.evaluate(payload => {
+      const element = showToast(payload, 'error', 0);
+      const result = { text: element.lastElementChild.textContent, injected: element.querySelectorAll('[data-xss]').length };
+      element.remove(); return result;
+    }, PAYLOAD);
+    assert.deepEqual(toast, { text: PAYLOAD, injected: 0 });
     const ids = await page.evaluate(() => TOOLS.map(tool => tool.id).filter(id => !['ai-chat', 'svg-preview'].includes(id)));
     const findings = {};
     for (const id of ids) {
@@ -71,7 +78,7 @@ const PAYLOAD = `x"'><img src=x data-xss onerror="window.__xss=(window.__xss||[]
     }
     // Markdown keeps safe raw HTML but strips active content.
     await page.evaluate(() => navigateTo('markdown'));
-    await page.locator('#mdInput').waitFor();
+    await page.locator('#mdInput').waitFor({state:'attached'});
     await page.evaluate(payload => {
       const input = document.getElementById('mdInput');
       input.value = `# Title\n\n<details><summary>More</summary><kbd>Ctrl</kbd></details>\n\n${payload}\n\n[x](javascript:alert(1)) <a href="java&#9;script:alert(1)">t</a> <iframe src="https://example.com"></iframe>`;

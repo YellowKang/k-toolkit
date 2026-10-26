@@ -1,10 +1,15 @@
 // Full capability list: preserve stable IDs for search, favorites and Agent calls.
 const TOOLS = window.ToolCatalog.tools;
 const CATALOG_ENTRIES = window.ToolCatalog.entries;
+const TOOL_BY_ID = new Map(TOOLS.map(tool => [tool.id, tool]));
+const ENTRIES_BY_CATEGORY = Object.groupBy ? Object.groupBy(CATALOG_ENTRIES, tool => tool.category) : CATALOG_ENTRIES.reduce((groups, tool) => {
+  (groups[tool.category] ||= []).push(tool);
+  return groups;
+}, {});
 
 // ── 分类 & 计数（顶层常量，避免重复遍历）──
 const CATEGORIES = Object.keys(window.ToolCatalog.categories);
-const CAT_COUNTS = Object.fromEntries(CATEGORIES.map(category => [category, CATALOG_ENTRIES.filter(tool => tool.category === category).length]));
+const CAT_COUNTS = Object.fromEntries(CATEGORIES.map(category => [category, (ENTRIES_BY_CATEGORY[category] || []).length]));
 const CAT_ICONS = Object.fromEntries(Object.entries(window.ToolCatalog.categories).map(([name, value]) => [name, value.icon]));
 
 // ── 持久化 ──
@@ -92,8 +97,6 @@ async function renderHomePage(mode) {
     } else {
       html = `<div class="home-section"><div class="section-title">${t('fav_title')} <span class="section-count">${favTools.length}</span></div><div class="tools-grid">${favTools.map(renderToolCard).join('')}</div></div>`;
     }
-    const aiTool = getLocalizedTools(TOOLS).find(t => t.id === 'ai-chat');
-    if (aiTool) html += `<div class="home-section"><div class="section-title">🤖 ${t('stat_ai_chat')}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
     content.innerHTML = html;
     return;
   }
@@ -105,8 +108,6 @@ async function renderHomePage(mode) {
     } else {
       html = `<div class="home-section"><div class="section-title">${t('recent_title')} <span class="section-count">${recentTools.length}</span></div><div class="tools-grid">${recentTools.map(renderToolCard).join('')}</div></div>`;
     }
-    const aiTool = getLocalizedTools(TOOLS).find(t => t.id === 'ai-chat');
-    if (aiTool) html += `<div class="home-section"><div class="section-title">🤖 ${t('stat_ai_chat')}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
     content.innerHTML = html;
     return;
   }
@@ -115,9 +116,10 @@ async function renderHomePage(mode) {
   const hour = new Date().getHours();
   const greeting = hour < 6 ? t('greet_late') : hour < 12 ? t('greet_morning') : hour < 18 ? t('greet_afternoon') : t('greet_evening');
   // 热门工具 top5（使用次数）
-  const topTools = Object.entries(usageCounts)
+  let topTools = Object.entries(usageCounts)
     .sort((a,b) => b[1]-a[1]).slice(0,5)
     .map(([id]) => tools.find(t => t.id===id)).filter(Boolean);
+  if (!topTools.length) topTools = ['json','timestamp','base64','http-tester','img-compress'].map(id => tools.find(tool => tool.id === id));
   const topHtml = topTools.length ? `
     <div class="home-hero-quick">
       <span style="font-size:11px;color:var(--text-muted)">${t('hero_hot')}</span>
@@ -125,16 +127,11 @@ async function renderHomePage(mode) {
     </div>` : '';
   html += `<div class="home-hero">
     <div class="home-hero-top">
-      <div class="home-hero-title">🔧 K Toolkit <span style="font-size:12px;opacity:0.6;font-weight:400;margin-left:6px">Agentic</span></div>
+      <div class="home-hero-title">K Toolkit</div>
       <div class="home-hero-sub">${greeting}，${t('hero_sub', CATALOG_ENTRIES.filter(tool => tool.id !== 'ai-chat').length)}</div>
     </div>
-    <div class="home-hero-stats">
-      <div class="home-hero-stat"><strong>${tools.length}</strong>${t('stat_tools')}</div>
-      <div class="home-hero-stat" onclick="navigateTo('favorites')" style="cursor:pointer"><strong>${favorites.length || 0}</strong>${t('stat_favs')}</div>
-      <div class="home-hero-stat" onclick="navigateTo('recent')" style="cursor:pointer"><strong>${recent.length || 0}</strong>${t('stat_recent')}</div>
-      <div class="home-hero-stat home-hero-stat-ai" onclick="navigateTo('ai-chat')" style="cursor:pointer;border-color:var(--accent)">🤖 ${t('stat_ai_chat')}</div>
-    </div>
     ${topHtml}
+    ${window.ToolWorkspace?.last() ? `<div class="home-resume"><button class="btn btn-secondary" onclick="navigateTo('${ToolWorkspace.last()}')">↩ ${ToolWorkspace.T('resume')} · ${tools.find(tool => tool.id === ToolWorkspace.last())?.name || ''}</button></div>` : ''}
   </div>`;
 
   // 分类 tab
@@ -142,10 +139,7 @@ async function renderHomePage(mode) {
   const localCatIcons = getLocalizedCatIcons(CAT_ICONS);
   html += `<div class="cat-tabs-wrap"><div class="cat-tabs"><button class="cat-tab ${currentCatFilter === 'all' ? 'active' : ''}" onclick="setCatFilter('all')">${t('cat_all')} <span class="cat-tab-count">${CATALOG_ENTRIES.filter(tool => tool.id !== 'ai-chat').length}</span></button>`;
   CATEGORIES.forEach(cat => {
-    const localCat = getLocalizedTools(TOOLS).find(tool => {
-      const orig = TOOLS.find(x => x.id === tool.id);
-      return orig && orig.category === cat;
-    });
+    const localCat = localizedTools.find(tool => TOOL_BY_ID.get(tool.id)?.category === cat);
     const localCatName = localCat ? localCat.category : cat;
     const n = CAT_COUNTS[cat];
     html += `<button class="cat-tab ${currentCatFilter === cat ? 'active' : ''}" onclick="setCatFilter('${cat}')">${localCatIcons[cat] || CAT_ICONS[cat] || ''} ${localCatName} <span class="cat-tab-count">${n}</span></button>`;
@@ -164,20 +158,12 @@ async function renderHomePage(mode) {
     html += `<div class="home-section"><div class="section-title">🕐 ${t('recent_title')} <span class="section-count">${recent.length}</span></div><div class="tools-grid">${recentTools.map(renderToolCard).join('')}</div></div>`;
   }
 
-  // AI 对话固定入口
-  if (currentCatFilter === 'all') {
-    const aiTool = localizedTools.find(t => t.id === 'ai-chat');
-    if (aiTool) {
-      html += `<div class="home-section"><div class="section-title">🤖 ${t('stat_ai_chat')}</div><div class="tools-grid">${renderToolCard(aiTool)}</div></div>`;
-    }
-  }
-
   // 分类工具区（IntersectionObserver 懒加载）
   const filteredCats = currentCatFilter === 'all' ? CATEGORIES : [currentCatFilter];
   filteredCats.forEach(cat => {
-    const sampleTool = localizedTools.find(tool => TOOLS.find(x => x.id === tool.id && x.category === cat));
+    const sampleTool = localizedTools.find(tool => TOOL_BY_ID.get(tool.id)?.category === cat);
     const localCatName = sampleTool ? sampleTool.category : cat;
-    const catTools = CATALOG_ENTRIES.filter(tool => tool.category === cat);
+    const catTools = ENTRIES_BY_CATEGORY[cat] || [];
     const icon = localCatIcons[cat] || CAT_ICONS[cat] || '';
     html += `<div class="home-section" data-lazy-cat="${cat}"><div class="section-title">${icon} ${localCatName} <span class="section-count">${catTools.length}</span></div><div class="tools-grid"></div></div>`;
   });
@@ -198,16 +184,17 @@ function _initLazyCats() {
       const cat = entry.target.dataset.lazyCat;
       const grid = entry.target.querySelector('.tools-grid');
       if (!grid || grid.children.length) return;
-      grid.innerHTML = getLocalizedTools(CATALOG_ENTRIES).filter(tool => TOOLS.find(original => original.id === tool.id)?.category === cat).map(renderToolCard).join('');
+      grid.innerHTML = getLocalizedTools(ENTRIES_BY_CATEGORY[cat] || []).map(renderToolCard).join('');
       _lazyCatObserver.unobserve(entry.target);
     });
-  }, { rootMargin: '200px' });
+  }, { root: document.getElementById('content'), rootMargin: '200px' });
   sections.forEach(s => _lazyCatObserver.observe(s));
 }
 
 function setCatFilter(cat) {
   currentCatFilter = cat;
-  renderHomePage('home');
+  if (currentPage === 'home') renderHomePage('home');
+  else navigateTo('home');
 }
 
 function renderToolCard(tool) {
@@ -215,7 +202,7 @@ function renderToolCard(tool) {
   const useCount = usageCounts[tool.id] || 0;
   const badge = useCount >= 3 ? `<span class="tool-card-badge">${useCount >= 99 ? '99+' : useCount}</span>` : '';
   const newBadge = tool.isNew ? `<span class="tool-card-new">NEW</span>` : '';
-  return `<div class="tool-card" onclick="navigateTo('${tool.id}')" onmouseenter="prefetchTool('${tool.id}')" style="--card-color:${tool.color}">
+  return `<div class="tool-card" role="link" tabindex="0" onkeydown="if(event.target===this && (event.key==='Enter'||event.key===' ')){event.preventDefault();navigateTo('${tool.id}')}" onclick="navigateTo('${tool.id}')" onmouseenter="prefetchTool('${tool.id}')" style="--card-color:${tool.color}">
     <button class="fav-btn ${isFav ? 'active' : ''}" data-id="${tool.id}" onclick="toggleFavorite('${tool.id}',event)" title="${isFav ? t('fav_remove') : t('fav_add')}">★</button>
     ${badge}${newBadge}
     <div class="tool-card-icon">${tool.icon}</div>
@@ -358,20 +345,29 @@ function initTopbarClock() {
   if (!el) return;
   const DAYS_ZH = ['日','一','二','三','四','五','六'];
   const DAYS_EN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const smallScreen = matchMedia('(max-width: 768px)');
+  let timer;
+  el.innerHTML = '<span class="topbar-clock-time"></span><span class="topbar-clock-date"></span>';
+  const timeEl = el.firstElementChild, dateEl = el.lastElementChild;
   function tick() {
+    clearTimeout(timer);
+    if (document.hidden || smallScreen.matches) return;
     const now = new Date();
     const h = String(now.getHours()).padStart(2,'0');
     const m = String(now.getMinutes()).padStart(2,'0');
-    const s = String(now.getSeconds()).padStart(2,'0');
     const lang = typeof getCurrentLang === 'function' ? getCurrentLang() : 'zh';
     const day = lang === 'zh' ? `周${DAYS_ZH[now.getDay()]}` : DAYS_EN[now.getDay()];
     const mo = String(now.getMonth()+1).padStart(2,'0');
     const d = String(now.getDate()).padStart(2,'0');
     const dateStr = lang === 'zh' ? `${mo}/${d} ${day}` : `${day} ${mo}/${d}`;
-    el.innerHTML = `<span class="topbar-clock-time">${h}:${m}:${s}</span><span class="topbar-clock-date">${dateStr}</span>`;
+    if (timeEl.textContent !== `${h}:${m}`) timeEl.textContent = `${h}:${m}`;
+    if (dateEl.textContent !== dateStr) dateEl.textContent = dateStr;
+    timer = setTimeout(tick, 60000 - (Date.now() % 60000));
   }
   tick();
-  setInterval(tick, 1000);
+  document.addEventListener('visibilitychange', tick);
+  window.addEventListener('toolkit-language-change', tick);
+  smallScreen.addEventListener('change', tick);
 }
 
 // ── 返回顶部 ──
@@ -396,6 +392,7 @@ async function navigateTo(page, pushHash = true) {
     location.hash = page;
     return;
   }
+  window.ToolWorkspace?.capture(currentPage);
   // 清理上一个工具的副作用（如 setInterval）
   if (window._activeCleanup) { window._activeCleanup(); window._activeCleanup = null; }
   // 离开 AI 对话页时移除全屏模式
@@ -426,10 +423,11 @@ async function navigateTo(page, pushHash = true) {
   // 工具页隐藏 FAB，首页显示
   const fab = document.getElementById('scrollTopBtn');
   if (fab) fab.style.display = isHomeGroup ? '' : 'none';
-  // 页面切换淡入
-  content.classList.remove('content-fade-in');
-  void content.offsetWidth;
-  content.classList.add('content-fade-in');
+  // Opacity only: no synchronous layout read or moving editor/focus targets.
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    content.getAnimations().forEach(animation => animation.cancel());
+    content.animate([{ opacity: 0.65 }, { opacity: 1 }], { duration: 120, easing: 'ease-out' });
+  }
 }
 
 function updateNavActive(page) {
@@ -550,7 +548,7 @@ function showSearchDropdown(q) {
   const matched = scored.slice(0, 12).map(x => x.t);
   searchDropdownIdx = -1;
   if (!matched.length) {
-    drop.innerHTML = `<div class="sdrop-empty">未找到「${escHtml(q)}」相关工具</div>`;
+    drop.innerHTML = `<div class="sdrop-empty">${t('search_no_result', escHtml(q))}</div>`;
   } else {
     const bycat = {};
     matched.forEach(t => { (bycat[t.category] = bycat[t.category] || []).push(t); });
@@ -685,6 +683,10 @@ function renderSearchResults(q) {
   // 拆分多关键词（空格/逗号/顿号分隔）
   const tokens = q.toLowerCase().split(/[\s,，、]+/).filter(Boolean);
   if (!tokens.length) return;
+  window.ToolWorkspace?.capture(currentPage);
+  if (window._activeCleanup) { window._activeCleanup(); window._activeCleanup = null; }
+  currentPage = '__search__'; searchQuery = q; updateNavActive('');
+  document.getElementById('content')?.classList.remove('chat-page-mode');
   // 使用频率加权：高频工具在同分段内靠前
   const localizedTools = getLocalizedTools(TOOLS);
   const matched = localizedTools.map(tool => ({ tool, s: _scoreToolSearch(tool, tokens) })).filter(x => x.s > 0)
@@ -738,15 +740,16 @@ function openThemePicker() {
   picker.id = 'themePicker';
   picker.style.cssText = 'position:absolute;top:calc(100% + 8px);right:0;background:var(--sidebar-bg);border:1px solid var(--border);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:4px;min-width:160px;z-index:9999;backdrop-filter:blur(24px);box-shadow:0 16px 48px rgba(0,0,0,0.4)';
   THEMES.forEach(th => {
-    const item = document.createElement('div');
-    item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;font-size:13px;color:var(--text);transition:background 0.15s' + (th.key === theme ? ';background:var(--surface);outline:1px solid var(--accent)' : '');
+    const item = document.createElement('button'); item.type = 'button';
+    item.setAttribute('aria-pressed', String(th.key === theme));
+    item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;border:0;background:transparent;text-align:left;border-radius:10px;cursor:pointer;font-size:13px;color:var(--text);transition:background 0.15s' + (th.key === theme ? ';background:var(--surface);outline:1px solid var(--accent)' : '');
     item.innerHTML = `<span style="width:14px;height:14px;border-radius:50%;background:${th.color};flex-shrink:0;display:inline-block"></span>${t(th.i18n)}`;
     item.onmouseenter = () => { if (th.key !== theme) item.style.background = 'var(--surface-hover)'; };
     item.onmouseleave = () => { if (th.key !== theme) item.style.background = ''; };
     item.onclick = () => { theme = th.key; LS.set('dtb_theme', theme); applyTheme(); picker.remove(); };
     picker.appendChild(item);
   });
-  const wrap = document.getElementById('themeBtn').parentElement;
+  const wrap = document.getElementById('themeBtn').closest('.topbar-settings') || document.getElementById('themeBtn').parentElement;
   wrap.style.position = 'relative';
   wrap.appendChild(picker);
   setTimeout(() => document.addEventListener('click', function h(e) {
@@ -792,13 +795,21 @@ function bindKeyboard() {
       e.preventDefault();
       focusSearch();
     }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    if (e.defaultPrevented || e.isComposing) return;
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       openCmdPalette();
     }
     if (e.key === 'Escape') {
+      const picker = document.getElementById('themePicker');
+      if (picker) {
+        e.preventDefault(); picker.remove();
+        const themeButton = document.getElementById('themeBtn');
+        (themeButton.offsetParent ? themeButton : document.getElementById('topbarMore')).focus();
+        return;
+      }
       // Don't handle Esc if modal/overlay is open (they handle it themselves)
-      if (document.getElementById('agMiniOverlay') || document.getElementById('agConfigModal')) return;
+      if (document.getElementById('cmdPalette') || document.getElementById('agMiniOverlay') || document.getElementById('agConfigModal')) return;
       const inp = document.getElementById('searchInput');
       if (document.activeElement === inp) {
         clearSearch(); inp.blur();
@@ -864,7 +875,7 @@ async function renderToolPageFull(tool) {
           <div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap">
               <div class="tool-page-name">${localTool.name}</div>
-              <span class="tool-breadcrumb" onclick="setCatFilter('${tool.category}');navigateTo('home')" title="${localTool.category}">${localCatIcons[tool.category]||CAT_ICONS[tool.category]||'📁'} ${localTool.category}</span>
+              <span class="tool-breadcrumb" onclick="setCatFilter('${tool.category}')" title="${localTool.category}">${localCatIcons[tool.category]||CAT_ICONS[tool.category]||'📁'} ${localTool.category}</span>
             </div>
             <div class="tool-page-desc">${localTool.desc}</div>
           </div>
@@ -877,11 +888,18 @@ async function renderToolPageFull(tool) {
       ${renderWorkbenchNav(tool.id)}
       <div class="tool-body" id="toolBody"></div>
     </div>`;
-  if (fn) fn(document.getElementById('toolBody'));
+  if (fn) {
+    const body = window.ToolWorkspace ? ToolWorkspace.mount(tool.id, document.getElementById('toolBody'), fn) : document.getElementById('toolBody');
+    if (!window.ToolWorkspace) fn(body);
+    window.ToolWorkspace?.mountActions(tool.id, body);
+  }
   else document.getElementById('toolBody').innerHTML = `<div class="empty-state"><div class="empty-icon">🔧</div><div class="empty-title">${t('load_fail')}</div></div>`;
+  if (window.matchMedia('(max-width:768px)').matches) {
+    content.querySelector('.tool-workbench-links [aria-current="page"]')?.scrollIntoView({ block:'nearest', inline:'nearest' });
+  }
 
   // 相关工具推荐
-  const related = getLocalizedTools(TOOLS).filter(tool2 => tool2.id !== tool.id && TOOLS.find(x => x.id === tool2.id && x.category === tool.category)).slice(0, 4);
+  const related = getLocalizedTools(TOOLS).filter(tool2 => tool2.id !== tool.id && TOOL_BY_ID.get(tool2.id)?.category === tool.category).slice(0, 4);
   if (related.length) {
     const relDiv = document.createElement('div');
     relDiv.className = 'related-tools';
@@ -900,8 +918,11 @@ function showToast(msg, type = 'success', duration = 2000, onClick = null) {
   }
   const el = document.createElement('div');
   el.className = 'toast-msg ' + type;
+  el.setAttribute('role', type === 'error' ? 'alert' : 'status');
   const icons = { success: '✓', error: '✕', info: 'ℹ', warn: '⚠' };
-  el.innerHTML = `<span>${icons[type] || '✓'}</span><span>${msg}</span>`;
+  const icon = document.createElement('span'); icon.textContent = icons[type] || '✓';
+  const message = document.createElement('span'); message.textContent = String(msg);
+  el.append(icon, message);
   if (onClick) { el.style.cursor = 'pointer'; el.addEventListener('click', onClick); }
   container.appendChild(el);
   if (duration > 0) {
@@ -910,18 +931,34 @@ function showToast(msg, type = 'success', duration = 2000, onClick = null) {
       setTimeout(() => el.remove(), 280);
     }, duration);
   }
+  return el;
 }
 
 // ── 工具函数 ──
-function copyText(text, btn) {
+async function copyText(text, btn) {
   const isEn = typeof getCurrentLang === 'function' && getCurrentLang() === 'en';
-  navigator.clipboard.writeText(text).then(() => {
-    const orig = btn.textContent;
-    btn.textContent = isEn ? '✓ Copied' : '✓ 已复制';
-    btn.classList.add('copied');
-    showToast(isEn ? 'Copied to clipboard' : '已复制到剪贴板');
-    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
-  }).catch(() => showToast(isEn ? 'Copy failed' : '复制失败', 'error'));
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+    else {
+      const active = document.activeElement;
+      const selection = active && typeof active.selectionStart === 'number' ? [active.selectionStart, active.selectionEnd] : null;
+      const field = document.createElement('textarea'); field.value = text;
+      field.style.cssText = 'position:fixed;left:-9999px;top:0'; document.body.appendChild(field);
+      let copied = false;
+      try { field.select(); copied = document.execCommand('copy'); }
+      finally { field.remove(); active?.focus(); if (selection) active.setSelectionRange(...selection); }
+      if (!copied) throw new Error('Clipboard unavailable');
+    }
+    if (btn) {
+      if (!btn.classList.contains('copied')) btn._copyOriginal = btn.textContent;
+      clearTimeout(btn._copyTimer);
+      btn.textContent = isEn ? '✓ Copied' : '✓ 已复制'; btn.classList.add('copied');
+      btn._copyTimer = setTimeout(() => { btn.textContent = btn._copyOriginal; btn.classList.remove('copied'); }, 1500);
+    }
+    // The button already confirms a copy; repeated field copies must not stack toasts.
+    if (!btn) showToast(isEn ? 'Copied to clipboard' : '已复制到剪贴板');
+    return true;
+  } catch { showToast(isEn ? 'Copy failed' : '复制失败', 'error'); return false; }
 }
 
 function shareTool(id) {
@@ -951,7 +988,7 @@ function _loadCmd(cb) {
 }
 
 function openCmdPalette() { _loadCmd(() => _cmdOpen()); }
-function closeCmdPalette() { const el = document.getElementById('cmdPalette'); if (el) el.remove(); if (typeof _cmdIdx !== 'undefined') _cmdIdx = -1; }
+function closeCmdPalette() { const el = document.getElementById('cmdPalette'); if (el) { const focus = el._returnFocus; el.remove(); if (focus?.isConnected) focus.focus(); } if (typeof _cmdIdx !== 'undefined') _cmdIdx = -1; }
 
 // ── 全局 UE 增强 ──
 
@@ -961,9 +998,10 @@ function _initGlobalKeySubmit() {
   if (!content) return;
   content.addEventListener('keydown', e => {
     const el = e.target;
-    const panel = el.closest('.tool-card-panel') || el.closest('.tool-body');
+    const panel = el.closest('[data-submit-scope], .tool-card-panel') || el.closest('.tool-body');
     if (!panel) return;
-    const btn = panel.querySelector('.btn-primary');
+    if (e.defaultPrevented || e.isComposing) return;
+    const btn = panel.querySelector('[data-tool-submit]');
     if (!btn) return;
     // Ctrl/Cmd+Enter: textarea 和 input 都触发
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -977,26 +1015,6 @@ function _initGlobalKeySubmit() {
       e.preventDefault();
       btn.click();
     }
-  });
-}
-
-// 增强 2：粘贴自动执行
-function _initGlobalPasteExec() {
-  const content = document.getElementById('content');
-  if (!content) return;
-  content.addEventListener('paste', e => {
-    const el = e.target;
-    if (!el.matches('textarea.tool-textarea, input.tool-input')) return;
-    if (el.dataset.noAutopaste !== undefined) return;
-    // 排除 text-diff 双输入框和 markdown 编辑器
-    if (el.id === 'diffA' || el.id === 'diffB' || el.id === 'mdInput') return;
-    // 仅对空输入框粘贴时触发
-    if (el.value.trim()) return;
-    const panel = el.closest('.tool-card-panel') || el.closest('.tool-body');
-    if (!panel) return;
-    const btn = panel.querySelector('.btn-primary');
-    if (!btn) return;
-    setTimeout(() => btn.click(), 200);
   });
 }
 
@@ -1025,7 +1043,6 @@ function _initTextareaCounter() {
 document.addEventListener('DOMContentLoaded', () => {
   init();
   _initGlobalKeySubmit();
-  _initGlobalPasteExec();
   _initTextareaCounter();
   // ── Agent 桥接：暴露内部变量给 agent 层 ──
   window.TOOLS        = TOOLS;

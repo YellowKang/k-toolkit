@@ -139,11 +139,11 @@ function renderJWT(el) {
       </div>
     </div>`;
 
-  const ta = document.getElementById('jwtInput');
-  ta.addEventListener('input', () => {
-    const v = ta.value.trim();
-    if (v.split('.').length === 3) decodeJWT();
-  });
+
+  const input=el.querySelector('#jwtInput');
+  input.addEventListener('input',()=>{input._revision=(input._revision||0)+1;el.querySelector('#jwtResultPanel').style.display='none';if(input.value.trim().split('.').length===3)decodeJWT();});
+  window._activeCleanup=()=>{input._revision=(input._revision||0)+1;};
+
 }
 
 function jwtSwitchTab(tab) {
@@ -203,56 +203,30 @@ function _jwtTl() {
 
 /* ── 解析相关 ── */
 
-function decodeJWT() {
-  const tl = _jwtTl();
-  const locale = getCurrentLang() === 'en' ? 'en-US' : 'zh-CN';
-  const token = document.getElementById('jwtInput').value.trim();
-  const panel = document.getElementById('jwtResultPanel');
-  const parts = document.getElementById('jwtParts');
-  if (!token) return;
-  const segs = token.split('.');
-  if (segs.length !== 3) {
-    panel.style.display='';
-    parts.innerHTML = '<div style="color:#ef4444;padding:12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px">✗ ' + tl('invalid_jwt') + '</div>';
-    return;
-  }
-  let header, payload;
+async function decodeJWT() {
+  const tl = _jwtTl(), input=document.getElementById('jwtInput');
+  const raw=input.value, token=raw.trim(), stamp=(input._revision||0)+1;input._revision=stamp;
+  const panel=document.getElementById('jwtResultPanel'),parts=document.getElementById('jwtParts');
+  const en=getCurrentLang()==='en';
+  if(!token){panel.style.display='none';return;}
+  panel.style.display='';parts.textContent=en?'Decoding…':'解析中…';
   try {
-    header  = JSON.parse(atob(segs[0].replace(/-/g,'+').replace(/_/g,'/')));
-    payload = JSON.parse(atob(segs[1].replace(/-/g,'+').replace(/_/g,'/')));
-  } catch(e) {
-    panel.style.display='';
-    parts.innerHTML = '<div style="color:#ef4444">' + tl('parse_fail') + '：' + escHtml(e.message) + '</div>';
-    return;
-  }
-  const now = Math.floor(Date.now()/1000);
-  const exp = payload.exp;
-  const expired = exp && exp < now;
-  const expStr = exp ? new Date(exp*1000).toLocaleString(locale) : tl('na');
-  const iatStr = payload.iat ? new Date(payload.iat*1000).toLocaleString(locale) : tl('na');
-  const nbfStr = payload.nbf ? new Date(payload.nbf*1000).toLocaleString(locale) : tl('na');
-
-  panel.style.display='';
-  parts.innerHTML =
-    '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">' +
-    _jwtBadge(header.alg||'?', 'alg', 'blue') +
-    _jwtBadge(header.typ||'?', 'typ', 'blue') +
-    (expired
-      ? _jwtBadge('✗ ' + tl('expired'), null, 'red')
-      : _jwtBadge('✓ ' + tl('valid'), null, 'green')) +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:16px">' +
-    _jwtTimeCard(tl('iat_label'), iatStr) +
-    _jwtTimeCard(tl('exp_label'), expStr, expired ? '#ef4444' : '#10b981') +
-    (payload.nbf ? _jwtTimeCard(tl('nbf_label'), nbfStr) : '') +
-    (payload.sub ? _jwtTimeCard(tl('sub_label'), payload.sub) : '') +
-    '</div>' +
-    _jwtSection('Header', header) +
-    _jwtSection('Payload', payload) +
-    '<div style="margin-bottom:12px">' +
-    '<div class="panel-label" style="margin-bottom:8px">Signature</div>' +
-    '<div style="font-family:monospace;font-size:12px;color:var(--text-muted);word-break:break-all;padding:10px 14px;background:rgba(0,0,0,0.3);border:1px solid var(--glass-border);border-radius:10px">' + segs[2] + '</div>' +
-    '</div>';
+    const data=(await ToolCompute.load('jwt')).decode(token);
+    if(!input.isConnected||input.value!==raw||input._revision!==stamp)return;
+    const {header,payload,dates}=data;
+    const labels=en?{'expired':'Expired','not-yet-valid':'Not active yet','no-expiry':'No expiry claim','within-time-window':'Within time window'}:{'expired':'已过期','not-yet-valid':'尚未生效','no-expiry':'未设置过期时间','within-time-window':'在声明的时间范围内'};
+    parts.innerHTML='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">'+
+      _jwtBadge(header.alg||'?', 'alg', 'blue')+_jwtBadge(header.typ||'?', 'typ', 'blue')+
+      _jwtBadge(en?'Signature not verified':'未验证签名',null,'blue')+
+      _jwtBadge(labels[data.timeStatus],null,data.expired||data.notYetValid?'red':'blue')+'</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:16px">'+
+      _jwtTimeCard(tl('iat_label'),dates.iat||tl('na'))+_jwtTimeCard(tl('exp_label'),dates.exp||tl('na'))+
+      (dates.nbf?_jwtTimeCard(tl('nbf_label'),dates.nbf):'')+
+      (Object.prototype.hasOwnProperty.call(payload,'sub')?_jwtTimeCard(tl('sub_label'),payload.sub):'')+'</div>'+
+      _jwtSection('Header',header)+_jwtSection('Payload',payload)+
+      '<div class="panel-label">Signature</div><div class="result-box" style="overflow-wrap:anywhere">'+escHtml(data.signature)+'</div>';
+    return data;
+  } catch(error) {if(input.isConnected&&input.value===raw&&input._revision===stamp)parts.textContent=tl('parse_fail')+'：'+error.message;}
 }
 
 function _jwtBadge(text, prefix, color) {
@@ -261,13 +235,13 @@ function _jwtBadge(text, prefix, color) {
     green: 'background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.4);color:#10b981',
     red:   'background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.35);color:#ef4444',
   };
-  return `<span style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;${colors[color]}">${prefix ? prefix+': '+text : text}</span>`;
+  return `<span style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;${colors[color]}">${escHtml(prefix ? prefix+': '+String(text) : String(text))}</span>`;
 }
 
 function _jwtTimeCard(label, val, color) {
   return `<div style="padding:10px 14px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);border-radius:10px">
-    <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${label}</div>
-    <div style="font-size:13px;font-weight:600;color:${color||'var(--text)'}">${val}</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${escHtml(String(label))}</div>
+    <div style="font-size:13px;font-weight:600;color:${color||'var(--text)'}">${escHtml(String(val))}</div>
   </div>`;
 }
 

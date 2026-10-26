@@ -4,11 +4,12 @@
 const _htI18nDict = {
   zh: {
     panel_title:      'HTTP 请求测试',
+    cancel: '取消请求', cancelled: '请求已取消', timeout: '请求超时，请检查接口后重试', code: '生成 cURL / fetch / axios', import: '导入 cURL', import_run: '解析并填入', bad_url: '请输入有效的 HTTP 或 HTTPS 地址',
     cors_warn:        '浏览器安全限制：跨域请求可能因 CORS 策略被拦截。建议测试同域或已配置 CORS 的接口，或使用后端代理。',
     send:             '发送',
     sending:          '请求中...',
     headers_label:    '请求头（每行 Key: Value）',
-    body_label:       '请求体（JSON）',
+    body_label:       '请求体',
     copy_response:    '复制响应',
     export_curl:      '导出 cURL',
     res_headers:      '响应头',
@@ -26,11 +27,12 @@ const _htI18nDict = {
   },
   en: {
     panel_title:      'HTTP Request Tester',
+    cancel: 'Cancel request', cancelled: 'Request cancelled', timeout: 'Request timed out. Check the endpoint and retry.', code: 'Generate cURL / fetch / axios', import: 'Import cURL', import_run: 'Parse and fill', bad_url: 'Enter a valid HTTP or HTTPS URL',
     cors_warn:        'Browser security: Cross-origin requests may be blocked by CORS policy. Test same-origin or CORS-enabled APIs, or use a backend proxy.',
     send:             'Send',
     sending:          'Sending...',
     headers_label:    'Headers (one per line: Key: Value)',
-    body_label:       'Body (JSON)',
+    body_label:       'Request body',
     copy_response:    'Copy Response',
     export_curl:      'Export cURL',
     res_headers:      'Response Headers',
@@ -54,11 +56,11 @@ const _HT_HISTORY_KEY = 'dtb_http_history';
 const _HT_HISTORY_MAX = 20;
 
 function _htLoadHistory() {
-  try { return JSON.parse(localStorage.getItem(_HT_HISTORY_KEY)) || []; } catch(_) { return []; }
+  try { const list = JSON.parse(localStorage.getItem(_HT_HISTORY_KEY)); return Array.isArray(list) ? list : []; } catch(_) { return []; }
 }
 
 function _htSaveHistory(list) {
-  localStorage.setItem(_HT_HISTORY_KEY, JSON.stringify(list.slice(0, _HT_HISTORY_MAX)));
+  try { localStorage.setItem(_HT_HISTORY_KEY, JSON.stringify(list.slice(0, _HT_HISTORY_MAX))); } catch {}
 }
 
 function _htAddHistory(entry) {
@@ -134,7 +136,7 @@ function _htExportCurl(btnEl) {
   const url = document.getElementById('htUrl').value.trim();
   if (!url) return;
   const headersRaw = document.getElementById('htHeaders').value.trim();
-  const bodyRaw = document.getElementById('htBody').value.trim();
+  const bodyRaw = document.getElementById('htBody').value;
   // Single-quote every argument so URLs/headers containing quotes cannot break out of the command.
   const shq = v => "'" + String(v).replace(/'/g, "'\\''") + "'";
   let cmd = `curl -X ${method} ${shq(url)}`;
@@ -147,24 +149,31 @@ function _htExportCurl(btnEl) {
     });
   }
   if (bodyRaw && !['GET', 'HEAD'].includes(method)) {
-    cmd += ` \\\n  -d ${shq(bodyRaw)}`;
+    cmd += ` \\\n  --data-raw ${shq(bodyRaw)}`;
   }
   copyText(cmd, btnEl);
 }
 
 /* ── Main render ── */
+let _htController = null;
 function renderHttpTester(el) {
+  window._activeCleanup = () => { _htController?.abort(); _htController = null; };
   el.innerHTML = `
     <div class="tool-card-panel">
       <div class="panel-label">${_htT('panel_title')}</div>
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;padding:8px 12px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.2);border-radius:8px">⚠️ ${_htT('cors_warn')}</div>
-      <div style="display:flex;gap:10px;margin-bottom:12px">
+      <div class="http-request-row" style="margin-bottom:12px">
         <select class="tool-input" id="htMethod" style="width:110px">
-          <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option>
+          <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
         </select>
         <input class="tool-input" id="htUrl" placeholder="https://api.example.com/endpoint" style="flex:1">
-        <button class="btn btn-primary" onclick="doHttpTest()" id="htSendBtn">${_htT('send')}</button>
+        <button class="btn btn-primary" data-tool-submit onclick="doHttpTest()" id="htSendBtn">${_htT('send')}</button>
       </div>
+      <div class="tool-actions" style="margin-bottom:12px">
+        <button type="button" class="btn btn-secondary" onclick="navigateTo('curl-gen')">${_htT('code')}</button>
+        <button type="button" class="btn btn-secondary" id="htCancelBtn" hidden onclick="_htController?.abort()">${_htT('cancel')}</button>
+      </div>
+      <details data-submit-scope><summary>${_htT('import')}</summary><textarea class="tool-textarea" id="htCurlInput" rows="3" placeholder="curl https://api.example.com"></textarea><button type="button" class="btn btn-secondary" data-tool-submit onclick="htImportCurl()">${_htT('import_run')}</button></details>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div>
           <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${_htT('headers_label')}</div>
@@ -203,53 +212,60 @@ function renderHttpTester(el) {
       ⚠️ ${_htT('cors_footer')}
     </div>`;
   _htRenderHistory();
+  window._htSession = RequestSession.mount(el, 'http');
+}
+
+async function htImportCurl() {
+  const input = document.getElementById('htCurlInput'), body = document.getElementById('toolBody');
+  const text = input.value;
+  try {
+    await loadTool('curl-gen', false);
+    if (!body.isConnected) return;
+    const data = parseCurlCommand(text);
+    RequestSession.set({ ...data, headers: Object.entries(data.headers).map(([k,v]) => k + ': ' + v).join('\n'), bodyType: 'raw' });
+    window._htSession.restore();
+  } catch (error) { if (body.isConnected) showToast(error.message, 'error'); }
 }
 
 async function doHttpTest() {
-  const url = document.getElementById('htUrl').value.trim();
-  if (!url) return;
-  const method = document.getElementById('htMethod').value;
-  const headersRaw = document.getElementById('htHeaders').value.trim();
-  const bodyRaw = document.getElementById('htBody').value.trim();
-  const btn = document.getElementById('htSendBtn');
-  btn.textContent = _htT('sending'); btn.disabled = true;
-  const headers = {};
-  headersRaw.split('\n').forEach(line => { const [k,...v]=line.split(':'); if(k&&v.length) headers[k.trim()]=v.join(':').trim(); });
-  const opts = { method, headers };
-  if (bodyRaw && !['GET','HEAD'].includes(method)) opts.body = bodyRaw;
-  const t0 = Date.now();
-  let status = 0;
+  if (_htController) return;
+  const root = document.getElementById('toolBody');
+  const find = id => root.querySelector('#' + id);
+  const url = find('htUrl').value.trim();
+  try { if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error(); }
+  catch { showToast(_htT('bad_url'), 'error'); return; }
+  const method = find('htMethod').value, headersRaw = find('htHeaders').value, bodyRaw = find('htBody').value;
+  const button = find('htSendBtn'), cancel = find('htCancelBtn');
+  const controller = new AbortController(); _htController = controller;
+  let timedOut = false;
+  const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 30000);
+  const current = () => root.isConnected && _htController === controller;
+  button.textContent = _htT('sending'); button.disabled = true; cancel.hidden = false;
+  const headers = Object.create(null);
+  headersRaw.split('\n').forEach(line => { const colon = line.indexOf(':'); if (colon > 0) headers[line.slice(0, colon).trim()] = line.slice(colon + 1).trim(); });
+  const options = { method, headers, signal: controller.signal };
+  if (bodyRaw && !['GET', 'HEAD'].includes(method)) options.body = bodyRaw;
+  const start = Date.now();
   try {
-    const res = await fetch(url, opts);
-    const elapsed = Date.now()-t0;
-    status = res.status;
-    const resText = await res.text();
-    let resBody = resText;
-    try { resBody = JSON.stringify(JSON.parse(resText),null,2); } catch(_){}
-    const badge = document.getElementById('htStatusBadge');
-    badge.textContent = res.status+' '+res.statusText;
-    badge.style.background = res.ok?'rgba(16,185,129,0.2)':'rgba(239,68,68,0.2)';
-    badge.style.color = res.ok?'#10b981':'#ef4444';
-    document.getElementById('htTime').textContent = elapsed+'ms';
-    let hText='';
-    res.headers.forEach((v,k)=>hText+=k+': '+v+'\n');
-    document.getElementById('htResHeaders').textContent = hText;
-    document.getElementById('htResBody').textContent = resBody;
-    // Save to history
-    _htAddHistory({
-      method,
-      url,
-      headers: headersRaw,
-      body: bodyRaw,
-      status: res.status,
-      time: new Date().toLocaleTimeString(),
-    });
+    const response = await fetch(url, options);
+    const raw = await response.text();
+    if (!current()) return;
+    let output = raw; try { output = JSON.stringify(JSON.parse(raw), null, 2); } catch {}
+    const badge = find('htStatusBadge');
+    badge.textContent = response.status + ' ' + response.statusText;
+    badge.style.color = response.ok ? '#10b981' : '#ef4444';
+    find('htTime').textContent = (Date.now() - start) + 'ms';
+    find('htResHeaders').textContent = [...response.headers].map(([key, value]) => key + ': ' + value).join('\n');
+    find('htResBody').textContent = output;
+    _htAddHistory({ method, url, headers: headersRaw, body: bodyRaw, status: response.status, time: new Date().toLocaleTimeString() });
     _htRenderHistory();
-  } catch(e) {
-    document.getElementById('htResBody').textContent = _htT('request_fail')+e.message;
-    const badge = document.getElementById('htStatusBadge');
-    badge.textContent=_htT('net_error'); badge.style.background='rgba(239,68,68,0.2)'; badge.style.color='#ef4444';
+  } catch (error) {
+    if (!current()) return;
+    find('htResBody').textContent = controller.signal.aborted ? _htT(timedOut ? 'timeout' : 'cancelled') : _htT('request_fail') + error.message;
+    find('htStatusBadge').textContent = _htT('net_error');
+    find('htResHeaders').textContent = ''; find('htTime').textContent = '';
+  } finally {
+    clearTimeout(timeout);
+    if (current()) { find('htResult').style.display = ''; button.disabled = false; button.textContent = _htT('send'); cancel.hidden = true; _htController = null; }
   }
-  document.getElementById('htResult').style.display='';
-  btn.textContent=_htT('send'); btn.disabled=false;
 }

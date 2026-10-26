@@ -140,27 +140,27 @@ const TextActions = [
   },
   {
     name: 'text_diff',
-    description: '比较两段文本的差异',
+    description: '按行、词或 Unicode 字符比较两段文本，保留重复内容和顺序，返回真实增删序列。',
     meta: { tier: 'standard', tags: ['diff', 'compare', 'text'], category: 'text' },
     parameters: {
       type: 'object',
       properties: {
         a: { type: 'string', description: '原始文本' },
         b: { type: 'string', description: '新文本' },
+        mode: { type: 'string', enum: ['line', 'word', 'char'], default: 'line' },
       },
       required: ['a', 'b'],
     },
-    execute({ a, b }) {
-      const linesA = a.split('\n');
-      const linesB = b.split('\n');
-      const setA = new Set(linesA);
-      const setB = new Set(linesB);
-      const addedLines   = linesB.filter(l => !setA.has(l)).length;
-      const removedLines = linesA.filter(l => !setB.has(l)).length;
-      const hasDiff = a !== b;
-      return { success: true,
-        data: { addedLines, removedLines, hasDiff, summary: hasDiff ? `+${addedLines} -${removedLines} 行` : '内容相同' },
-        display: hasDiff ? `差异: +${addedLines} 行 / -${removedLines} 行` : '两段文本相同' };
+    async execute({ a, b, mode = 'line' }) {
+      try {
+        const compute = await window.ToolCompute.load('text-diff');
+        const diff = compute.diff(compute.tokenize(a, mode), compute.tokenize(b, mode));
+        const addedLines = diff.filter(([type]) => type === 1).length, removedLines = diff.filter(([type]) => type === -1).length;
+        const hasDiff = a !== b, en = window.getCurrentLang?.() === 'en';
+        const unit = (en ? { line:'lines', word:'tokens', char:'characters' } : { line:'行', word:'词段', char:'字' })[mode];
+        const summary = hasDiff ? `+${addedLines} -${removedLines} ${unit}` : en ? 'Identical' : '内容相同';
+        return {success:true,data:{mode,added:addedLines,removed:removedLines,...(mode==='line'?{addedLines,removedLines}:{}),hasDiff,summary,diff},display:summary};
+      } catch(error) { return {success:false,error:error.message}; }
     },
   },
 ];

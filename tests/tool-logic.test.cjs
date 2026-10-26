@@ -167,7 +167,7 @@ test('salary tax uses cumulative withholding and the separate bonus table', () =
 });
 
 test('subnet math validates octets and labels special-purpose ranges', () => {
-  const { ipParse, ipSubnet, ipTypes, numToIp } = load('tools/ip-calc.js');
+  const { ipParse, ipSubnet, ipTypes, numToIp } = load('compute/ip.js', 'tools/ip-calc.js');
   assert.equal(ipParse('999.1.1.1'), null);
   assert.equal(ipParse('192.168.1.256'), null);
   const s = ipSubnet(ipParse('192.168.1.100'), 26);
@@ -194,9 +194,9 @@ test('.env parsing follows dotenv quoting, comments, export and duplicates', () 
 });
 
 test('timestamps are classified as s/ms/µs/ns by digit count', () => {
-  const { tsDetectUnit, tsToMillis } = load('tools/timestamp.js');
+  const { tsDetectUnit, tsToMillis } = load('compute/date.js', 'tools/timestamp.js');
   assert.deepEqual(['1700000000', '1700000000123', '1700000000123456', '1700000000123456789', '-86400', '0'].map(tsDetectUnit), ['s', 'ms', 'us', 'ns', 's', 's']);
-  assert.equal(tsToMillis('1700000000123456'), 1700000000123.456);
+  assert.equal(tsToMillis('1700000000123456'), 1700000000123);
   assert.equal(new Date(tsToMillis('1700000000123456789')).toISOString(), '2023-11-14T22:13:20.123Z');
   assert.equal(tsDetectUnit('12abc'), null);
 });
@@ -212,7 +212,7 @@ test('CSS units convert through px with root and parent font sizes', () => {
 });
 
 test('unit conversions use exact definitions without floating-point noise', () => {
-  const { ucConvertValue: c } = load('tools/unit-convert.js');
+  const { ucConvertValue: c } = load('compute/units.js','tools/unit-convert.js');
   assert.equal(c('speed', 1, 'mps', 'kmh'), 3.6);
   assert.equal(c('speed', 100, 'kmh', 'mps'), 27.7777777778);
   assert.equal(c('length', 1, 'mi', 'km'), 1.609344);

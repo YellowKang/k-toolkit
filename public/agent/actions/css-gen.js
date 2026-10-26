@@ -2,53 +2,7 @@
 
 // ── CSS 生成 & 颜色工具 原子 Actions ─────────────────────────────
 
-// ─── 颜色工具函数 ───────────────────────────────────────────────
-function _hexToRgb(hex) {
-  hex = hex.replace('#', '');
-  if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-  return [parseInt(hex.slice(0,2),16), parseInt(hex.slice(2,4),16), parseInt(hex.slice(4,6),16)];
-}
-
-function _rgbToHsl(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r,g,b), min = Math.min(r,g,b);
-  let h, s, l = (max+min)/2;
-  if (max === min) { h = s = 0; }
-  else {
-    const d = max - min;
-    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
-    if (max === r) h = (g-b)/d + (g<b?6:0);
-    else if (max === g) h = (b-r)/d + 2;
-    else h = (r-g)/d + 4;
-    h /= 6;
-  }
-  return [Math.round(h*360), Math.round(s*100), Math.round(l*100)];
-}
-
-function _hslToRgb(h, s, l) {
-  h /= 360; s /= 100; l /= 100;
-  if (s === 0) { const v = Math.round(l*255); return [v,v,v]; }
-  const hue2rgb = (p, q, t) => {
-    if (t<0) t+=1; if (t>1) t-=1;
-    if (t<1/6) return p+(q-p)*6*t;
-    if (t<1/2) return q;
-    if (t<2/3) return p+(q-p)*(2/3-t)*6;
-    return p;
-  };
-  const q = l < 0.5 ? l*(1+s) : l+s-l*s;
-  const p = 2*l - q;
-  return [Math.round(hue2rgb(p,q,h+1/3)*255), Math.round(hue2rgb(p,q,h)*255), Math.round(hue2rgb(p,q,h-1/3)*255)];
-}
-
-function _rgbToHex(r, g, b) {
-  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
-}
-
-function _luminance(r, g, b) {
-  const a = [r,g,b].map(v => { v /= 255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); });
-  return 0.2126*a[0] + 0.7152*a[1] + 0.0722*a[2];
-}
-
+(function () {
 // ─── Actions ────────────────────────────────────────────────────
 const CssGenActions = [
   {
@@ -173,13 +127,9 @@ const CssGenActions = [
       },
       required: ['fg', 'bg'],
     },
-    execute({ fg, bg }) {
+    async execute({ fg, bg }) {
       try {
-        const [fr,fg2,fb] = _hexToRgb(fg);
-        const [br,bg2,bb] = _hexToRgb(bg);
-        const l1 = _luminance(fr,fg2,fb);
-        const l2 = _luminance(br,bg2,bb);
-        const ratio = parseFloat(((Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05)).toFixed(2));
+        const ratio=(await ToolCompute.load('color')).contrast(fg,bg);
         const aa = ratio >= 4.5;
         const aaa = ratio >= 7;
         const aaLarge = ratio >= 3;
@@ -201,48 +151,15 @@ const CssGenActions = [
       },
       required: ['color'],
     },
-    execute({ color, scheme = 'shades' }) {
+    async execute({ color, scheme = 'shades' }) {
       try {
-        const [r,g,b] = _hexToRgb(color);
-        const [h,s,l] = _rgbToHsl(r,g,b);
-        let colors = [];
-
-        if (scheme === 'shades') {
-          // 生成 9 级色阶 (50-900)
-          const levels = [95, 90, 80, 70, 60, 50, 40, 30, 20];
-          colors = levels.map(lv => {
-            const [rr,gg,bb] = _hslToRgb(h, s, lv);
-            return { label: `${100-lv > 50 ? (100-lv)*10+100 : (100-lv)*10+50}`, hex: _rgbToHex(rr,gg,bb) };
-          });
-        } else if (scheme === 'complementary') {
-          colors = [
-            { label: 'base', hex: color },
-            { label: 'complement', hex: _rgbToHex(..._hslToRgb((h+180)%360, s, l)) },
-          ];
-        } else if (scheme === 'analogous') {
-          colors = [-30, 0, 30].map((offset, i) => ({
-            label: ['left', 'base', 'right'][i],
-            hex: _rgbToHex(..._hslToRgb((h+offset+360)%360, s, l)),
-          }));
-        } else if (scheme === 'triadic') {
-          colors = [0, 120, 240].map((offset, i) => ({
-            label: ['base', 'triadic-1', 'triadic-2'][i],
-            hex: _rgbToHex(..._hslToRgb((h+offset)%360, s, l)),
-          }));
-        } else if (scheme === 'split') {
-          colors = [0, 150, 210].map((offset, i) => ({
-            label: ['base', 'split-1', 'split-2'][i],
-            hex: _rgbToHex(..._hslToRgb((h+offset)%360, s, l)),
-          }));
-        }
-
-        const cssVars = colors.map((c, i) => `--color-${i}: ${c.hex};`).join('\n');
-        return { success: true,
-          data: { colors, cssVars, scheme },
-          display: colors.map(c => `${c.label}: ${c.hex}`).join(' | ') };
+        await ToolCompute.load('color');
+        const data=KCompute.color.palette(color,scheme);return {success:true,data,display:data.colors.map(c=>c.hex).join(' | ')};
       } catch (e) { return { success: false, data: { error: e.message }, display: '颜色格式错误' }; }
     },
   },
 ];
 
 window.CssGenActions = CssGenActions;
+
+})();

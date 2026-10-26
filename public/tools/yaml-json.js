@@ -41,7 +41,7 @@ function renderYAMLJSON(el) {
       <div class="panel-label">${T('input')}</div>
       <textarea class="tool-textarea" id="yjInput" rows="10" spellcheck="false" placeholder="${T('placeholder')}" oninput="_yjAutoDetect()" style="font-family:monospace"></textarea>
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="yjToJSON()">${T('to_json')}</button>
+        <button class="btn btn-primary" data-tool-submit onclick="yjToJSON()">${T('to_json')}</button>
         <button class="btn btn-primary" onclick="yjToYAML()">${T('to_yaml')}</button>
         <button class="btn btn-secondary" onclick="yjSwap()">${T('swap')}</button>
         <button class="btn btn-secondary" onclick="yjClear()">${T('clear')}</button>

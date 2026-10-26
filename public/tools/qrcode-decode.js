@@ -57,10 +57,11 @@ function renderQRCodeDecode(el) {
     const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
     if (item) { e.preventDefault(); qrdHandleFile(item.getAsFile()); }
   };
+  _qrdShared = ImageSession.mount(el, { onUse: files => qrdHandleFile(files[0], false) });
   document.addEventListener('paste', onPaste);
   window._activeCleanup = () => {
     document.removeEventListener('paste', onPaste);
-    _qrdRevision++;
+    _qrdRevision++; _qrdController?.abort(); _qrdShared?.dispose();
     if (_qrdUrl) { URL.revokeObjectURL(_qrdUrl); _qrdUrl = null; }
   };
   ToolCompute.loadVendor('jsqr').catch(() => {});
@@ -80,7 +81,7 @@ function qrdDrop(e) {
   if (file) qrdHandleFile(file);
 }
 
-let _qrdRevision = 0, _qrdUrl = null;
+let _qrdRevision = 0, _qrdUrl = null, _qrdShared = null, _qrdController = null;
 function _qrdStatus(text, color) {
   const status = document.getElementById('qrdStatus');
   if (!status) return;
@@ -88,47 +89,38 @@ function _qrdStatus(text, color) {
   status.style.color = color;
 }
 
-function qrdHandleFile(file) {
+async function qrdHandleFile(file, remember = true) {
   const T = makeToolI18n(_qrdDict);
-  if (!file || !file.type.startsWith('image/')) return;
-  const revision = ++_qrdRevision;
+  if (!file) return;
+  _qrdController?.abort();
+  const revision = ++_qrdRevision, controller = _qrdController = new AbortController();
+  if (remember && !_qrdShared.remember([file])) return;
   const img = document.getElementById('qrdPreview');
   if (_qrdUrl) URL.revokeObjectURL(_qrdUrl);
-  _qrdUrl = URL.createObjectURL(file);
+  _qrdUrl = URL.createObjectURL(file); img.src = _qrdUrl;
   document.getElementById('qrdResult').style.display = '';
   _qrdStatus(T('decoding'), 'var(--text-muted)');
   document.getElementById('qrdContent').textContent = '';
   document.getElementById('qrdActions').replaceChildren();
-  img.onload = () => { if (revision === _qrdRevision) qrdDecode(img, revision); };
-  img.onerror = () => { if (revision === _qrdRevision) _qrdStatus(T('bad_image'), '#e74c3c'); };
-  img.src = _qrdUrl;
-}
-
-async function qrdDecode(img, revision = _qrdRevision) {
-  const T = makeToolI18n(_qrdDict);
-  let decode;
-  try { decode = await ToolCompute.loadVendor('jsqr'); }
-  catch { _qrdStatus(T('lib_fail'), '#e74c3c'); return; }
-  if (revision !== _qrdRevision) return;
-  // Large photos decode faster (and as reliably) when scaled down.
-  const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  qrdRunDecode(imageData, canvas, decode);
+  try {
+    const data = await (await ToolCompute.load('image')).qr(file, { signal: controller.signal });
+    if (!controller.signal.aborted && revision === _qrdRevision && img.isConnected) qrdRenderText(data.result);
+  } catch (error) {
+    if (!controller.signal.aborted && revision === _qrdRevision && img.isConnected) _qrdStatus(error.message, 'var(--danger)');
+  }
 }
 
 /** Render the decoded text without interpreting it as HTML. */
 function qrdRunDecode(imageData, canvas, decode = window.jsQR) {
   const T = makeToolI18n(_qrdDict);
   const code = decode(imageData.data, canvas.width, canvas.height);
-  const actions = document.getElementById('qrdActions');
-  actions.replaceChildren();
+  document.getElementById('qrdActions').replaceChildren();
+  document.getElementById('qrdContent').textContent = '';
   if (!code) { _qrdStatus(T('none'), '#e74c3c'); return; }
-  const text = code.data;
+  qrdRenderText(code.data);
+}
+function qrdRenderText(text) {
+  const T = makeToolI18n(_qrdDict), actions = document.getElementById('qrdActions'); actions.replaceChildren();
   _qrdStatus(T('ok'), '#10b981');
   document.getElementById('qrdContent').textContent = text;
   const copy = document.createElement('button');

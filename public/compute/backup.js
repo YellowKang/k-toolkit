@@ -7,7 +7,7 @@
     { id: 'prefs', keys: ['dtb_lang', 'dtb_theme', 'dtb_sidebar_collapsed', 'dtb_collapsed_cats', 'ag_fab_pos', 'dtb_otp_settings'] },
     { id: 'history', keys: ['dtb_favorites', 'dtb_recent', 'dtb_usage', 'dtb_search_history'] },
     { id: 'tools', keys: ['dtb_note', 'dtb_todo', 'dtb_countdowns', 'dtb_saved_regex', 'dtb_mc_history', 'dtb_typing_scores', 'dtb_http_history'] },
-    { id: 'chat', keys: ['dtb_chat_history', 'dtb_chat_system', 'dtb_chat_config'] },
+    { id: 'chat', keys: ['dtb_chat_history', 'dtb_chat_system', 'dtb_chat_config', 'dtb_chat_history_meta', 'dtb_context_preferences'] },
     { id: 'agent', prefix: 'ag_', exclude: key => key.startsWith('ag_key_') || key === 'ag_fab_pos' },
     { id: 'apikeys', prefix: 'ag_key_', sensitive: true },
     { id: 'otp', keys: ['dtb_otp_vault'] },

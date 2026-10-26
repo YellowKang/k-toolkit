@@ -1,132 +1,114 @@
-// File state and event handlers belong to this page instance, not the global scope.
+// Both legacy image routes share this bounded, in-memory batch workbench.
 (function () {
-  const tl = makeToolI18n({
-    zh: {
-      title: '图片压缩 / 格式转换', choose: '点击选择图片，或拖拽到此处',
-      formats: 'JPG / PNG / WebP / GIF · 在本地处理，不上传服务器',
-      note: 'GIF 仅导出静态帧；PNG 不受质量滑块影响；转 JPEG 时透明背景填充为白色。',
-      quality: '质量', format: '格式', run: '压缩 / 转换', busy: '处理中…',
-      empty: '请先选择图片', invalid: '请选择有效的图片文件', readError: '图片读取失败，请重新选择',
-      decodeError: '无法解码图片，请选择浏览器支持的有效图片', encodeError: '无法生成所选格式，请更换格式或图片',
-      large: '图片超过 4000 万像素，请先缩小后再处理', original: '原图', output: '处理后',
-      saved: '节省', increased: '体积增加', size: '尺寸', result: '处理结果', download: '下载图片',
-    },
-    en: {
-      title: 'Compress / convert image', choose: 'Choose an image or drop it here',
-      formats: 'JPG / PNG / WebP / GIF · Processed locally, no upload',
-      note: 'GIF exports a still frame. PNG ignores quality. JPEG uses a white background for transparency.',
-      quality: 'Quality', format: 'Format', run: 'Compress / convert', busy: 'Processing…',
-      empty: 'Choose an image first', invalid: 'Choose a valid image file', readError: 'Unable to read the image. Please select it again.',
-      decodeError: 'Unable to decode the image. Choose a valid image supported by your browser.', encodeError: 'Unable to encode this format. Try a different format or image.',
-      large: 'Image exceeds 40 megapixels. Resize it before processing.', original: 'Original', output: 'Output',
-      saved: 'Saved', increased: 'Size increased', size: 'Dimensions', result: 'Result', download: 'Download image',
-    },
+  const T = makeToolI18n({
+    zh: { title: '图片压缩与转换', choose: '选择或拖入图片（可多选）', quality: '质量', format: '输出格式', run: '压缩 / 转换', busy: '处理中…', cancel: '取消', clear: '清空图片', empty: '请先选择图片', invalid: '请选择图片文件', limit: '最多 20 张图片，总大小不超过 100 MB', decode: '无法解码图片，请检查文件格式', encode: '无法生成所选图片格式', large: '图片超过 4000 万像素，请先缩小', queued: '等待处理', cancelled: '已取消，可重新处理', download: '下载', all: '全部下载', original: '原图', result: '处理结果', saved: '节省', increased: '体积增加', note: '在本地处理。PNG 不受质量影响；JPEG 将透明背景填为白色；动画仅导出静态帧。切页保留图片与已完成结果，刷新后清除。', selected: n => `已选择 ${n} 张图片`, result_limit: '结果总大小超过 100 MB，请减少图片数量', reuse: '转为 Base64' },
+    en: { title: 'Image compression & conversion', choose: 'Choose or drop images (multiple allowed)', quality: 'Quality', format: 'Output format', run: 'Compress / convert', busy: 'Processing…', cancel: 'Cancel', clear: 'Clear images', empty: 'Choose images first', invalid: 'Choose image files', limit: 'Up to 20 images totaling 100 MB', decode: 'Unable to decode the image. Check the format.', encode: 'Unable to generate the selected image format', large: 'Image exceeds 40 megapixels. Resize it first.', queued: 'Ready to process', cancelled: 'Cancelled. Run again to retry.', download: 'Download', all: 'Download all', original: 'Original', result: 'Results', saved: 'Saved', increased: 'Size increased', note: 'Processed locally. PNG ignores quality; JPEG fills transparency white; animation exports a still frame. Images and completed results stay while switching tools, and clear on refresh.', selected: n => `${n} images selected`, result_limit: 'Results exceed 100 MB. Select fewer images.', reuse: 'Convert to Base64' },
   });
-  const size = bytes => bytes < 1024 ? bytes + ' B' : bytes < 1048576 ? (bytes / 1024).toFixed(1) + ' KB' : (bytes / 1048576).toFixed(2) + ' MB';
-
-  window.renderImgCompress = function (el) {
-    let file = null, revision = 0, disposed = false, shared;
-    const urls = new Set();
-    const release = () => { urls.forEach(url => URL.revokeObjectURL(url)); urls.clear(); };
-    const objectUrl = blob => { const url = URL.createObjectURL(blob); urls.add(url); return url; };
-    window._activeCleanup = () => { disposed = true; revision++; release(); shared?.dispose(); };
-
-    el.innerHTML = `
-      <div class="tool-card-panel">
-        <div class="panel-label">${tl('title')}</div>
-        <button type="button" id="imgDropZone" style="display:block;width:100%;border:2px dashed var(--glass-border);background:transparent;color:var(--text);border-radius:14px;padding:32px 16px;text-align:center;cursor:pointer;margin-bottom:14px">
-          <span style="font-size:32px;display:block">🖼️</span>
-          <span id="imgSelectedName" style="display:block;overflow-wrap:anywhere">${tl('choose')}</span>
-          <span style="display:block;font-size:12px;color:var(--text-muted);margin-top:8px">${tl('formats')}</span>
-        </button>
-        <input type="file" id="imgFileInput" accept="image/*" hidden>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-          <label for="imgQuality">${tl('quality')}</label>
-          <input type="range" id="imgQuality" min="10" max="100" value="80" style="flex:1;min-width:100px">
-          <output id="imgQualVal" for="imgQuality">80%</output>
-          <label for="imgFormat">${tl('format')}</label>
-          <select id="imgFormat" class="tool-input" style="width:auto"><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select>
-          <button type="button" class="btn btn-primary" id="imgCompressRun">${tl('run')}</button>
-        </div>
-        <p style="font-size:12px;color:var(--text-muted)">${tl('note')}</p>
-        <div id="imgCompressStatus" role="status" aria-live="polite" style="overflow-wrap:anywhere"></div>
-      </div>
-      <div id="imgCompressResult" hidden></div>`;
-    const find = selector => el.querySelector(selector);
-    const zone = find('#imgDropZone'), input = find('#imgFileInput');
-    const status = find('#imgCompressStatus'), result = find('#imgCompressResult');
-    const run = find('#imgCompressRun'), qualityInput = find('#imgQuality');
-    const reset = () => {
-      revision++; release(); result.replaceChildren(); result.hidden = true;
-      run.disabled = false; run.textContent = tl('run'); status.textContent = '';
-    };
-    const choose = (selected, remember = true) => {
-      if (!selected) return;
-      reset(); file = null;
-      find('#imgSelectedName').textContent = tl('choose');
-      if (!selected.type.startsWith('image/')) { status.textContent = tl('invalid'); return; }
-      file = selected;
-      if (remember) shared.remember([selected]);
-      find('#imgSelectedName').textContent = file.name + ' · ' + size(file.size);
-    };
-    shared = ImageSession.mount(el, { onUse: files => choose(files[0], false) });
-    zone.addEventListener('click', () => input.click());
-    input.addEventListener('change', () => { choose(input.files[0]); input.value = ''; });
-    zone.addEventListener('dragover', event => { event.preventDefault(); zone.style.borderColor = 'var(--accent)'; });
-    zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
-    zone.addEventListener('drop', event => { event.preventDefault(); zone.style.borderColor = ''; choose(event.dataTransfer.files[0]); });
-    qualityInput.addEventListener('input', () => { find('#imgQualVal').textContent = qualityInput.value + '%'; });
-    find('#imgFormat').addEventListener('change', event => { qualityInput.disabled = event.target.value === 'image/png'; });
-
-    run.addEventListener('click', async () => {
-      if (!file) { status.textContent = tl('empty'); return; }
-      reset();
-      const ticket = revision, selected = file;
-      const current = () => !disposed && ticket === revision && el.isConnected;
-      const format = find('#imgFormat').value, quality = Number(qualityInput.value) / 100;
-      run.disabled = true; run.textContent = tl('busy'); status.textContent = tl('busy');
-      try {
-        const sourceUrl = objectUrl(selected);
-        const img = await new Promise((resolve, reject) => {
-          const image = new Image();
-          image.onload = () => resolve(image);
-          image.onerror = () => reject(new Error(tl('decodeError')));
-          image.src = sourceUrl;
-        });
-        if (!current()) return;
-        const width = img.naturalWidth, height = img.naturalHeight;
-        if (!width || !height) throw new Error(tl('decodeError'));
-        if (width * height > 40000000) throw new Error(tl('large'));
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error(tl('encodeError'));
-        if (format === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, width, height); }
-        ctx.drawImage(img, 0, 0);
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, format, quality));
-        canvas.width = canvas.height = 0;
-        if (!current()) return;
-        if (!blob || blob.type !== format) throw new Error(tl('encodeError'));
-        const outputUrl = objectUrl(blob), saved = (1 - blob.size / selected.size) * 100;
-        result.innerHTML = `<div class="tool-card-panel">
-          <div class="panel-label">${tl('result')}</div>
-          <p>${tl('original')}: ${size(selected.size)} · ${tl('output')}: ${size(blob.size)} · ${tl(saved >= 0 ? 'saved' : 'increased')}: ${Math.abs(saved).toFixed(1)}% · ${tl('size')}: ${width} × ${height}</p>
-          <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px">
-            <img data-preview="original" alt="${tl('original')}" style="flex:1;min-width:0;width:45%;max-height:260px;object-fit:contain">
-            <img data-preview="output" alt="${tl('output')}" style="flex:1;min-width:0;width:45%;max-height:260px;object-fit:contain">
-          </div><a class="btn btn-primary" data-download>${tl('download')}</a></div>`;
-        result.querySelector('[data-preview="original"]').src = sourceUrl;
-        result.querySelector('[data-preview="output"]').src = outputUrl;
-        const download = result.querySelector('[data-download]');
-        download.href = outputUrl;
-        download.download = (selected.name.replace(/\.[^.]+$/, '') || 'image') + '-compressed.' + (format === 'image/jpeg' ? 'jpg' : format.split('/')[1]);
-        download.parentElement.appendChild(shared.resultButton(blob, download.download));
-        result.hidden = false; status.textContent = '';
-      } catch (error) {
-        if (current()) { release(); status.textContent = error.message || tl('readError'); }
-      } finally {
-        if (current()) { run.disabled = false; run.textContent = tl('run'); }
+  const state = { files: [], results: [], format: 'image/jpeg', quality: 80, revision: 0, running: false, route: null, controller: null };
+  const size = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB';
+  function release() { state.results.forEach(result => { if (result.url) URL.revokeObjectURL(result.url); }); state.results = []; }
+  function mount(el, webp) {
+    let disposed = false;
+    if (webp && state.route !== 'webp') state.format = 'image/webp';
+    state.route = webp ? 'webp' : 'compress';
+    const ids = webp ? { file:'iwFile', drop:'iwDrop', quality:'iwQuality', status:'iwStatus', result:'iwResults' } : { file:'imgFileInput', drop:'imgDropZone', quality:'imgQuality', status:'imgCompressStatus', result:'imgCompressResult' };
+    el.innerHTML = `<div class="tool-card-panel">
+      <div class="panel-label">${T('title')}</div>
+      <button type="button" id="${ids.drop}" class="image-drop"><span>🖼️ ${T('choose')}</span><span id="imgSelectedName"></span></button>
+      <input type="file" id="${ids.file}" accept="image/*" multiple hidden>
+      <div class="tool-actions image-options">
+        <label>${T('format')}<select class="tool-input" id="imgFormat"><option value="image/jpeg">JPEG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></label>
+        <label for="${ids.quality}">${T('quality')} <output id="imgQualVal"></output><input type="range" id="${ids.quality}" min="10" max="100" value="${state.quality}"></label>
+        <button type="button" class="btn btn-primary" data-tool-submit id="imgCompressRun">${T('run')}</button>
+        <button type="button" class="btn btn-secondary" id="imageCancel" hidden>${T('cancel')}</button>
+        <button type="button" class="btn btn-secondary" id="imageClear">${T('clear')}</button>
+      </div><p class="workspace-notice">${T('note')}</p><p id="${ids.status}" role="status" aria-live="polite"></p>
+    </div>
+    <div class="tool-card-panel" id="${ids.result}" hidden><div class="tool-actions"><span class="panel-label">${T('result')}</span><button type="button" class="btn btn-secondary" id="iwDownloadAll" hidden>${T('all')}</button></div><div id="iwList" class="image-results"></div></div>`;
+    const find = selector => el.querySelector(selector), status = find('#' + ids.status), runButton = find('#imgCompressRun');
+    const shared = ImageSession.mount(el, { multiple: true, onUse: files => choose(files, false) });
+    const download = result => { const a = document.createElement('a'); a.href = result.url; a.download = result.name; el.appendChild(a); a.click(); a.remove(); };
+    function rows() {
+      if (disposed) return;
+      const list = find('#iwList'); list.replaceChildren();
+      find('#' + ids.result).hidden = !state.results.length;
+      find('#iwDownloadAll').hidden = !state.results.some(item => item.url);
+      state.files.forEach((file, i) => {
+        const result = state.results[i]; if (!result) return;
+        const row = document.createElement('div'); row.className = 'image-result-row';
+        const name = document.createElement('strong'); name.textContent = file.name;
+        const info = document.createElement('div'); info.dataset.info = ''; info.setAttribute('role', 'status');
+        const text = document.createElement('div'); text.className = 'image-result-info'; text.append(name, info); row.append(text);
+        if (result.url) {
+          const img = document.createElement('img'); img.src = result.url; img.alt = T('result'); row.prepend(img);
+          const saved = (1 - result.blob.size / file.size) * 100;
+          info.textContent = `${size(file.size)} → ${size(result.blob.size)} · ${T(saved >= 0 ? 'saved' : 'increased')} ${Math.abs(saved).toFixed(1)}% · ${result.width} × ${result.height}`;
+          const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-secondary'; button.dataset.download = ''; button.textContent = T('download'); button.onclick = () => download(result);
+          const next = document.createElement('button'); next.type = 'button'; next.className = 'btn btn-secondary'; next.textContent = T('reuse');
+          next.onclick = () => { if (ImageSession.useNext('img-base64', [new File([result.blob], result.name, {type:result.blob.type})])) navigateTo('img-base64'); };
+          row.append(button, shared.resultButton(result.blob, result.name), next);
+        } else info.textContent = T(result.state || 'queued');
+        list.appendChild(row);
+      });
+    }
+    function update() {
+      const format = find('#imgFormat'), quality = find('#' + ids.quality);
+      format.value = state.format; quality.value = state.quality; quality.disabled = state.format === 'image/png' || state.running; format.disabled = state.running;
+      find('#imgQualVal').textContent = state.quality + '%';
+      find('#imgSelectedName').textContent = state.files.length ? T('selected', state.files.length) + ' · ' + state.files[0].name : '';
+      runButton.disabled = state.running; runButton.textContent = T(state.running ? 'busy' : 'run'); find('#imageCancel').hidden = !state.running;
+      rows();
+    }
+    function cancel() { state.controller?.abort(); state.controller = null; state.revision++; state.running = false; state.results.forEach(item => { if (['busy','queued'].includes(item.state)) item.state = 'cancelled'; }); update(); }
+    function choose(files, remember = true) {
+      files = Array.from(files); status.textContent = '';
+      if (files.some(file => !file.type.startsWith('image/'))) { status.textContent = T('invalid'); return; }
+      if (!files.length) return;
+      if (files.length > 20 || files.reduce((sum, file) => sum + file.size, 0) > 100 * 1024 * 1024) { status.textContent = T('limit'); return; }
+      cancel(); release(); state.files = files;
+      if (remember) shared.remember(files);
+      update();
+    }
+    async function run() {
+      if (state.running) return;
+      if (!state.files.length) { status.textContent = T('empty'); return; }
+      release(); state.results = state.files.map(() => ({ state:'queued' })); state.running = true;
+      const ticket = ++state.revision, format = state.format, quality = state.quality;
+      const controller = state.controller = new AbortController(), generation = ImageSession.generation();
+      const current = () => !disposed && ticket === state.revision;
+      let total = 0; update(); status.textContent = '';
+      for (let i = 0; i < state.files.length && current(); i++) {
+        const file = state.files[i]; state.results[i].state = 'busy'; rows();
+        try {
+          const compute = await ToolCompute.load('image');
+          if (!current()) return;
+          const { blob, width, height, name } = await compute.convert(file, { format, quality }, { signal: controller.signal });
+          if (!current()) return;
+          if (total + blob.size > 100 * 1024 * 1024) throw new Error('result_limit');
+          total += blob.size;
+          const artifact = generation === ImageSession.generation() ? ImageSession.addResult(blob, name, generation) : null;
+          state.results[i] = { blob, width, height, url:URL.createObjectURL(blob), name, fileId:artifact?.id };
+        } catch (error) {
+          if (!current()) return;
+          const key = ['decode','encode','large','result_limit'].includes(error.code || error.message) ? error.code || error.message : 'encode';
+          state.results[i] = { state:key }; status.textContent = T(key);
+        }
+        rows();
       }
-    });
-  };
+      if (current()) { state.running = false; state.controller = null; update(); }
+    }
+    find('#' + ids.drop).onclick = () => find('#' + ids.file).click();
+    find('#' + ids.file).onchange = event => { choose(event.target.files); event.target.value = ''; };
+    find('#' + ids.drop).ondragover = event => event.preventDefault();
+    find('#' + ids.drop).ondrop = event => { event.preventDefault(); choose(event.dataTransfer.files); };
+    find('#imgFormat').onchange = event => { state.format = event.target.value; update(); };
+    find('#' + ids.quality).oninput = event => { state.quality = Number(event.target.value); find('#imgQualVal').textContent = state.quality + '%'; };
+    runButton.onclick = run; find('#imageCancel').onclick = cancel;
+    find('#imageClear').onclick = () => { cancel(); release(); state.files = []; status.textContent = ''; update(); };
+    find('#iwDownloadAll').onclick = () => state.results.filter(item => item.url).forEach(download);
+    window._activeCleanup = () => { cancel(); disposed = true; shared.dispose(); };
+    update();
+  }
+  window.renderImgCompress = el => mount(el, false);
+  window.renderImgWebp = el => mount(el, true);
 })();

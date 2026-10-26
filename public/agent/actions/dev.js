@@ -22,144 +22,57 @@ const DevActions = [
   },
   // hash_all 由 composite.js 提供（含 MD5），此处不重复定义
   {
-    name: 'jwt_decode',
-    description: '解码 JWT Token（不验证签名）',
-    meta: { tier: 'standard', tags: ['jwt', 'token', 'decode', 'auth'], category: 'dev' },
-    parameters: {
-      type: 'object',
-      properties: { token: { type: 'string', description: 'JWT Token 字符串' } },
-      required: ['token'],
-    },
-    execute({ token }) {
-      try {
-        const parts = token.split('.');
-        if (parts.length !== 3) throw new Error('无效的 JWT 格式');
-        const decode = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
-        const header = decode(parts[0]);
-        const payload = decode(parts[1]);
-        const signature = parts[2];
-        const now = Math.floor(Date.now() / 1000);
-        const expired = payload.exp ? payload.exp < now : undefined;
-        const expAt = payload.exp ? new Date(payload.exp * 1000).toISOString() : undefined;
-        return { success: true, data: { header, payload, signature, expired, expAt },
-          display: expired === true ? 'JWT 已过期' : expired === false ? 'JWT 有效' : 'JWT 解码成功' };
-      } catch (e) {
-        return { success: false, data: { error: e.message }, display: `解码失败: ${e.message}` };
-      }
-    },
+    name:'jwt_decode',description:'解码 JWT 的 UTF-8 JSON Header/Payload，返回 exp/nbf 时间状态；不验证签名，不能据此认定令牌可信或有效。',
+    meta:{tier:'standard',tags:['jwt','token','decode','auth'],category:'dev'},
+    parameters:{type:'object',properties:{token:{type:'string',maxLength:65536}},required:['token'],additionalProperties:false},
+    async execute({token}){try{const data=(await window.ToolCompute.load('jwt')).decode(token);return {success:true,data,display:'JWT: '+data.timeStatus+' · signature not verified'};}catch(error){return {success:false,error:error.message};}},
   },
   {
-    name: 'url_parse',
-    description: '解析 URL 各组成部分',
-    meta: { tier: 'standard', tags: ['url', 'parse', 'query', 'params'], category: 'dev' },
-    parameters: {
-      type: 'object',
-      properties: { url: { type: 'string', description: '要解析的 URL' } },
-      required: ['url'],
-    },
-    execute({ url }) {
-      try {
-        const u = new URL(url);
-        const params = {};
-        u.searchParams.forEach((v, k) => { params[k] = v; });
-        return { success: true,
-          data: { protocol: u.protocol, host: u.host, pathname: u.pathname, params, hash: u.hash },
-          display: `协议: ${u.protocol} 主机: ${u.host}` };
-      } catch (e) {
-        return { success: false, data: { error: e.message }, display: `URL 解析失败: ${e.message}` };
-      }
-    },
+    name:'url_parse',description:'解析 URL，返回有序 entries[{key,value}] 与 params（重复键为数组，单值为字符串），只解码一次；支持基础 URL 和相对路径。',
+    meta:{tier:'standard',tags:['url','parse','query','params','参数','解析'],category:'dev'},
+    parameters:{type:'object',properties:{url:{type:'string',maxLength:65536},base:{type:'string',description:'解析相对路径时的基础 URL'}},required:['url'],additionalProperties:false},
+    async execute({url,base}){try{return {success:true,data:(await window.ToolCompute.load('url')).parse(url,{base})};}catch(error){return {success:false,error:error.message};}},
   },
   {
-    name: 'url_encode',
-    description: 'URL 编码文本',
-    meta: { tier: 'standard', tags: ['url', 'encode', 'urlencode'], category: 'dev' },
-    parameters: {
-      type: 'object',
-      properties: { text: { type: 'string', description: '要编码的文本' } },
-      required: ['text'],
-    },
-    execute({ text }) {
-      const result = encodeURIComponent(text);
-      return { success: true, data: { result }, display: `URL 编码完成` };
-    },
+    name:'url_build',description:'构建 URL；entries 为有序参数数组，保留重复键、空值和片段。默认追加已有查询参数，replace=true 替换已有查询。不发起网络请求。',
+    meta:{tier:'standard',tags:['url','build','query','params','构建','参数'],category:'dev'},
+    parameters:{type:'object',properties:{base:{type:'string'},entries:{type:'array',maxItems:5000,items:{type:'object',properties:{key:{type:'string'},value:{type:'string'}},required:['key','value'],additionalProperties:false}},replace:{type:'boolean'}},required:['base','entries'],additionalProperties:false},
+    async execute({base,entries,replace=false}){try{return {success:true,data:{result:(await window.ToolCompute.load('url')).build(base,entries,{replace})}};}catch(error){return {success:false,error:error.message};}},
   },
-  {
-    name: 'url_decode',
-    description: 'URL 解码文本',
-    meta: { tier: 'standard', tags: ['url', 'decode', 'urldecode'], category: 'dev' },
-    parameters: {
-      type: 'object',
-      properties: { text: { type: 'string', description: '要解码的文本' } },
-      required: ['text'],
-    },
-    execute({ text }) {
-      try {
-        const result = decodeURIComponent(text);
-        return { success: true, data: { result }, display: `URL 解码完成` };
-      } catch (e) {
-        return { success: false, data: { error: e.message }, display: `解码失败: ${e.message}` };
-      }
-    },
-  },
+  ...['encode','decode'].map(direction=>({
+    name:'url_'+direction,description:(direction==='encode'?'URL 编码':'URL 解码')+'，保留空白。mode=component 参数值（默认）/uri 整段 URI/form 表单（空格与 +）。查询参数结果不要重复解码。',
+    meta:{tier:'standard',tags:['url',direction,'url'+direction,'编码','解码'],category:'dev'},
+    parameters:{type:'object',properties:{text:{type:'string',maxLength:65536},mode:{type:'string',enum:['component','uri','form'],default:'component'}},required:['text'],additionalProperties:false},
+    async execute({text,mode='component'}){try{return {success:true,data:{result:(await window.ToolCompute.load('url')).codec(text,{decode:direction==='decode',mode})}};}catch(error){return {success:false,error:error.message};}},
+  })),
   {
     name: 'regex_test',
-    description: '用正则表达式匹配文本',
-    meta: { tier: 'standard', tags: ['regex', 'regexp', 'match', 'pattern'], category: 'dev' },
+    description: '用正则表达式匹配或替换文本。与页面使用相同的可中止 Worker，替换支持 $1、$& 和命名组；超时明确报错。',
+    meta: { tier: 'standard', tags: ['regex', 'regexp', 'match', 'pattern', 'replace', '正则', '替换'], category: 'dev' },
     parameters: {
       type: 'object',
       properties: {
         pattern: { type: 'string', description: '正则表达式' },
         flags:   { type: 'string', description: '修饰符，如 gi', default: 'g' },
         text:    { type: 'string', description: '要匹配的文本' },
+        mode: { type: 'string', enum: ['match', 'replace'], default: 'match' },
+        replacement: { type: 'string', description: '替换模板，默认空字符串' },
       },
       required: ['pattern', 'text'],
     },
-    execute({ pattern, flags = 'g', text }) {
-      try {
-        const re = new RegExp(pattern, flags);
-        const matches = [];
-        let m;
-        while ((m = re.exec(text)) !== null) {
-          matches.push({ match: m[0], index: m.index, groups: m.groups });
-          if (!flags.includes('g')) break;
-        }
-        return { success: true, data: { matches, count: matches.length, namedGroups: matches[0]?.groups },
-          display: `找到 ${matches.length} 个匹配` };
-      } catch (e) {
-        return { success: false, data: { error: e.message }, display: `正则错误: ${e.message}` };
-      }
+    async execute({ pattern, flags = 'g', text, mode = 'match', replacement = '' }, {signal} = {}) {
+      const data=await (await window.ToolCompute.load('regex')).run({pattern,flags,text,mode,replacement},{signal});
+      if(data.error)return {success:false,error:data.error,display:'Regex: '+data.error};
+      if(mode==='replace')return {success:true,data:{result:data.result},display:window.getCurrentLang?.()==='en'?'Replacement complete':'替换完成'};
+      const matches=data.matches.map(m=>({match:text.slice(m.index,m.end),index:m.index,groups:m.named,captures:m.groups}));
+      return {success:true,data:{matches,count:matches.length,namedGroups:matches[0]?.groups,truncated:data.truncated},display:window.getCurrentLang?.()==='en' ? `${matches.length} matches${data.truncated?' (truncated)':''}` : `${matches.length} 处匹配${data.truncated?'（已截断）':''}`};
     },
   },
   {
-    name: 'timestamp_convert',
-    description: '时间戳与日期相互转换',
-    meta: { tier: 'standard', tags: ['timestamp', 'date', 'time', 'convert'], category: 'dev' },
-    parameters: {
-      type: 'object',
-      properties: {
-        value:     { type: 'string', description: '时间戳数字或日期字符串' },
-        direction: { type: 'string', enum: ['toDate', 'toTs'] },
-        unit:      { type: 'string', enum: ['s', 'ms'], default: 's' },
-      },
-      required: ['value', 'direction'],
-    },
-    execute({ value, direction, unit = 's' }) {
-      if (direction === 'toDate') {
-        const ms = unit === 's' ? Number(value) * 1000 : Number(value);
-        const d = new Date(ms);
-        const iso = d.toISOString();
-        const now = Date.now();
-        const diff = Math.round((ms - now) / 1000);
-        const relative = diff > 0 ? `${diff}s 后` : `${-diff}s 前`;
-        return { success: true, data: { result: iso, iso, relative }, display: iso };
-      } else {
-        const d = new Date(value);
-        if (isNaN(d)) return { success: false, data: { error: '无效日期' }, display: '无效日期' };
-        const ts = unit === 's' ? Math.floor(d.getTime() / 1000) : d.getTime();
-        return { success: true, data: { result: ts, iso: d.toISOString(), relative: '' }, display: String(ts) };
-      }
-    },
+    name:'timestamp_convert',description:'严格日期与时间戳转换，与页面共用。unit auto/s/ms/us/ns；自动按位数猜测，历史时间应显式给单位。无偏移日期按 timeZone（默认 local），DST 缺失/重复时间拒绝；重叠可选 earlier/later。us/ns 输出为字符串，精度到毫秒。',
+    meta:{tier:'standard',tags:['timestamp','date','time','convert','时间戳','日期'],category:'dev'},
+    parameters:{type:'object',properties:{value:{type:'string',maxLength:100},direction:{type:'string',enum:['toDate','toTs']},unit:{type:'string',enum:['auto','s','ms','us','ns']},timeZone:{type:'string',maxLength:80},disambiguation:{type:'string',enum:['reject','earlier','later']}},required:['value','direction'],additionalProperties:false},
+    async execute({value,...options}){try{const data=(await ToolCompute.load('date')).timestamp(value,options);return {success:true,data,display:String(data.result)};}catch(e){return {success:false,error:e.message};}}
   },
   {
     name: 'cron_parse',
@@ -276,68 +189,10 @@ const DevActions = [
     },
   },
   {
-    name: 'timezone_convert',
-    description: '在不同时区之间转换时间',
-    meta: { tier: 'standard', tags: ['timezone', 'time', 'convert', 'utc'], category: 'dev' },
-    parameters: {
-      type: 'object',
-      properties: {
-        time: { type: 'string', description: '时间字符串（ISO 格式或 HH:mm）' },
-        from: { type: 'string', description: '源时区，如 Asia/Shanghai' },
-        to:   { type: 'string', description: '目标时区，如 America/New_York' },
-      },
-      required: ['time', 'from', 'to'],
-    },
-    execute({ time, from, to }) {
-      try {
-        // A time without an explicit offset is a wall-clock time in the source zone (not this browser's zone).
-        const text = String(time).trim();
-        const hhmm = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(text);
-        const wall = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(text);
-        let ms;
-        if (hhmm) {
-          const today = ToolCompute.zonedParts(Date.now(), from);
-          ms = ToolCompute.zonedTimeToUtc({ ...today, hour: +hhmm[1], minute: +hhmm[2], second: +(hhmm[3] || 0) }, from);
-        } else if (wall) {
-          ms = ToolCompute.zonedTimeToUtc({ year: +wall[1], month: +wall[2], day: +wall[3], hour: +(wall[4] || 0), minute: +(wall[5] || 0), second: +(wall[6] || 0) }, from);
-        } else {
-          ms = Date.parse(text);
-        }
-        if (!Number.isFinite(ms)) throw new Error('无效时间格式');
-        const date = new Date(ms);
-
-        const fmtOpts = { timeZone: '', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
-
-        // Format in source timezone
-        fmtOpts.timeZone = from;
-        const fromStr = new Intl.DateTimeFormat('sv-SE', fmtOpts).format(date);
-
-        // Format in target timezone
-        fmtOpts.timeZone = to;
-        const toStr = new Intl.DateTimeFormat('sv-SE', fmtOpts).format(date);
-
-        // Calculate offset difference
-        const getOffset = (tz) => {
-          const s = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' }).format(date);
-          const m = s.match(/GMT([+-]?\d+(?::\d+)?)/);
-          if (!m) return 0;
-          const parts = m[1].split(':');
-          const h = parseInt(parts[0], 10);
-          const min = parts[1] ? parseInt(parts[1], 10) * Math.sign(h || 1) : 0;
-          return h * 60 + min;
-        };
-        const fromOffset = getOffset(from);
-        const toOffset = getOffset(to);
-        const diffHours = (toOffset - fromOffset) / 60;
-        const diffStr = diffHours >= 0 ? `+${diffHours}` : `${diffHours}`;
-
-        return { success: true,
-          data: { from: { timezone: from, time: fromStr }, to: { timezone: to, time: toStr }, diffHours },
-          display: `${from} ${fromStr} → ${to} ${toStr}（差 ${diffStr}h）` };
-      } catch (e) {
-        return { success: false, data: { error: e.message }, display: `时区转换失败: ${e.message}` };
-      }
-    },
+    name:'timezone_convert',description:'严格时区转换：ISO 日期时间或 HH:mm（来源时区今天）。无偏移输入属于 from 时区；DST 跳时拒绝，重复时间默认拒绝，可选 earlier/later。',
+    meta:{tier:'standard',tags:['timezone','time','convert','utc','时区'],category:'dev'},
+    parameters:{type:'object',properties:{time:{type:'string',maxLength:100},from:{type:'string',maxLength:80},to:{type:'string',maxLength:80},disambiguation:{type:'string',enum:['reject','earlier','later']}},required:['time','from','to'],additionalProperties:false},
+    async execute({time,from,to,disambiguation}){try{const data=(await ToolCompute.load('date')).timezone(time,from,to,disambiguation);return {success:true,data,display:data.result};}catch(e){return {success:false,error:e.message};}}
   },
   {
     name: 'ua_parse',

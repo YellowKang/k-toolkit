@@ -185,18 +185,18 @@ const CAT_NAME_EN = {
 const TOOLS_EN = {
   // Text (文本处理)
   'uuid':             { name:'UUID Generator',     desc:'Batch generate UUID v4, one-click copy, custom count',                        category:'Text' },
-  'json':             { name:'JSON Formatter',     desc:'Format, minify and validate JSON with instant syntax highlighting',            category:'Text' },
+  'json':             { name:'JSON Formatter',     desc:'Format, unescape and expand nested JSON; quickly copy values and paths',            category:'Text' },
   'base64':           { name:'Base64',             desc:'Encode/decode text and files to Base64, supports URL-safe and Data URL',      category:'Text' },
   'wordcount':        { name:'Word Count',         desc:'Count characters, words, lines, paragraphs and CJK characters',              category:'Text' },
-  'regex':            { name:'Regex Tester',       desc:'Real-time highlight matches, capture group details, multiple flags',          category:'Text' },
+  'regex':            { name:'Regex Tester',       desc:'Capture groups, named groups and replacement with zero-width matching and timeouts',          category:'Text' },
   'json-csv':         { name:'JSON/CSV Convert',   desc:'Convert JSON and CSV both ways with quoting, delimiter detection and Excel export', category:'Text' },
-  'text-diff':        { name:'Text Diff',          desc:'Line-by-line comparison of two texts with highlighted differences',           category:'Text' },
-  'markdown':         { name:'Markdown Preview',   desc:'Real-time Markdown rendering with syntax highlighting',                       category:'Text' },
+  'text-diff':        { name:'Text Diff',          desc:'Exact line, word or character diff with pagination and full export',           category:'Text' },
+  'markdown':         { name:'Markdown Preview',   desc:'Split editor and preview with tables, task lists and HTML copy',                       category:'Text' },
   'case-convert':     { name:'Case Convert',       desc:'Convert between camelCase, snake_case, UPPERCASE and more',                  category:'Text' },
   'unicode-convert':  { name:'Unicode Convert',    desc:'Convert Unicode code points and characters, escape sequences',               category:'Text' },
   'html-entity':      { name:'HTML Entity',        desc:'HTML entity encode/decode with swap, reference for special characters',      category:'Text' },
   'lorem':            { name:'Lorem Ipsum',        desc:'Generate Lorem Ipsum placeholder text, custom paragraphs and word count',    category:'Text' },
-  'text-escape':      { name:'Text Escape',        desc:'Escape/unescape JSON/regex/HTML/URL special characters',                     category:'Text' },
+  'text-escape':      { name:'Text Escape',        desc:'Escape JSON/HTML/URL/regex, unescape one layer, copy and continue processing',                     category:'Text' },
   'diff-json':        { name:'JSON Diff',          desc:'Diff two JSON or YAML objects with highlighted differences',                  category:'Text' },
   'toml-json':        { name:'TOML/JSON',          desc:'Convert TOML 1.0 and JSON both ways, incl. inline tables and multi-line arrays', category:'Data' },
   'slug-gen':         { name:'Slug Generator',     desc:'Convert text to URL-friendly slug with pinyin support',                      category:'Text' },
@@ -208,7 +208,7 @@ const TOOLS_EN = {
   'jwt':              { name:'JWT Tool',           desc:'Decode/generate JWT tokens with HS256 signing support',                      category:'Dev Tools' },
   'number-base':      { name:'Number Base',        desc:'Arbitrary-precision binary/octal/decimal/hex conversion and code points',   category:'Dev Tools' },
   'yaml-json':        { name:'YAML/JSON',          desc:'Convert YAML and JSON both ways with anchors, merge keys and multi-document', category:'Data' },
-  'sql-format':       { name:'SQL Formatter',      desc:'Beautify/minify SQL, supports SELECT/INSERT/UPDATE/DELETE',                  category:'Dev Tools' },
+  'sql-format':       { name:'SQL Formatter',      desc:'SQL formatting that preserves strings and comments, with dialect, case and indent options',                  category:'Dev Tools' },
   'curl-gen':         { name:'cURL Generator',     desc:'Visually generate curl/fetch/axios code snippets with cURL import',          category:'Dev Tools' },
   'http-status':      { name:'HTTP Status',        desc:'Look up HTTP status code meanings, search and browse by category',           category:'Dev Tools' },
   'cron':             { name:'Cron Expression',    desc:'Parse Linux/Spring/Quartz cron, validate fields and list next runs',          category:'Dev Tools' },
@@ -243,7 +243,7 @@ const TOOLS_EN = {
   'morse':            { name:'Morse Code',         desc:'Convert text to Morse code and decode back',                                 category:'Crypto' },
   'xml-format':       { name:'XML Formatter',      desc:'Format, minify and convert XML to JSON, keeping comments and CDATA',        category:'Data' },
   // Calculator (计算工具)
-  'calculator':       { name:'Calculator',         desc:'Scientific calculator with history, supports keyboard input',                category:'Calculator' },
+  'calculator':       { name:'Calculator',         desc:'Editable expressions, scientific functions and history; shared with the Agent',                category:'Calculator' },
   'unit-convert':     { name:'Unit Convert',       desc:'Convert length, mass, temperature, area, volume, time, storage, speed and number formats', category:'Calculator' },
   'loan-calc':        { name:'Loan Calculator',    desc:'Monthly payment, total interest and amortization schedule',                  category:'Calculator' },
   'byte-convert':     { name:'Byte Convert',       desc:'Storage units in both 1024 and 1000 bases, plus network speed',              category:'Calculator' },
@@ -282,7 +282,7 @@ const TOOLS_EN = {
   'chmod-calc':       { name:'Chmod Calculator',   desc:'Linux file permission calculator, numeric and symbolic mode conversion',      category:'Dev Tools' },
   'placeholder-img':  { name:'Placeholder Image',  desc:'Generate placeholder images with custom size/color/text, Canvas download',    category:'Image' },
   'string-inspect':   { name:'String Inspector',   desc:'Inspect each character: Unicode codepoint, byte count, invisible char highlight', category:'Text' },
-  'json-schema':      { name:'JSON Schema',        desc:'Infer JSON Schema (Draft-07) from sample JSON, validate against schema',     category:'Dev Tools' },
+  'json-schema':      { name:'JSON Schema',        desc:'Infer from all samples; Draft-07 validation with error paths and cancellation',     category:'Dev Tools' },
   'favicon-gen':      { name:'Favicon Generator',  desc:'Generate multi-size favicons from text/emoji, export ICO/PNG/SVG',           category:'Image' },
   'llm-token':        { name:'LLM Token Counter',  desc:'Estimate text token count and API call cost for GPT/Claude models',          category:'Dev Tools' },
   'hmac-gen':         { name:'HMAC Generator',     desc:'Generate HMAC-SHA256/384/512/SHA1 message authentication codes',             category:'Crypto' },
@@ -318,6 +318,7 @@ function makeToolI18n(dict) {
 }
 
 function setLang(lang) {
+  window.ToolWorkspace?.capture(window.currentPage);
   if (window.currentPage !== 'ai-chat' && window._activeCleanup) {
     window._activeCleanup(); window._activeCleanup = null;
   }
@@ -333,7 +334,8 @@ function setLang(lang) {
   const inp = document.getElementById('searchInput');
   if (inp) inp.placeholder = t('search_placeholder');
   // 重渲染当前页
-  if (typeof renderHomePage === 'function') renderHomePage(typeof currentPage !== 'undefined' ? currentPage : 'home');
+  if (typeof renderHomePage === 'function' && ['home','favorites','recent','ai-chat'].includes(window.currentPage || 'home')) renderHomePage(window.currentPage || 'home');
+  if (window.currentPage === '__search__' && typeof renderSearchResults === 'function') renderSearchResults(searchQuery);
   // 重建侧边栏导航（分类名/工具名需要更新）
   if (typeof buildSidebarNav === 'function') buildSidebarNav();
   // 刷新主题按钮名称

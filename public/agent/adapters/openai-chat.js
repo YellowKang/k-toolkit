@@ -13,8 +13,7 @@ const OpenAIChatAdapter = {
   ],
 
   async chat({ messages, tools, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
-    const base = baseUrl || 'https://api.openai.com';
-    const url = `${base}/v1/chat/completions`;
+    const url = window.AgentTransport.endpoint('openai-chat', baseUrl);
 
     const oaiMsgs = messages.map(m => {
       if (m.role === 'tool') {
@@ -53,12 +52,10 @@ const OpenAIChatAdapter = {
       body: JSON.stringify(body),
     });
 
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`OpenAI API error ${resp.status}: ${err}`);
-    }
+    if (!resp.ok) throw await window.AgentTransport.responseError(resp);
 
     const raw = await resp.json();
+    if (raw.error || raw.status === 'failed') throw window.AgentTransport.apiError(502, raw);
     const choice = raw.choices?.[0];
     const msg = choice?.message || {};
 
@@ -78,8 +75,7 @@ const OpenAIChatAdapter = {
   },
 
   async *chatStream({ messages, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
-    const base = baseUrl || 'https://api.openai.com';
-    const url = `${base}/v1/chat/completions`;
+    const url = window.AgentTransport.endpoint('openai-chat', baseUrl);
 
     const oaiMsgs = messages.map(m => ({ role: m.role, content: m.content }));
 
@@ -101,13 +97,11 @@ const OpenAIChatAdapter = {
       body: JSON.stringify(body),
     });
 
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`OpenAI API error ${resp.status}: ${err}`);
-    }
+    if (!resp.ok) throw await window.AgentTransport.responseError(resp);
 
     let usage = { input: 0, output: 0 };
     for await (const chunk of parseSSEStream(resp, signal)) {
+      if (chunk.error || chunk.type === 'error' || chunk.type === 'response.failed') throw window.AgentTransport.apiError(502, chunk.response || chunk);
       const delta = chunk.choices?.[0]?.delta;
       if (delta?.content) {
         yield { type: 'delta', text: delta.content };

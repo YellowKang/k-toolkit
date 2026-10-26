@@ -13,10 +13,10 @@ const _pomDict = {
 
 function renderPomodoro(el) {
   const T = makeToolI18n(_pomDict);
-  // clean up any existing timer
-  if (window._pomTimer) { clearInterval(window._pomTimer); window._pomTimer = null; }
-  window._pomWork=25; window._pomBreak=5; window._pomSec=1500; window._pomTotal=1500;
-  window._pomRunning=false; window._pomPhase='work'; window._pomCount=0;
+  if (window._pomSec === undefined) {
+    window._pomWork=25; window._pomBreak=5; window._pomSec=1500; window._pomTotal=1500;
+    window._pomRunning=false; window._pomPhase='work'; window._pomCount=0;
+  }
 
   el.innerHTML = `
     <div class="tool-card-panel" style="text-align:center">
@@ -46,11 +46,10 @@ function renderPomodoro(el) {
     </div>`;
   _updatePomDisplay();
 
-  window._activeCleanup = function() {
-    if (window._pomTimer) { clearInterval(window._pomTimer); window._pomTimer = null; }
-    window._pomRunning = false;
-    document.title = 'DevToolbox';
-  };
+  window._activeCleanup = () => {};
+  if (window._pomRunning) _pomTick();
+  const start = document.getElementById('pomStartBtn');
+  start.textContent = T(window._pomRunning ? 'pause' : window._pomSec < window._pomTotal ? 'resume' : 'start');
 }
 
 function pomSet(w,b) {
@@ -63,17 +62,23 @@ function pomSet(w,b) {
 function pomToggle() {
   const T = makeToolI18n(_pomDict);
   if (window._pomRunning) {
+    _pomTick();
     clearInterval(window._pomTimer); window._pomTimer=null; window._pomRunning=false;
+    window.ToolActivity?.update('pomodoro', '', false);
     const btn=document.getElementById('pomStartBtn'); if(btn) btn.textContent=T('resume');
+    _updatePomDisplay();
   } else {
     window._pomRunning=true;
+    window._pomEnd = Date.now() + window._pomSec * 1000;
     window._pomTimer=setInterval(_pomTick,1000);
     const btn=document.getElementById('pomStartBtn'); if(btn) btn.textContent=T('pause');
+    _updatePomDisplay();
   }
 }
 
 function pomReset() {
   if(window._pomTimer){clearInterval(window._pomTimer);window._pomTimer=null;}
+  window.ToolActivity?.update('pomodoro', '', false);
   window._pomRunning=false; window._pomPhase='work';
   window._pomSec=window._pomWork*60; window._pomTotal=window._pomWork*60;
   const btn=document.getElementById('pomStartBtn'); if(btn) btn.textContent=makeToolI18n(_pomDict)('start');
@@ -81,27 +86,33 @@ function pomReset() {
 }
 
 function _pomTick() {
-  window._pomSec--;
-  if (window._pomSec<=0) {
+  let notify = false;
+  while (Date.now() >= window._pomEnd) {
     if(window._pomPhase==='work'){
       window._pomCount++;
       window._pomPhase='break';
       window._pomSec=window._pomBreak*60;
       window._pomTotal=window._pomBreak*60;
-      const T = makeToolI18n(_pomDict);
-      if(Notification.permission==='granted') new Notification(T('notify_title'),{body:T('notify_body', window._pomBreak)});
+      notify = true;
     } else {
       window._pomPhase='work';
       window._pomSec=window._pomWork*60;
       window._pomTotal=window._pomWork*60;
     }
+    window._pomEnd += window._pomSec * 1000;
   }
+  if (notify && window._pomPhase === 'break' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    const T = makeToolI18n(_pomDict);
+    new Notification(T('notify_title'), { body:T('notify_body', window._pomBreak) });
+  }
+  window._pomSec = Math.max(0, Math.ceil((window._pomEnd - Date.now()) / 1000));
   _updatePomDisplay();
 }
 
 function _updatePomDisplay() {
   const T = makeToolI18n(_pomDict);
   const m=Math.floor(window._pomSec/60),s=window._pomSec%60;
+  window.ToolActivity?.update('pomodoro', '🍅 ' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0'), window._pomRunning);
   const timeEl=document.getElementById('pomTime');
   if(timeEl) timeEl.textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
   const ph=document.getElementById('pomPhase');

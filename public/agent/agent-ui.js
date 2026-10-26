@@ -167,6 +167,19 @@ const AG_CSS = `
 .ag-card-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .ag-card-detail { display: none; margin-top: 6px; }
 .ag-card-detail.open { display: block; }
+.ag-result { min-width:0; margin-top:8px; }
+.ag-result-controls { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+.ag-result select, .ag-result textarea { min-width:0; max-width:100%; color:var(--ag-text,#e2e8f0); background:var(--ag-input-bg,#1e293b); border:1px solid var(--ag-border,#475569); border-radius:6px; padding:6px; font:inherit; }
+.ag-result select { flex:1; width:100%; }
+.ag-result-controls select { width:auto; flex-basis:140px; }
+.ag-result textarea { display:block; box-sizing:border-box; width:100%; margin:8px 0; resize:vertical; }
+.ag-result-note, .ag-result-status { font-size:11px; color:var(--ag-muted,#94a3b8); overflow-wrap:anywhere; margin:4px 0; }
+.ag-result-status:empty { display:none; }
+.ag-result-file { border-top:1px solid var(--ag-border,#475569); padding-top:8px; margin-top:8px; overflow-wrap:anywhere; }
+.ag-result-details { margin-top:8px; }
+.ag-result-details summary { cursor:pointer; font-size:11px; }
+.ag-result-details pre { max-height:220px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; }
+.md-code-lang { display:block; margin-bottom:6px; font:600 10px/1.4 system-ui,sans-serif; color:var(--ag-muted,#94a3b8); text-transform:uppercase; user-select:none; }
 .ag-workflow-preview, .ag-card-detail pre {
   background: color-mix(in srgb,var(--ag-bg,#000) 70%,transparent);
   border-radius: 6px;
@@ -272,6 +285,22 @@ const AG_CSS = `
   box-shadow: var(--ag-shadow,0 24px 80px rgba(0,0,0,0.6));
   animation: ag-rp-slideup 0.2s ease-out;
 }
+.ag-config-box { width:min(540px,calc(100vw - 24px)); background:var(--bg); color:var(--text); backdrop-filter:none; -webkit-backdrop-filter:none; }
+.ag-config-header,.ag-config-footer { position:sticky; background:var(--bg); z-index:1; }
+.ag-config-header { top:0; } .ag-config-footer { bottom:0; }
+#cfgSaveBtn { background:var(--accent); color:var(--text-on-accent); }
+.ag-endpoint { display:block; margin-top:8px; padding:9px; border-radius:6px; background:var(--ag-bg2); color:var(--text-muted); font-size:11px; overflow-wrap:anywhere; }
+.ag-config-advanced { margin:16px 0; border-top:1px solid var(--border); padding-top:12px; }
+.ag-config-advanced summary { cursor:pointer; font-size:12px; margin-bottom:14px; }
+.ag-connection-test { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.ag-model-picker { display:flex; align-items:center; gap:8px; }
+.ag-model-picker input { flex:1; min-width:0; }
+.ag-model-picker button { flex-shrink:0; white-space:nowrap; }
+#cfgRemoteModel { margin-top:8px; }
+#cfgRemoteModel[hidden] { display:none; }
+#cfgStatus { min-height:20px; font-size:12px; line-height:1.6; color:var(--text-muted); }
+#cfgStatus.error { color:var(--danger,#ef4444); }
+.ag-config-box button:focus-visible,.ag-config-box summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 .ag-config-box::-webkit-scrollbar { width: 4px; }
 .ag-config-box::-webkit-scrollbar-thumb { background: var(--ag-border,rgba(255,255,255,0.1)); border-radius: 2px; }
 .ag-config-header {
@@ -927,6 +956,14 @@ function buildPanel() {
   })();
 
   // Wire close / clear / config
+  const contextWrap=document.createElement('div');panel.querySelector('.ag-messages').before(contextWrap);
+  panel._contextUpdate=window.AgentContext?.mount(contextWrap);
+  const attach=document.createElement('button');attach.className='ag-btn ag-btn-icon';attach.id='agAttachFiles';attach.textContent='📎';attach.setAttribute('aria-label',getCurrentLang()==='en'?'Attach local files':'选择本地文件');
+  panel.querySelector('.ag-header-actions').prepend(attach);
+  const fileInput=document.createElement('input');fileInput.type='file';fileInput.multiple=true;fileInput.hidden=true;fileInput.id='agFileInput';panel.append(fileInput);
+  const filesStatus=document.createElement('div');filesStatus.id='agFilesStatus';filesStatus.setAttribute('role','status');filesStatus.style.cssText='font-size:12px;padding:0 14px;overflow-wrap:anywhere';panel.querySelector('.ag-footer').before(filesStatus);
+  filesStatus.textContent=getCurrentLang()==='en'?'For long JSON / CSV, attach a file to process the original content.':'长 JSON / CSV 建议附加文件，直接处理原始内容。';
+  attach.onclick=()=>fileInput.click();fileInput.onchange=()=>{try{const files=FileSession.replace(fileInput.files);filesStatus.textContent=getCurrentLang()==='en'?`${files.length} local files ready; ask the assistant to process them.`:`已暂存 ${files.length} 个本地文件，可让助手处理。`; }catch(e){filesStatus.textContent=e.message;}finally{fileInput.value='';}};
   document.getElementById('agCloseBtn').onclick = () => { panel.style.display = 'none'; };
   document.getElementById('agClearBtn').onclick = () => {
     if (_session) _session.clearHistory();

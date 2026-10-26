@@ -9,8 +9,7 @@ const GeminiAdapter = {
 
   async chat({ messages, tools, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
     // Use OpenAI-compatible endpoint provided by Google
-    const base = baseUrl || 'https://generativelanguage.googleapis.com/v1beta/openai';
-    const url = `${base}/chat/completions`;
+    const url = window.AgentTransport.endpoint('gemini', baseUrl);
 
     const oaiMsgs = messages.map(m => {
       if (m.role === 'tool') return { role: 'tool', tool_call_id: m.tool_call_id, content: m.content };
@@ -41,12 +40,10 @@ const GeminiAdapter = {
       body: JSON.stringify(body),
     });
 
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`Gemini API error ${resp.status}: ${err}`);
-    }
+    if (!resp.ok) throw await window.AgentTransport.responseError(resp);
 
     const raw = await resp.json();
+    if (raw.error || raw.status === 'failed') throw window.AgentTransport.apiError(502, raw);
     const choice = raw.choices?.[0];
     const msg = choice?.message || {};
 
@@ -70,7 +67,7 @@ const GeminiAdapter = {
     const base = baseUrl || 'https://generativelanguage.googleapis.com/v1beta/openai';
     yield* window.OpenAIChatAdapter.chatStream.call(
       { ...window.OpenAIChatAdapter, defaultModel: this.defaultModel },
-      { messages, model: model || this.defaultModel, max_tokens, temperature, baseUrl: base, apiKey, signal }
+      { messages, model: model || this.defaultModel, max_tokens, temperature, baseUrl: window.AgentTransport.endpoint('gemini', base), apiKey, signal }
     );
   },
 };

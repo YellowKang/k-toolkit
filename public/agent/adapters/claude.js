@@ -7,8 +7,7 @@ const ClaudeAdapter = {
   models: ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5', 'claude-opus-4-5', 'claude-sonnet-4-5', 'claude-3-5-haiku-20241022'],
 
   async chat({ messages, tools, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
-    const base = baseUrl || 'https://api.anthropic.com';
-    const url = `${base}/v1/messages`;
+    const url = window.AgentTransport.endpoint('claude', baseUrl);
 
     const sysMsg = messages.find(m => m.role === 'system');
     const chatMsgs = messages.filter(m => m.role !== 'system');
@@ -73,12 +72,10 @@ const ClaudeAdapter = {
       body: JSON.stringify(body),
     });
 
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`Claude API error ${resp.status}: ${err}`);
-    }
+    if (!resp.ok) throw await window.AgentTransport.responseError(resp);
 
     const raw = await resp.json();
+    if (raw.error || raw.status === 'failed') throw window.AgentTransport.apiError(502, raw);
     const toolCalls = [];
     let textContent = '';
     for (const block of (raw.content || [])) {
@@ -109,8 +106,7 @@ const ClaudeAdapter = {
   },
 
   async *chatStream({ messages, model, max_tokens, temperature, baseUrl, apiKey, signal }) {
-    const base = baseUrl || 'https://api.anthropic.com';
-    const url = `${base}/v1/messages`;
+    const url = window.AgentTransport.endpoint('claude', baseUrl);
 
     const sysMsg = messages.find(m => m.role === 'system');
     const chatMsgs = messages.filter(m => m.role !== 'system').map(m => {
@@ -138,13 +134,11 @@ const ClaudeAdapter = {
       body: JSON.stringify(body),
     });
 
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`Claude API error ${resp.status}: ${err}`);
-    }
+    if (!resp.ok) throw await window.AgentTransport.responseError(resp);
 
     let inputTokens = 0, outputTokens = 0;
     for await (const evt of parseSSEStream(resp, signal)) {
+      if (evt.error || evt.type === 'error' || evt.type === 'response.failed') throw window.AgentTransport.apiError(502, evt.response || evt);
       if (evt.type === 'message_start') {
         inputTokens = evt.message?.usage?.input_tokens || 0;
       } else if (evt.type === 'content_block_delta') {

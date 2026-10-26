@@ -29,7 +29,7 @@ const {execFileSync}=require('node:child_process');const express=require('expres
   await send('/workflow clean-base64  beta \nalpha\n beta\n');assert.equal(await page.locator('.ag-card').last().locator('ol li').count(),2);
   assert.equal(await page.locator('.ag-workflow-preview').last().textContent(),Buffer.from('beta\nalpha').toString('base64'));
   await page.evaluate(()=>{window.__copied='';Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copied=text}}})});
-  await page.locator('.ag-card').last().getByRole('button',{name:'复制',exact:true}).click();assert.equal(await page.evaluate(()=>window.__copied),Buffer.from('beta\nalpha').toString('base64'));
+  await page.locator('.ag-card').last().getByRole('button',{name:'复制完整内容',exact:true}).click();assert.equal(await page.evaluate(()=>window.__copied),Buffer.from('beta\nalpha').toString('base64'));
   await send('/workflow decode-json bm90IGpzb24=');assert.ok(await page.locator('.ag-card').last().evaluate(el=>el.classList.contains('error')));assert.equal(await page.locator('.ag-card').last().locator('ol li').count(),2);
   await page.evaluate(()=>{const action=_AGENT_ALL_ACTIONS.get('base64_encode');window.__savedEncode=action.execute;action.execute=(_, {signal})=>new Promise(resolve=>signal.addEventListener('abort',()=>resolve({success:false,error:'cancelled'}),{once:true}));});
   await page.locator('#agInput').fill('/b64 stop test');await page.locator('#agSendBtn').click();await page.locator('#agStopBtn.visible').click();

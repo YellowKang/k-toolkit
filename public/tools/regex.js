@@ -32,6 +32,12 @@ function renderRegex(el) {
       saved_toast:    '已保存',
       copied_toast:   '已复制替换结果',
       flag_g: '全局匹配', flag_i: '忽略大小写', flag_m: '多行模式', flag_s: '点号匹配换行', flag_u: 'Unicode模式',
+      running: '正在匹配…', timeout: '匹配超时已停止，请简化表达式或缩小文本范围。',
+      worker_error: '无法启动匹配，请刷新页面后重试。',
+      limit: '支持最多 20 万字符文本、5000 字符表达式和 1 万字符替换模板。',
+      output_limit: '替换结果超过 200 万字符，请缩小范围。', match_limit: '匹配超过 2000 处，请缩小范围后替换。',
+      truncated: '匹配超过 2000 处，当前只展示前 2000 处。',
+      detail_limit: '详情显示前 20 个匹配、最多 32 个捕获组，每段内容最多 2000 字符。',
       // snippet labels
       sn_email:'邮箱', sn_url:'URL', sn_phone:'手机', sn_ip:'IP', sn_date:'日期', sn_number:'数字',
       sn_idcard:'身份证', sn_chinese:'中文', sn_html:'HTML标签', sn_hex:'HEX颜色', sn_domain:'域名',
@@ -69,6 +75,12 @@ function renderRegex(el) {
       saved_toast:    'Saved',
       copied_toast:   'Copied replace result',
       flag_g: 'Global', flag_i: 'Case insensitive', flag_m: 'Multiline', flag_s: 'Dotall', flag_u: 'Unicode',
+      running: 'Matching…', timeout: 'Matching timed out. Simplify the pattern or use a smaller text.',
+      worker_error: 'Unable to start matching. Refresh the page and try again.',
+      limit: 'Limits: 200,000 text characters, 5,000 pattern characters and a 10,000-character replacement template.',
+      output_limit: 'Replacement exceeds 2,000,000 characters. Use a smaller text.', match_limit: 'More than 2,000 matches. Use a smaller text before replacing.',
+      truncated: 'More than 2,000 matches. Showing the first 2,000.',
+      detail_limit: 'Details show the first 20 matches, up to 32 groups per match and 2,000 characters per value.',
       sn_email:'Email', sn_url:'URL', sn_phone:'Phone', sn_ip:'IP', sn_date:'Date', sn_number:'Number',
       sn_idcard:'ID Card', sn_chinese:'Chinese', sn_html:'HTML Tag', sn_hex:'HEX Color', sn_domain:'Domain',
       sn_zip:'Zip Code', sn_uuid:'UUID', sn_mac:'MAC Addr', sn_version:'Version',
@@ -149,6 +161,7 @@ function renderRegex(el) {
     </div>`;
 
   window._regexMode = 'match';
+  window._activeCleanup = _regexCancel;
   regexRenderSaved();
 }
 
@@ -166,7 +179,7 @@ function _regexToggleFlag(f) {
   btn.style.background = active ? 'rgba(102,126,234,0.2)' : 'rgba(255,255,255,0.04)';
   btn.style.color = active ? 'var(--accent)' : 'var(--text-muted)';
   btn.style.borderColor = active ? 'rgba(102,126,234,0.5)' : 'var(--glass-border)';
-  testRegex();
+  runRegex();
 }
 
 function _regexFillSnippet(btn) {
@@ -201,10 +214,27 @@ function _regexCopyReplace() {
   navigator.clipboard.writeText(el.textContent).then(() => showToast(tl('copied_toast')));
 }
 
-function runRegex() { testRegex(); }
+let _regexTimer, _regexWorker, _regexComplete;
+function _regexFinish(result) {
+  clearTimeout(_regexTimer);
+  if(_regexWorker) {_regexWorker.abort();_regexWorker=null;}
+  const complete=_regexComplete;_regexComplete=null;if(complete)complete(result);
+}
+function _regexCancel() { _regexFinish({success:false,error:'cancelled'}); }
+function runRegex() {
+  _regexCancel();
+  document.getElementById('regexResultPanel').style.display='none';
+  document.getElementById('regexStatus').textContent='';
+  return new Promise(resolve=>{_regexComplete=resolve;_regexTimer=setTimeout(_regexExecute,180);});
+}
 
 function testRegex() {
+  _regexCancel();
+  return new Promise(resolve=>{_regexComplete=resolve;_regexExecute();});
+}
+async function _regexExecute() {
   const tl = window._regexTl || ((k) => k);
+  if(!document.getElementById('regexPattern')){_regexCancel();return;}
   const pattern  = document.getElementById('regexPattern').value;
   const text     = document.getElementById('regexText').value;
   const flags    = document.getElementById('regexFlags').value;
@@ -215,68 +245,59 @@ function testRegex() {
   if (!pattern) {
     panel.style.display = 'none';
     statusEl.textContent = '';
+    _regexFinish({success:false,error:tl('no_pattern')});
     return;
   }
 
-  let re;
+  statusEl.textContent=tl('running');statusEl.style.color='var(--text-muted)';
+  function fail(key,detail) {
+    statusEl.textContent=key==='syntax'?tl('regex_error')+detail:tl(key);statusEl.style.color='var(--accent-pink)';panel.style.display='none';
+    _regexFinish({success:false,error:statusEl.textContent});
+  }
+  const controller=new AbortController();_regexWorker=controller;
+  const replacement=document.getElementById('regexReplaceStr').value;
   try {
-    re = new RegExp(pattern, flags);
-  } catch(e) {
-    statusEl.textContent = tl('regex_error') + e.message;
-    statusEl.style.color = '#ef4444';
-    panel.style.display = 'none';
-    return;
-  }
-
-  panel.style.display = '';
-
-  if (mode === 'replace') {
-    const replaceStr = document.getElementById('regexReplaceStr').value;
-    let result;
-    try {
-      result = text.replace(re, replaceStr);
-    } catch(e) {
-      result = tl('replace_error') + e.message;
+    const compute=await ToolCompute.load('regex');
+    const data=await compute.run({pattern,text,flags,mode,replacement},{signal:controller.signal});
+    if(_regexWorker!==controller || !statusEl.isConnected)return;
+    if(data.error){fail(data.error,data.detail);return;}
+    panel.style.display='';
+    if(mode==='replace') {
+      document.getElementById('regexReplaceResult').textContent=data.result;
+      statusEl.textContent=tl('replace_done');statusEl.style.color='var(--text)';_regexFinish({success:true});return;
     }
-    document.getElementById('regexReplaceResult').textContent = result;
-    statusEl.textContent = tl('replace_done');
-    statusEl.style.color = '#10b981';
-    return;
-  }
+    _regexRenderMatches(data,text,tl,statusEl);_regexFinish({success:true});
+  } catch(error) {if(_regexWorker===controller && statusEl.isConnected && error.name!=='AbortError')fail('worker_error');}
 
+}
+
+function _regexRenderMatches(data,text,tl,statusEl) {
   // Match mode
   const highlight = document.getElementById('regexHighlight');
   const matchesEl = document.getElementById('regexMatches');
 
-  const matches = [];
-  let m;
-  const safeRe = new RegExp(pattern, flags.includes('g') ? flags : flags+'g');
-  safeRe.lastIndex = 0;
-  while ((m = safeRe.exec(text)) !== null) {
-    matches.push({...m, index: m.index, input: m.input});
-    if (!flags.includes('g') || m[0].length === 0) break;
-  }
+  const matches = data.matches;
 
-  statusEl.textContent = matches.length ? tl('match_count', matches.length) : tl('no_match');
-  statusEl.style.color  = matches.length ? '#10b981' : 'var(--text-muted)';
+  statusEl.textContent = data.truncated ? tl('truncated') : matches.length ? tl('match_count', matches.length) : tl('no_match');
+  statusEl.style.color  = 'var(--text-muted)';
 
   let html = '', last = 0;
   matches.forEach(m => {
     html += _escRe(text.slice(last, m.index));
-    html += `<mark style="background:rgba(240,147,251,0.35);color:#f093fb;border-radius:2px">${_escRe(m[0])}</mark>`;
-    last = m.index + m[0].length;
+    html += `<mark style="background:var(--accent-soft);color:var(--text);border-radius:2px">${m.index===m.end?'│':_escRe(text.slice(m.index,m.end))}</mark>`;
+    last = m.end;
   });
   html += _escRe(text.slice(last));
   highlight.innerHTML = html;
 
   if (matches.length) {
-    matchesEl.innerHTML = `<div class="panel-label" style="margin-bottom:8px">${tl('match_detail_title', Math.min(matches.length,20))}</div>` +
+    matchesEl.innerHTML = `<div class="panel-label" style="margin-bottom:8px">${tl('match_detail_title', Math.min(matches.length,20))}</div><p class="workspace-notice">${tl('detail_limit')}</p>` +
       matches.slice(0,20).map((m,i) => `
         <div style="margin-bottom:6px;padding:8px 12px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);border-radius:8px">
-          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">#${i+1} · ${tl('position_label')} ${m.index}\u2013${m.index+m[0].length}</div>
-          <div style="font-family:monospace;color:var(--neon);word-break:break-all">${_escRe(m[0])}</div>
-          ${m.slice(1).length ? m.slice(1).map((g,gi) =>
-            `<span style="font-size:11px;color:var(--text-muted)">${tl('group_label', gi+1)}</span> <span style="font-size:11px;color:#f093fb">${_escRe(g||'undefined')}</span> `).join('') : ''}
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">#${i+1} · ${tl('position_label')} ${m.index}\u2013${m.end}</div>
+          <div style="font-family:monospace;color:var(--text);word-break:break-all">${_escRe(text.slice(m.index,Math.min(m.end,m.index+2000)))}</div>
+          ${m.groups.map((g,gi) => `<span style="font-size:11px;color:var(--text-muted)">${tl('group_label', gi+1)}</span> <code>${_escRe(g===null?'undefined':g)}</code> `).join('')}
+          ${m.named ? Object.entries(m.named).map(([name,value])=>`<div><code>${_escRe(name)}</code>: ${_escRe(value===null?'undefined':value)}</div>`).join('') : ''}
         </div>`).join('');
   } else matchesEl.innerHTML = '';
 }
@@ -333,6 +354,7 @@ function regexDeleteSaved(i) {
 }
 
 function clearRegex() {
+  _regexCancel();
   document.getElementById('regexPattern').value = '';
   document.getElementById('regexText').value = '';
   document.getElementById('regexFlags').value = '';

@@ -41,30 +41,49 @@ const _chatTl = makeToolI18n({
 
 // ── State ──
 let _chatMessages = [];
-let _chatAdapter = null;
 let _chatAdapterId = '';
 let _chatModel = '';
 let _chatTemp = 0.7;
 let _chatMaxCtx = 20;
 let _chatSystemPrompt = '';
-let _chatAbort = null;
 let _chatImages = []; // pending images [{base64, mime, name}]
 let _chatBusy = false;
+let _chatRun = null, _chatPreparing = false, _chatDraft = '', _chatInitialized = false;
+let _chatHistoryLimit=40, _chatContextUpdate=null;
+let _chatSticky = true, _chatScrollFrame = 0, _chatUndo = null, _chatImageEpoch = 0;
+const _chatSay = (zh, en) => window.getCurrentLang?.() === 'en' ? en : zh;
 
 const _CHAT_LS_KEY = 'dtb_chat_history';
 const _CHAT_SYS_KEY = 'dtb_chat_system';
 const _CHAT_CFG_KEY = 'dtb_chat_config';
 
 function _chatLoadHistory() {
-  try { return JSON.parse(localStorage.getItem(_CHAT_LS_KEY)) || []; } catch { return []; }
+  try {
+    const messages = JSON.parse(localStorage.getItem(_CHAT_LS_KEY));
+    const saved=Array.isArray(messages)?messages:messages?.messages;
+    if (!Array.isArray(saved)) return [];
+    let omitted=messages?.omitted;try{omitted=omitted||JSON.parse(localStorage.getItem('dtb_chat_history_meta')||'{}')?.omitted;}catch{}
+    if(omitted)queueMicrotask(()=>window.showToast?.(_chatSay('仅恢复上次保存的最近历史；旧内容请查看导出文件。','Only the recent saved history was restored; see your export for older content.')));
+
+    return saved.filter(m => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string').slice(-500).map(m => ({ ...m,
+      _images: Array.isArray(m._images) ? m._images.filter(img => img && /^image\/(png|jpeg|webp|gif)$/.test(img.mime) && typeof img.base64 === 'string' && /^[A-Za-z0-9+/=]+$/.test(img.base64)).slice(0, 4) : null,
+    }));
+  } catch { return []; }
 }
 function _chatSaveHistory() {
   try {
-    const save = _chatMessages.slice(-100).map(m => ({
-      role: m.role, content: m.content, _images: m._images || null, ts: m.ts
-    }));
-    localStorage.setItem(_CHAT_LS_KEY, JSON.stringify(save));
-  } catch {}
+    const save=[];let characters=0;
+    for(let i=_chatMessages.length-1;i>=0;i--){const m=_chatMessages[i],value={role:m.role,content:m.content,_images:m._images||null,ts:m.ts,status:m.status},size=JSON.stringify(value).length;if(save.length>=500||characters+size>1500000)break;save.unshift(value);characters+=size;}
+    while(save.length&&save[0].role!=='user')save.shift();
+    const omitted=_chatMessages.length-save.length;
+    localStorage.setItem(_CHAT_LS_KEY,JSON.stringify(save));
+    localStorage.setItem('dtb_chat_history_meta',JSON.stringify({omitted}));
+    const status=document.getElementById('_chatStorageStatus');if(status)status.textContent=omitted?_chatSay(`刷新后仅恢复最近 ${save.length} 条；请导出以保留完整对话。`,`Only the latest ${save.length} messages will survive refresh; export to keep the full conversation.`):'';
+    return true;
+  } catch {
+    window.showToast?.(_chatSay('对话暂存失败，浏览器空间不足；请导出后再清理。', 'Chat could not be saved. Export it before freeing browser storage.'), 'error');
+    return false;
+  }
 }
 function _chatLoadConfig() {
   try { return JSON.parse(localStorage.getItem(_CHAT_CFG_KEY)) || {}; } catch { return {}; }
@@ -72,7 +91,7 @@ function _chatLoadConfig() {
 function _chatSaveConfig() {
   try {
     localStorage.setItem(_CHAT_CFG_KEY, JSON.stringify({
-      adapterId: _chatAdapterId, model: _chatModel, temp: _chatTemp, maxCtx: _chatMaxCtx
+      ..._chatLoadConfig(), maxCtx: _chatMaxCtx
     }));
   } catch {}
 }
@@ -81,76 +100,18 @@ function _chatSaveConfig() {
 function _chatEsc(s) {
   const d = document.createElement('div');
   d.textContent = s;
-  return d.innerHTML;
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // ── Markdown → HTML (use agent's mdToHtml if available, otherwise built-in fallback) ──
 function _chatMd(text) {
-  if (typeof window._agMdToHtml === 'function') return window._agMdToHtml(text);
-  // Fallback: basic markdown rendering for when agent module hasn't loaded yet
-  let html = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  // Code blocks
-  const codeBlocks = [];
-  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
-    const i = codeBlocks.length;
-    const esc = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const label = lang ? '<span class="md-code-lang">' + lang + '</span>' : '';
-    codeBlocks.push('<pre class="md-pre">' + label + '<code class="lang-' + (lang||'text') + '">' + esc + '</code></pre>');
-    return '\x00CB' + i + '\x00';
-  });
-  // Inline code
-  html = html.replace(/`([^`]+)`/g, (_, c) => '<code class="md-inline-code">' + c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code>');
-  // Escape remaining
-  const parts = html.split(/(<\/?(?:pre|code|strong|em|del|a|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tr|th|td|br|hr|span)[^>]*>)/);
-  html = parts.map((p, i) => i % 2 === 0 ? p.replace(/&(?!amp;|lt;|gt;)/g, '&amp;').replace(/<(?!\/?(?:pre|code|strong|em|del|a|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tr|th|td|br|hr|span))/g, '&lt;') : p).join('');
-  // Headers
-  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-  // Bold & italic
-  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, t, u) => {
-    if (/^\s*(?:javascript|data|vbscript):/i.test(u)) return t;
-    return '<a href="' + u + '" target="_blank" rel="noopener">' + t + '</a>';
-  });
-  // Blockquotes
-  html = html.replace(/((?:^> .+\n?)+)/gm, (_, b) => '<blockquote class="md-blockquote">' + b.replace(/^> /gm, '').trim() + '</blockquote>');
-  // Horizontal rules
-  html = html.replace(/^(?:---|\*\*\*|___)\s*$/gm, '<hr class="md-hr">');
-  // Unordered lists
-  html = html.replace(/(?:^|\n)((?:[\-\*\+] .+\n?)+)/g, (_, list) => {
-    return '<ul>' + list.trim().split('\n').map(l => '<li>' + l.replace(/^[\-\*\+] /, '') + '</li>').join('') + '</ul>';
-  });
-  // Ordered lists
-  html = html.replace(/(?:^|\n)((?:\d+\. .+\n?)+)/g, (_, list) => {
-    return '<ol>' + list.trim().split('\n').map(l => '<li>' + l.replace(/^\d+\. /, '') + '</li>').join('') + '</ol>';
-  });
-  // Tables
-  html = html.replace(/(?:^|\n)((?:\|.+\|\n?)+)/g, (match, block) => {
-    const rows = block.trim().split('\n').filter(r => r.trim());
-    if (rows.length < 2 || !/^\|[\s:]*-{2,}/.test(rows[1])) return match;
-    const pr = r => r.replace(/^\||\|$/g, '').split('|').map(c => c.trim());
-    let t = '<table class="md-table"><thead><tr>' + pr(rows[0]).map(h => '<th>' + h + '</th>').join('') + '</tr></thead><tbody>';
-    for (const r of rows.slice(2)) t += '<tr>' + pr(r).map(c => '<td>' + c + '</td>').join('') + '</tr>';
-    return t + '</tbody></table>';
-  });
-  // Line breaks
-  html = html.replace(/\n/g, '<br>');
-  html = html.replace(/<br>(<\/?(?:pre|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tr|th|td|hr))/g, '$1');
-  html = html.replace(/(<\/(?:pre|ul|ol|li|h[1-6]|blockquote|table|thead|tbody|tr|th|td|hr)>)<br>/g, '$1');
-  // Restore code blocks
-  html = html.replace(/\x00CB(\d+)\x00/g, (_, i) => codeBlocks[+i]);
-  return html;
+  if (text.length <= 100000 && typeof window._agMdToHtml === 'function') return window._agMdToHtml(text);
+  return '<div style="white-space:pre-wrap">' + _chatEsc(text) + '</div>';
 }
 
 // ── Build messages for API ──
-function _chatBuildMessages() {
-  const trimmed = _chatMaxCtx > 0 ? _chatMessages.slice(-(_chatMaxCtx * 2)) : [..._chatMessages];
+function _chatBuildMessages(history = _chatMessages) {
+  const trimmed = history;
   const sys = _chatSystemPrompt || _chatTl('system_default');
   const result = [{ role: 'system', content: sys }];
 
@@ -170,6 +131,8 @@ function _chatBuildMessages() {
       result.push({ role: msg.role, content: msg.content });
     }
   }
+  const context=window.AgentContext?.build(result.slice(1),{system:sys,maxTurns:_chatMaxCtx,replyTokens:window.AgentConfig?.AG.load().max_tokens||2000});
+  if(context){_chatContextUpdate?.(context.stats);return context.messages;}
   return result;
 }
 
@@ -180,21 +143,24 @@ function _chatFmtTime(ts) {
 }
 
 // ── Copy text helper ──
-function _chatCopyText(text, btn) {
-  navigator.clipboard.writeText(text).then(() => {
-    const orig = btn.innerHTML;
-    btn.innerHTML = `✓ <span>${_chatTl('copied')}</span>`;
-    btn.style.color = '#34d399';
-    setTimeout(() => { btn.innerHTML = orig; btn.style.color = ''; }, 1500);
-  });
-}
+function _chatCopyText(text, btn) { return window.copyText(text, btn); }
 
 // ── Render a single message bubble ──
+function _chatMountContext(){const root=document.getElementById('_chatContextControls');if(root&&!root.childElementCount&&window.AgentContext)_chatContextUpdate=AgentContext.mount(root);}
+function _chatOlderButton(container){
+  container.querySelector('#_chatLoadOlder')?.remove();
+  const first=container.querySelector('._chat-row'),index=first?_chatMessages.indexOf(first._message):0;if(index<=0)return;
+  const button=document.createElement('button');button.id='_chatLoadOlder';button.className='_chat-action-btn';button.textContent=_chatSay(`加载更早消息（剩余 ${index} 条）`,`Load earlier messages (${index} remaining)`);
+  button.onclick=()=>{const list=document.getElementById('_chatMsgList'),height=list.scrollHeight,top=list.scrollTop;_chatHistoryLimit+=40;_chatRenderHistory(container);list.scrollTop=top+list.scrollHeight-height;};container.prepend(button);
+}
+function _chatLimitRows(container){const rows=[...container.querySelectorAll('._chat-row')];while(rows.length>_chatHistoryLimit)rows.shift().remove();_chatOlderButton(container);}
+function _chatRenderHistory(container){container.replaceChildren();for(const message of _chatMessages.slice(-_chatHistoryLimit))_chatRenderMsg(message,container);_chatOlderButton(container);}
 function _chatRenderMsg(msg, container) {
   const isUser = msg.role === 'user';
 
   // Row wrapper (controls alignment)
   const row = document.createElement('div');
+  row._message = msg;
   row.className = `_chat-row ${isUser ? '_chat-row-user' : '_chat-row-ai'}`;
 
   // Avatar
@@ -250,7 +216,7 @@ function _chatRenderMsg(msg, container) {
   // Timestamp
   const ts = document.createElement('span');
   ts.className = '_chat-ts';
-  ts.textContent = _chatFmtTime(msg.ts);
+  ts.textContent = _chatFmtTime(msg.ts) + (msg.status ? ' · ' + (msg.status === 'stopped' ? _chatSay('已停止 · 部分回复', 'Stopped · Partial reply') : _chatSay('已中断 · 部分回复', 'Interrupted · Partial reply')) : '');
   actions.appendChild(ts);
 
   // Copy full message button
@@ -269,22 +235,8 @@ function _chatRenderMsg(msg, container) {
     retryBtn.dataset.actionKey = 'retry';
     retryBtn.innerHTML = `↻ <span>${_chatTl('retry')}</span>`;
     retryBtn.title = _chatTl('retry');
-    retryBtn.onclick = () => {
-      if (_chatBusy) return;
-      // Remove this and any subsequent messages
-      const idx = _chatMessages.indexOf(msg);
-      if (idx >= 0) {
-        _chatMessages.splice(idx);
-        _chatSaveHistory();
-        // Remove DOM rows from this point
-        const rows = container.querySelectorAll('._chat-row');
-        let found = false;
-        rows.forEach(r => { if (r === row || found) { found = true; r.remove(); } });
-        // Re-send last user message
-        const lastUser = _chatMessages.filter(m => m.role === 'user').pop();
-        if (lastUser) _chatDoSend(lastUser.content, lastUser._images || []);
-      }
-    };
+    retryBtn.hidden = _chatMessages.at(-1) !== msg;
+    retryBtn.onclick = () => _chatRetry(msg);
     actions.appendChild(retryBtn);
   }
 
@@ -330,193 +282,85 @@ function _chatCreateStreamRow(container) {
   return { row, col, bubble, content };
 }
 
-// ── Finalize stream row: add action bar ──
-function _chatFinalizeStreamRow(aiMsg, col, content, container) {
-  // Remove cursor
-  const cursor = content.querySelector('._chat-cursor');
-  if (cursor) cursor.remove();
-
-  // Re-render final markdown & add code copy buttons
-  content.innerHTML = _chatMd(aiMsg.content || '');
-  content.querySelectorAll('pre').forEach(pre => {
-    const btn = document.createElement('button');
-    btn.className = '_chat-copy-btn';
-    btn.innerHTML = `⎘ ${_chatTl('copy')}`;
-    btn.title = _chatTl('copy');
-    btn.onclick = () => _chatCopyText(pre.querySelector('code')?.textContent || pre.textContent, btn);
-    pre.style.position = 'relative';
-    pre.appendChild(btn);
+function _chatRefreshRetry() {
+  document.querySelectorAll('._chat-row').forEach(row => {
+    const button = row.querySelector('[data-action-key="retry"]');
+    if (button) { button.hidden = row._message !== _chatMessages.at(-1); button.disabled = _chatBusy; }
   });
-
-  // Action bar
-  const actions = document.createElement('div');
-  actions.className = '_chat-actions _chat-actions-ai';
-
-  const ts = document.createElement('span');
-  ts.className = '_chat-ts';
-  ts.textContent = _chatFmtTime(aiMsg.ts);
-  actions.appendChild(ts);
-
-  const copyBtn = document.createElement('button');
-  copyBtn.className = '_chat-action-btn';
-  copyBtn.dataset.actionKey = 'copy';
-  copyBtn.innerHTML = `⎘ <span>${_chatTl('copy')}</span>`;
-  copyBtn.title = _chatTl('copy');
-  copyBtn.onclick = () => _chatCopyText(aiMsg.content || '', copyBtn);
-  actions.appendChild(copyBtn);
-
-  const retryBtn = document.createElement('button');
-  retryBtn.className = '_chat-action-btn';
-  retryBtn.dataset.actionKey = 'retry';
-  retryBtn.innerHTML = `↻ <span>${_chatTl('retry')}</span>`;
-  retryBtn.title = _chatTl('retry');
-  retryBtn.onclick = () => {
-    if (_chatBusy) return;
-    const idx = _chatMessages.indexOf(aiMsg);
-    if (idx >= 0) {
-      _chatMessages.splice(idx);
-      _chatSaveHistory();
-      const rows = container.querySelectorAll('._chat-row');
-      const row = col.parentElement;
-      let found = false;
-      rows.forEach(r => { if (r === row || found) { found = true; r.remove(); } });
-      const lastUser = _chatMessages.filter(m => m.role === 'user').pop();
-      if (lastUser) _chatDoSend(lastUser.content, lastUser._images || []);
-    }
-  };
-  actions.appendChild(retryBtn);
-
-  col.appendChild(actions);
 }
-
-// ── Core send logic (reused by retry) ──
-async function _chatDoSend(text, images) {
-  const AG = window.AgentConfig?.AG;
-  const apiKey = AG?.getKey?.(_chatAdapterId) ||
-    (() => { try { return JSON.parse(localStorage.getItem('ag_key_' + _chatAdapterId)) || ''; } catch { return ''; } })();
-  if (!apiKey) { _chatShowNoKey(); return; }
-
-  const msgList = _chatGetMsgContainer();
-  _chatBusy = true;
-  _chatUpdateButtons();
-
-  _chatAbort = new AbortController();
-  if (!window.AgentAdapters) {
-    if (window._agEnsureLoaded) await window._agEnsureLoaded();
+function _chatRetry(message) {
+  if (_chatBusy || _chatMessages.at(-1) !== message) return;
+  _chatDoSend('', [], message.role === 'assistant' ? message : null);
+}
+function _chatFinishRun(run, status, error) {
+  if (_chatRun !== run || run.finished) return;
+  run.finished = true; clearTimeout(run.renderTimer); clearTimeout(run.timer);
+  run.thinking.remove(); run.stream?.row.remove();
+  const keep = run.text && (!run.replace || status === 'complete');
+  if (keep) {
+    const message = { role: 'assistant', content: run.text, ts: Date.now(), status: status === 'complete' ? undefined : status };
+    if (run.replace) {
+      const index = _chatMessages.indexOf(run.replace);
+      if (index >= 0) _chatMessages.splice(index, 1, message);
+      run.container.querySelectorAll('._chat-row').forEach(row => { if (row._message === run.replace) row.remove(); });
+    } else _chatMessages.push(message);
+    _chatRenderMsg(message, run.container);
+    _chatSaveHistory();_chatLimitRows(run.container);
   }
-  const adapter = window.AgentAdapters?.getAdapter(_chatAdapterId);
-  if (!adapter) {
-    _chatBusy = false;
-    _chatAbort = null;
-    _chatUpdateButtons();
-    _chatShowError(_chatTl('no_adapter'));
-    return;
-  }
-
-  const chatMessages = _chatBuildMessages();
-  const baseUrl = AG?.get?.('base_url', '') || '';
-  const streamParams = {
-    messages: chatMessages,
-    model: _chatModel || adapter.defaultModel,
-    max_tokens: AG?.get?.('max_tokens', 2000) || 2000,
-    temperature: _chatTemp,
-    baseUrl: baseUrl || undefined,
-    apiKey,
-    signal: _chatAbort.signal,
-  };
-
-  // Try streaming path
-  if (typeof adapter.chatStream === 'function') {
-    const thinkEl = document.createElement('div');
-    thinkEl.className = '_chat-row _chat-row-ai _chat-thinking';
-    thinkEl.innerHTML = `<div class="_chat-avatar _chat-avatar-ai">🤖</div><div class="_chat-col"><div class="_chat-msg _chat-msg-ai"><div class="_chat-content"><span class="_chat-dots">${_chatTl('thinking')}</span></div></div></div>`;
-    msgList.appendChild(thinkEl);
-    _chatScrollBottom();
-
-    try {
-      const gen = adapter.chatStream(streamParams);
-      let accumulated = '';
-      let streamRowCreated = false;
-      let streamRow = null;
-      let renderScheduled = false;
-
-      for await (const chunk of gen) {
-        if (chunk.type === 'delta') {
-          // Create stream row on first delta (replace thinking indicator)
-          if (!streamRowCreated) {
-            thinkEl.remove();
-            streamRow = _chatCreateStreamRow(msgList);
-            streamRowCreated = true;
-          }
-          accumulated += chunk.text;
-
-          // Throttled rendering via requestAnimationFrame
-          if (!renderScheduled) {
-            renderScheduled = true;
-            requestAnimationFrame(() => {
-              renderScheduled = false;
-              if (streamRow) {
-                streamRow.content.innerHTML = _chatMd(accumulated) + '<span class="_chat-cursor">▍</span>';
-                _chatScrollBottom();
-              }
-            });
-          }
-        } else if (chunk.type === 'done') {
-          // Stream complete
-        }
-      }
-
-      // Ensure thinking is removed even if no deltas received
-      if (!streamRowCreated) {
-        thinkEl.remove();
-        streamRow = _chatCreateStreamRow(msgList);
-      }
-
-      const aiMsg = { role: 'assistant', content: accumulated, ts: Date.now() };
-      _chatMessages.push(aiMsg);
-      _chatFinalizeStreamRow(aiMsg, streamRow.col, streamRow.content, msgList);
-      _chatScrollBottom();
-      _chatSaveHistory();
-    } catch (err) {
-      thinkEl.remove();
-      // Remove partial stream row on abort
-      const partialRow = msgList.querySelector('._chat-row:last-child');
-      if (err.name === 'AbortError') {
-        // Keep partial content if any was accumulated
-        // (the row is already in DOM, just finalize it)
-      } else {
-        _chatShowError(err.message || _chatTl('error'));
-      }
-    } finally {
-      _chatBusy = false;
-      _chatAbort = null;
-      _chatUpdateButtons();
-    }
-    return;
-  }
-
-  // Fallback: non-streaming path
-  const thinkEl = document.createElement('div');
-  thinkEl.className = '_chat-row _chat-row-ai _chat-thinking';
-  thinkEl.innerHTML = `<div class="_chat-avatar _chat-avatar-ai">🤖</div><div class="_chat-col"><div class="_chat-msg _chat-msg-ai"><div class="_chat-content"><span class="_chat-dots">${_chatTl('thinking')}</span></div></div></div>`;
-  msgList.appendChild(thinkEl);
+  _chatRun = null; _chatBusy = false;
+  _chatUpdateButtons(); _chatRefreshRetry();
+  if (error) _chatShowError(window.AgentTransport.message(error), true);
   _chatScrollBottom();
-
+}
+async function _chatDoSend(text, images, replace = null) {
+  if (_chatBusy) return;
+  const cfg = window.AgentConfig.AG.load();
+  if (!cfg.apiKey && cfg.adapter !== 'custom') { _chatShowNoKey(); return; }
+  const adapter = window.AgentAdapters.getAdapter(cfg.adapter);
+  const container = _chatGetMsgContainer(); if (!container) return;
+  const run = { controller: new AbortController(), container, text: '', replace, stream: null, renderTimer: null, finished: false };
+  _chatUndo = null; document.getElementById('_chatUndoBar')?.remove();
+  _chatRun = run; _chatBusy = true; _chatUpdateButtons(); _chatRefreshRetry();
+  container.querySelectorAll('._chat-msg-error, ._chat-welcome').forEach(el => el.remove());
+  run.thinking = document.createElement('div'); run.thinking.className = '_chat-thinking'; run.thinking.textContent = _chatTl('thinking'); container.appendChild(run.thinking);
+  let params;
+  try { params={...cfg,model:cfg.model||adapter.defaultModel,messages:_chatBuildMessages(replace?_chatMessages.slice(0,-1):_chatMessages),signal:run.controller.signal}; }
+  catch(error){_chatFinishRun(run,'interrupted',error);return;}
+  const transport = window.AgentTransport;
+  const resetTimeout = () => { clearTimeout(run.timer); run.timer = transport.timeout(run.controller, 60000); };
+  resetTimeout();
+  _chatScrollBottom();
   try {
-    const result = await adapter.chat(streamParams);
-    thinkEl.remove();
-    const aiMsg = { role: 'assistant', content: result.message?.content || '', ts: Date.now() };
-    _chatMessages.push(aiMsg);
-    _chatRenderMsg(aiMsg, msgList);
-    _chatScrollBottom();
-    _chatSaveHistory();
-  } catch (err) {
-    thinkEl.remove();
-    if (err.name !== 'AbortError') _chatShowError(err.message || _chatTl('error'));
+    if (typeof adapter.chatStream === 'function') {
+      const iterator = adapter.chatStream(params);
+      try {
+        while (true) {
+          const chunk = await transport.wait(iterator.next(), run.controller.signal);
+          if (_chatRun !== run || run.controller.signal.aborted) return;
+          if (chunk.done) break;
+          resetTimeout();
+          if (chunk.value.type !== 'delta' || typeof chunk.value.text !== 'string') continue;
+          run.text += chunk.value.text;
+          if (run.text.length > 1000000) throw Object.assign(new Error(_chatSay('回复过长，已保留收到的内容。请缩小问题范围。', 'Reply too long. Received text has been kept; narrow the request.')), { code: 'config' });
+          if (!run.stream) { run.thinking.remove(); run.stream = _chatCreateStreamRow(container); }
+          if (!run.renderTimer) run.renderTimer = setTimeout(() => {
+            run.renderTimer = null; if (_chatRun !== run) return;
+            run.stream.content.innerHTML = _chatMd(run.text) + '<span class="_chat-cursor">▍</span>';
+            _chatScrollBottom();
+          }, 100);
+        }
+      } finally { Promise.resolve(iterator.return?.()).catch(() => {}); }
+    } else {
+      const result = await transport.wait(adapter.chat(params), run.controller.signal);
+      if (_chatRun !== run) return;
+      run.text = result.message?.content || '';
+    }
+    if (!run.text.trim()) throw Object.assign(new Error(_chatSay('服务未返回正文，请检查模型和输出上限后重试。', 'The service returned no text. Check the model and output limit, then retry.')), { code: 'config' });
+    _chatFinishRun(run, 'complete');
+  } catch (error) {
+    _chatFinishRun(run, error.name === 'AbortError' ? 'stopped' : 'interrupted', error.name === 'AbortError' ? null : error);
   } finally {
-    _chatBusy = false;
-    _chatAbort = null;
-    _chatUpdateButtons();
+    clearTimeout(run.timer); run.controller.abort();
   }
 }
 
@@ -527,14 +371,16 @@ async function _chatSend() {
   if (!text && _chatImages.length === 0) return;
   if (_chatBusy) return;
 
-  // Check API key — read from Agent config or directly from localStorage
-  const AG = window.AgentConfig?.AG;
-  const apiKey = AG?.getKey?.(_chatAdapterId) ||
-    (() => { try { return JSON.parse(localStorage.getItem('ag_key_' + _chatAdapterId)) || ''; } catch { return ''; } })();
-  if (!apiKey) {
-    _chatShowNoKey();
-    return;
-  }
+  if (_chatPreparing) return;
+  _chatPreparing = true;
+  try { if (!window.AgentAdapters && !await window._agEnsureLoaded()) return; }
+  catch { _chatShowError(_chatTl('no_adapter')); return; }
+  finally { _chatPreparing = false; }
+  if (!input?.isConnected || _chatBusy) return;
+  _chatSyncConfig();
+  const cfg = window.AgentConfig.AG.load();
+  if (!cfg.apiKey && cfg.adapter !== 'custom') { _chatShowNoKey(); return; }
+  _chatUndo = null; document.getElementById('_chatUndoBar')?.remove();
 
   // Build user message
   const userMsg = {
@@ -544,42 +390,41 @@ async function _chatSend() {
     ts: Date.now(),
   };
   _chatMessages.push(userMsg);
-  _chatImages = [];
+  _chatSaveHistory();
+  _chatImages = []; _chatImageEpoch++;
+  _chatDraft = "";
   _chatUpdateImgPreview();
 
   // Render user bubble
   const msgList = _chatGetMsgContainer();
-  _chatRenderMsg(userMsg, msgList);
+  _chatRenderMsg(userMsg, msgList);_chatLimitRows(msgList);
   input.value = '';
   input.style.height = 'auto';
-  _chatScrollBottom();
+  _chatScrollBottom(true);
 
   // Delegate to core send
   await _chatDoSend(text, userMsg._images || []);
 }
 
 function _chatStop() {
-  if (_chatAbort) {
-    _chatAbort.abort();
-    _chatAbort = null;
-  }
-  _chatBusy = false;
-  _chatUpdateButtons();
-  // Remove thinking bubble
-  const thinking = document.querySelector('._chat-thinking');
-  if (thinking) thinking.remove();
-  // Remove streaming cursor
-  const cursor = document.querySelector('._chat-cursor');
-  if (cursor) cursor.remove();
+  if (!_chatRun) return;
+  const run = _chatRun;
+  run.controller.abort();
+  _chatFinishRun(run, 'stopped');
 }
 
-function _chatShowError(msg) {
+function _chatShowError(msg, retry = false) {
   const msgList = _chatGetMsgContainer();
   if (!msgList) return;
   const el = document.createElement('div');
   el.className = '_chat-msg _chat-msg-error';
   el.style.cssText = 'align-self:center;max-width:90%;margin:4px auto';
   el.innerHTML = `<div class="_chat-content" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#f87171;border-radius:12px">&#x26a0; ${_chatEsc(msg)}</div>`;
+  if (retry) {
+    const button = document.createElement('button'); button.className = '_chat-action-btn'; button.textContent = _chatTl('retry');
+    button.onclick = () => { const last = _chatMessages.at(-1); if (last) _chatRetry(last); };
+    el.appendChild(button);
+  }
   msgList.appendChild(el);
   _chatScrollBottom();
 }
@@ -595,16 +440,19 @@ function _chatShowNoKey() {
   inner.innerHTML = `<span>&#x26a0; ${_chatTl('no_key')}</span>`;
   const btn = document.createElement('button');
   btn.textContent = _chatTl('go_settings');
-  btn.onclick = () => { if (window.toggleAgentPanel) window.toggleAgentPanel(); };
+  btn.onclick = _chatOpenSettings;
   inner.appendChild(btn);
   el.appendChild(inner);
   msgList.appendChild(el);
   _chatScrollBottom();
 }
 
-function _chatScrollBottom() {
+function _chatScrollBottom(force = false) {
+  if (force) _chatSticky = true;
+  if (!_chatSticky) return;
   const el = document.getElementById('_chatMsgList');
-  if (el) requestAnimationFrame(() => el.scrollTop = el.scrollHeight);
+  cancelAnimationFrame(_chatScrollFrame);
+  _chatScrollFrame = requestAnimationFrame(() => { if (el?.isConnected && _chatSticky) el.scrollTop = el.scrollHeight; });
 }
 
 function _chatGetMsgContainer() {
@@ -618,7 +466,7 @@ function _chatUpdateButtons() {
   const input = document.getElementById('_chatInput');
   if (sendBtn) sendBtn.style.display = _chatBusy ? 'none' : '';
   if (stopBtn) stopBtn.style.display = _chatBusy ? '' : 'none';
-  if (input) input.disabled = _chatBusy;
+  if (input) input.setAttribute('aria-busy', String(_chatBusy));
 }
 
 // ── Image handling ──
@@ -631,18 +479,18 @@ function _chatAttachImage() {
   inp.click();
 }
 
-function _chatProcessFiles(files) {
+async function _chatProcessFiles(files) {
+  const epoch = _chatImageEpoch;
   for (const file of files) {
-    if (!file.type.startsWith('image/')) continue;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result;
-      const base64 = dataUrl.split(',')[1];
-      const mime = file.type;
-      _chatImages.push({ base64, mime, name: file.name });
-      _chatUpdateImgPreview();
-    };
-    reader.readAsDataURL(file);
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type) || file.size > 2 * 1024 * 1024 || _chatImages.length >= 4) {
+      window.showToast?.(_chatSay('最多 4 张 PNG/JPEG/WebP/GIF，每张不超过 2 MB。', 'Up to 4 PNG/JPEG/WebP/GIF images, at most 2 MB each.'), 'error'); continue;
+    }
+    try {
+      const data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
+      if (epoch !== _chatImageEpoch) return;
+      if (_chatImages.length >= 4) break;
+      _chatImages.push({ base64: data.split(',')[1], mime: file.type, name: file.name }); _chatUpdateImgPreview();
+    } catch { window.showToast?.(_chatSay('图片读取失败。', 'Could not read image.'), 'error'); }
   }
 }
 
@@ -667,13 +515,23 @@ function _chatUpdateImgPreview() {
 
 // ── Clear chat ──
 function _chatClear() {
-  _chatMessages = [];
-  _chatImages = [];
-  const msgList = document.getElementById('_chatMsgList');
-  const inner = _chatGetMsgContainer();
-  if (inner) inner.innerHTML = '';
-  _chatUpdateImgPreview();
-  try { localStorage.removeItem(_CHAT_LS_KEY); } catch {}
+  _chatStop();
+  _chatUndo = { messages: _chatMessages, images: _chatImages, draft: document.getElementById('_chatInput')?.value || _chatDraft };
+  _chatMessages = []; _chatImages = []; _chatDraft = ''; _chatImageEpoch++;
+  const inner = _chatGetMsgContainer(); inner?.replaceChildren();
+  const input = document.getElementById('_chatInput'); if (input) input.value = '';
+  _chatUpdateImgPreview(); _chatSaveHistory();
+  document.getElementById('_chatUndoBar')?.remove();
+  const bar = document.createElement('div'); bar.id = '_chatUndoBar'; bar.className = '_chat-notice';
+  const button = document.createElement('button'); button.className = '_chat-action-btn'; button.textContent = _chatSay('撤销清空', 'Undo clear');
+  button.onclick = () => {
+    if (!_chatUndo || _chatBusy) return;
+    _chatMessages = _chatUndo.messages; _chatImages = _chatUndo.images; _chatDraft = _chatUndo.draft; _chatUndo = null;
+    if (input) { input.value = _chatDraft; input.dispatchEvent(new Event('input')); }
+    _chatRenderHistory(inner);
+    _chatUpdateImgPreview(); _chatSaveHistory(); _chatScrollBottom(true); bar.remove();
+  };
+  bar.appendChild(button); document.getElementById('_chatMsgList')?.after(bar);
 }
 
 // ── Export Markdown ──
@@ -691,103 +549,22 @@ function _chatExportMd() {
   URL.revokeObjectURL(a.href);
 }
 
-// ── Settings dialog ──
-function _chatOpenSettings() {
-  const overlay = document.createElement('div');
-  overlay.className = '_chat-overlay';
-  const dialog = document.createElement('div');
-  dialog.className = '_chat-dialog _chat-settings-dialog';
-  const adapterList = window.AgentAdapters?.listAdapters?.() || [
-    { id: 'claude', name: 'Claude' }, { id: 'openai-chat', name: 'OpenAI' },
-    { id: 'gemini', name: 'Gemini' }, { id: 'custom', name: 'Custom' },
-  ];
-  const _adapterIcons2 = { claude: '✦', 'openai-chat': '⬡', openai: '⬡', gemini: '✴', custom: '⚙' };
-  let activeTab = _chatAdapterId;
-  function getKey(id) { try { return JSON.parse(localStorage.getItem('ag_key_' + id)) || ''; } catch { return ''; } }
-  function setKey(id, v) { try { localStorage.setItem('ag_key_' + id, JSON.stringify(v)); } catch {} }
-  function getBaseUrl() { try { return JSON.parse(localStorage.getItem('ag_base_url')) || ''; } catch { return ''; } }
-  function setBaseUrl(v) { try { localStorage.setItem('ag_base_url', JSON.stringify(v)); } catch {} }
-  function getMaxTok() { try { const v = localStorage.getItem('ag_max_tokens'); return v ? JSON.parse(v) : 2000; } catch { return 2000; } }
-  function setMaxTok(v) { try { localStorage.setItem('ag_max_tokens', JSON.stringify(+v)); } catch {} }
-
-  function renderDialog() {
-    dialog.innerHTML = `
-      <div class="_chat-settings-header">
-        <span class="_chat-settings-icon">⚙</span>
-        <h3>${_chatTl('settings_title')}</h3>
-        <button class="_chat-settings-close" id="_chatSettingsClose">✕</button>
-      </div>
-      <div class="_chat-settings-tabs">${adapterList.map(a =>
-        `<button class="_chat-settings-tab${a.id === activeTab ? ' active' : ''}" data-id="${a.id}">${_adapterIcons2[a.id] || '◈'} ${a.name || a.id}</button>`
-      ).join('')}</div>
-      <div class="_chat-settings-body">
-        <div class="_chat-settings-field">
-          <label>${_chatTl('api_key')} <span style="opacity:.5;font-size:11px">(${activeTab})</span></label>
-          <div class="_chat-key-wrap">
-            <input type="password" id="_chatKeyInput" value="${_chatEsc(getKey(activeTab))}" placeholder="sk-..." autocomplete="off">
-            <button class="_chat-key-eye" id="_chatKeyEye">👁</button>
-          </div>
-        </div>
-        <div class="_chat-settings-field">
-          <label>${_chatTl('base_url')}</label>
-          <input type="text" id="_chatBaseUrl" value="${_chatEsc(getBaseUrl())}" placeholder="https://api.openai.com/v1">
-        </div>
-        <div class="_chat-settings-field _chat-settings-row">
-          <div style="flex:1">
-            <label>${_chatTl('max_tokens')}</label>
-            <input type="number" id="_chatMaxTok" value="${getMaxTok()}" min="256" max="32000" step="256" style="width:100%">
-          </div>
-          <div style="flex:1">
-            <label>${_chatTl('system_prompt')}</label>
-            <button class="_chat-btn-secondary" id="_chatSysPromptBtn" style="width:100%;margin-top:2px">${_chatTl('sys_prompt_title')} ↗</button>
-          </div>
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;padding:0 20px 20px">
-        <button class="_chat-btn-secondary" id="_chatSettingsCancel">${_chatTl('cancel')}</button>
-        <button class="_chat-btn-primary" id="_chatSettingsSave">${_chatTl('save')}</button>
-      </div>`;
-    overlay.appendChild(dialog);
-    // Tab switching
-    dialog.querySelectorAll('._chat-settings-tab').forEach(tab => {
-      tab.onclick = () => { activeTab = tab.dataset.id; renderDialog(); };
-    });
-    dialog.querySelector('#_chatSettingsClose').onclick = () => overlay.remove();
-    dialog.querySelector('#_chatSettingsCancel').onclick = () => overlay.remove();
-    const eyeBtn = dialog.querySelector('#_chatKeyEye');
-    const keyInp = dialog.querySelector('#_chatKeyInput');
-    if (eyeBtn) eyeBtn.onclick = () => { keyInp.type = keyInp.type === 'password' ? 'text' : 'password'; };
-    const sysBtn = dialog.querySelector('#_chatSysPromptBtn');
-    if (sysBtn) sysBtn.onclick = () => { overlay.remove(); _chatEditSystemPrompt(); };
-    dialog.querySelector('#_chatSettingsSave').onclick = () => {
-      const key = dialog.querySelector('#_chatKeyInput')?.value.trim() || '';
-      const baseUrl = dialog.querySelector('#_chatBaseUrl')?.value.trim() || '';
-      const maxTok = dialog.querySelector('#_chatMaxTok')?.value || '2000';
-      setKey(activeTab, key);
-      setBaseUrl(baseUrl);
-      setMaxTok(maxTok);
-      _chatAdapterId = activeTab;
-      // update toolbar badge
-      if (typeof _chatUpdateBadge === 'function') _chatUpdateBadge();
-      const badge = document.getElementById('_chatAdapterBadge');
-      if (badge) {
-        const icons = { claude: '✦', 'openai-chat': '⬡', openai: '⬡', gemini: '✴', custom: '⚙' };
-        const adapters2 = window.AgentAdapters?.listAdapters?.() || [
-          { id: 'claude', name: 'Claude' }, { id: 'openai-chat', name: 'OpenAI' },
-          { id: 'gemini', name: 'Gemini' }, { id: 'custom', name: 'Custom' },
-        ];
-        const icon = icons[activeTab] || '◈';
-        const name = adapters2.find(a => a.id === activeTab)?.name || activeTab;
-        badge.innerHTML = `<span class="_chat-badge-icon">${icon}</span><span class="_chat-badge-name">${name}</span>`;
-      }
-      overlay.remove();
-    };
-  }
-  renderDialog();
-  const _chatRoot = document.getElementById('_chatPageRoot') || document.body;
-  _chatRoot.appendChild(overlay);
-  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+// ── Shared connection settings ──
+async function _chatOpenSettings() {
+  try { if (!window.AgentConfig && !await window._agEnsureLoaded()) return; window._agOpenConfig(); }
+  catch { _chatShowError(_chatTl('no_adapter')); }
 }
+function _chatSyncConfig() {
+  const cfg = window.AgentConfig?.AG.load(); if (!cfg) return;
+  _chatAdapterId = cfg.adapter; _chatModel = cfg.model; _chatTemp = cfg.temperature;
+  const adapter = window.AgentAdapters.getAdapter(cfg.adapter);
+  const setup = document.getElementById('_chatSetup'); if (setup) setup.hidden = !!cfg.apiKey || (cfg.adapter === 'custom' && !!cfg.baseUrl && !!cfg.model);
+  const badge = document.getElementById('_chatAdapterBadge'); if (badge) badge.textContent = adapter.name;
+  const model = document.getElementById('_chatModelBadge'); if (model) model.textContent = cfg.model || adapter.defaultModel || '—';
+  const range = document.querySelector('._chat-temp-wrap input'); if (range) range.value = cfg.temperature;
+  const value = document.querySelector('._chat-temp-val'); if (value) value.textContent = cfg.temperature;
+}
+window.addEventListener('agent-config-change', _chatSyncConfig);
 
 // ── System prompt dialog ──
 function _chatEditSystemPrompt() {
@@ -880,6 +657,11 @@ function _chatToggleCtxMenu(btn) {
 function _chatRefreshI18n() {
   const root = document.getElementById('_chatPageRoot');
   if (!root) return;
+  const home = document.getElementById('_chatHome'); if (home) home.textContent = _chatSay('← 工具箱', '← Toolbox');
+  const clear = document.getElementById('_chatClearBtn'); if (clear) clear.textContent = _chatSay('清空对话', 'Clear chat');
+  const setup = document.getElementById('_chatSetup'); if (setup) setup.textContent = _chatSay('配置 AI 连接', 'Configure AI connection');
+  const jump = document.getElementById('_chatJumpBottom'); if (jump) jump.textContent = _chatSay('↓ 回到最新消息', '↓ Latest messages');
+  const undo = document.querySelector('#_chatUndoBar button'); if (undo) undo.textContent = _chatSay('撤销清空', 'Undo clear');
   // Labels with data-i18n
   root.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
@@ -947,18 +729,19 @@ function renderAiChat(container) {
   const AG = window.AgentConfig?.AG;
   function _lsGet(key, def) { try { const v = localStorage.getItem('ag_' + key); return v === null ? def : JSON.parse(v); } catch { return def; } }
   const savedCfg = _chatLoadConfig();
-  _chatAdapterId = savedCfg.adapterId || AG?.get?.('adapter', 'claude') || _lsGet('adapter', 'claude');
-  _chatModel = savedCfg.model || AG?.get?.('model', '') || _lsGet('model', '');
-  _chatTemp = savedCfg.temp ?? AG?.get?.('temperature', 0.7) ?? _lsGet('temperature', 0.7);
-  _chatMaxCtx = savedCfg.maxCtx ?? 20;
-  _chatSystemPrompt = '';
+  _chatAdapterId = AG?.load().adapter || _lsGet('adapter', 'claude');
+  _chatModel = AG?.load().model || _lsGet('model', '');
+  _chatTemp = AG?.load().temperature ?? _lsGet('temperature', 0.7);
+  _chatMaxCtx = [0, 5, 10, 20].includes(savedCfg.maxCtx) ? savedCfg.maxCtx : 20;
   try { _chatSystemPrompt = localStorage.getItem(_CHAT_SYS_KEY) || ''; } catch {}
-  _chatMessages = _chatLoadHistory();
-  _chatImages = [];
-  _chatBusy = false;
-
-  // Trigger Agent module load in background (non-blocking, so adapters are ready when user sends)
-  if (!window.AgentAdapters && window._agEnsureLoaded) window._agEnsureLoaded().catch(() => {});
+  if (!_chatInitialized) { _chatMessages = _chatLoadHistory(); _chatInitialized = true; }
+  _chatSticky = true;
+  if (!window.AgentAdapters && window._agEnsureLoaded) window._agEnsureLoaded().then(() => {
+    if (container.isConnected) {
+      _chatSyncConfig();_chatMountContext();
+      if (!_chatBusy) { const inner = _chatGetMsgContainer(); if (inner && _chatMessages.length) { _chatRenderHistory(inner); } }
+    }
+  }).catch(() => {});
   // Get adapters
   const adapters = window.AgentAdapters?.listAdapters?.() || [];
   const adapterList = adapters.length > 0 ? adapters : [
@@ -995,6 +778,16 @@ function renderAiChat(container) {
     ._chat-msgs-inner{padding:0 32px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box}
     @keyframes _chatFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
+    ._chat-msgs-inner{max-width:1000px;margin:0 auto;width:100%}
+    ._chat-input-inner{max-width:936px;margin:0 auto}
+    ._chat-actions{opacity:.75!important;height:auto!important;min-height:28px;flex-wrap:wrap}
+    ._chat-actions:focus-within,._chat-row:hover ._chat-actions{opacity:1!important}
+    #_chatSetup[hidden],._chat-action-btn[hidden],._chat-jump[hidden]{display:none!important}
+    ._chat-jump{align-self:center;flex-shrink:0;margin:4px 0;padding:7px 15px;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--accent);cursor:pointer;font-size:12px}
+    ._chat-thinking,._chat-notice{color:var(--text-muted);padding:10px 16px;font-size:12px;text-align:center}
+    ._chat-model-badge{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    ._chat-wrap button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    @media(prefers-reduced-motion:reduce){._chat-row{animation:none!important}._chat-cursor{animation:none!important}}
     /* ── Row layout ── */
     ._chat-row{display:flex;align-items:flex-start;gap:12px;animation:_chatFadeIn .22s ease;padding:8px 0;width:100%}
     ._chat-row-user{justify-content:flex-end}
@@ -1149,25 +942,6 @@ function renderAiChat(container) {
     ._chat-btn-secondary{background:var(--surface);color:var(--text);border:1px solid var(--border);padding:7px 14px;border-radius:9px;cursor:pointer;font-size:13px}
     ._chat-settings-btn{border-color:color-mix(in srgb,var(--accent) 32%,transparent);color:var(--accent3,var(--accent))!important}
     ._chat-settings-btn:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)!important;border-color:var(--accent)!important}
-    ._chat-settings-dialog{max-width:520px;padding:0;overflow:hidden}
-    ._chat-settings-header{display:flex;align-items:center;gap:10px;padding:20px 20px 16px;border-bottom:1px solid var(--border,rgba(255,255,255,.08))}
-    ._chat-settings-icon{font-size:18px;opacity:.8}
-    ._chat-settings-header h3{flex:1;font-size:15px;font-weight:600;color:var(--text,#f1f5f9);margin:0}
-    ._chat-settings-close{background:none;border:none;cursor:pointer;color:var(--text-muted,rgba(241,245,249,.5));font-size:16px;padding:2px 6px;border-radius:6px;transition:color .15s}
-    ._chat-settings-close:hover{color:var(--text,#f1f5f9)}
-    ._chat-settings-tabs{display:flex;gap:4px;padding:12px 20px 0;border-bottom:1px solid var(--border,rgba(255,255,255,.08))}
-    ._chat-settings-tab{background:none;border:none;border-bottom:2px solid transparent;padding:6px 12px;font-size:13px;cursor:pointer;color:var(--text-muted,rgba(241,245,249,.55));margin-bottom:-1px;transition:all .15s;border-radius:6px 6px 0 0}
-    ._chat-settings-tab:hover{color:var(--text,#f1f5f9);background:rgba(255,255,255,.04)}
-    ._chat-settings-tab.active{color:var(--accent3,var(--accent));border-bottom-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
-    ._chat-settings-body{padding:16px 20px;display:flex;flex-direction:column;gap:14px}
-    ._chat-settings-field{display:flex;flex-direction:column;gap:6px}
-    ._chat-settings-field label{font-size:11px;font-weight:600;color:var(--text-muted,rgba(241,245,249,.55));text-transform:uppercase;letter-spacing:.4px}
-    ._chat-settings-field input{background:rgba(255,255,255,.05);color:var(--text,#f1f5f9);border:1px solid var(--border,rgba(255,255,255,.1));border-radius:10px;padding:9px 12px;font-size:13px;outline:none;width:100%;box-sizing:border-box;transition:border-color .15s}
-    ._chat-settings-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}
-    ._chat-settings-row{flex-direction:row;gap:12px}
-    ._chat-key-wrap{position:relative;display:flex}
-    ._chat-key-wrap input{flex:1;padding-right:40px}
-    ._chat-key-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--text-muted,rgba(241,245,249,.5));padding:2px}
     /* ── Responsive: tablet ── */
     @media(max-width:768px){
       ._chat-msgs-inner{padding:0 16px}
@@ -1177,7 +951,14 @@ function renderAiChat(container) {
     }
     /* ── Responsive: mobile ── */
     @media(max-width:600px){
-      ._chat-toolbar{gap:4px;padding:6px 10px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+      ._chat-toolbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:7px;padding:8px 10px;overflow:visible}
+      ._chat-toolbar button{white-space:nowrap;min-height:30px}
+      #_chatHome{grid-area:1/1} #_chatClearBtn{grid-area:1/2;justify-self:start}
+      ._chat-settings-btn{grid-area:1/3}
+      #_chatAdapterBadge{grid-area:2/1}
+      #_chatModelBadge{grid-area:2/2;max-width:100%;min-width:0}
+      #_chatCtxWrap{grid-area:2/3;display:flex}
+      ._chat-toolbar-sep,._chat-toolbar-spacer{display:none}
       ._chat-toolbar::-webkit-scrollbar{display:none}
       ._chat-temp-wrap{display:none}
       ._chat-msgs{padding:8px 0}
@@ -1235,11 +1016,14 @@ function renderAiChat(container) {
   // ── Toolbar ──
   const toolbar = document.createElement('div');
   toolbar.className = '_chat-toolbar';
+  const home = document.createElement('button'); home.id = '_chatHome'; home.className = '_chat-adapter-btn'; home.textContent = _chatSay('← 工具箱', '← Toolbox'); home.onclick = () => navigateTo('home'); toolbar.appendChild(home);
+  const clear = document.createElement('button'); clear.id = '_chatClearBtn'; clear.className = '_chat-adapter-btn'; clear.textContent = _chatSay('清空对话', 'Clear chat'); clear.onclick = _chatClear; toolbar.appendChild(clear);
 
   // Current adapter badge
-  const adapterBadge = document.createElement('div');
+  const adapterBadge = document.createElement('button');
   adapterBadge.className = '_chat-adapter-badge';
   adapterBadge.id = '_chatAdapterBadge';
+  adapterBadge.onclick = _chatOpenSettings; adapterBadge.title = _chatTl('settings');
   const _adapterIcons = { claude: '✦', 'openai-chat': '⬡', openai: '⬡', gemini: '✴', custom: '⚙' };
   function _chatUpdateBadge() {
     const icon = _adapterIcons[_chatAdapterId] || '◈';
@@ -1249,33 +1033,9 @@ function renderAiChat(container) {
   _chatUpdateBadge();
   toolbar.appendChild(adapterBadge);
 
-  // Model display (click to edit inline)
-  const modelBadge = document.createElement('div');
-  modelBadge.className = '_chat-model-badge';
-  modelBadge.id = '_chatModelBadge';
-  const _currentModel = () => _chatModel || currentAdapter?.defaultModel || '';
-  modelBadge.innerHTML = `<span class="_chat-model-label">${_chatEsc(_currentModel()) || '—'}</span><span style="opacity:.4;font-size:10px"> ▾</span>`;
-  modelBadge.title = _chatTl('model');
-  modelBadge.onclick = () => {
-    // inline edit
-    const cur = _currentModel();
-    const inp = document.createElement('input');
-    inp.type = 'text'; inp.value = cur;
-    inp.list = '_chatModelDatalist';
-    inp.className = '_chat-model-inline-input';
-    const dl = document.createElement('datalist');
-    dl.id = '_chatModelDatalist';
-    (currentAdapter?.models || []).forEach(m => { const o = document.createElement('option'); o.value = m; dl.appendChild(o); });
-    modelBadge.innerHTML = ''; modelBadge.appendChild(inp); modelBadge.appendChild(dl);
-    inp.focus(); inp.select();
-    const done = () => {
-      _chatModel = inp.value.trim();
-      _chatSaveConfig();
-      modelBadge.innerHTML = `<span class="_chat-model-label">${_chatEsc(_chatModel) || '—'}</span><span style="opacity:.4;font-size:10px"> ▾</span>`;
-    };
-    inp.onblur = done;
-    inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } if (e.key === 'Escape') inp.blur(); };
-  };
+  const modelBadge = document.createElement('button');
+  modelBadge.className = '_chat-model-badge'; modelBadge.id = '_chatModelBadge';
+  modelBadge.textContent = _chatModel || currentAdapter?.defaultModel || '—'; modelBadge.title = _chatTl('model'); modelBadge.onclick = _chatOpenSettings;
   toolbar.appendChild(modelBadge);
 
   // Separator
@@ -1292,7 +1052,11 @@ function renderAiChat(container) {
   rangeInput.oninput = () => {
     _chatTemp = parseFloat(rangeInput.value);
     tempVal.textContent = _chatTemp.toFixed(1);
-    _chatSaveConfig();
+  };
+  rangeInput.setAttribute('aria-label', _chatTl('temp'));
+  rangeInput.onchange = () => {
+    const AG = window.AgentConfig?.AG; if (!AG) return;
+    try { AG.save({ ...AG.load(), temperature: Number(rangeInput.value) }); } catch (e) { _chatSyncConfig(); window.showToast?.(e.message, 'error'); }
   };
   toolbar.appendChild(tempGroup);
 
@@ -1301,7 +1065,7 @@ function renderAiChat(container) {
 
   // Context control button
   const ctxWrap = document.createElement('div');
-  ctxWrap.className = '_chat-toolbar-group';
+  ctxWrap.className = '_chat-toolbar-group'; ctxWrap.id = '_chatCtxWrap';
   ctxWrap.style.position = 'relative';
   const ctxBtn = document.createElement('button');
   ctxBtn.className = '_chat-adapter-btn';
@@ -1313,6 +1077,7 @@ function renderAiChat(container) {
 
   // Spacer
   const toolbarSpacer = document.createElement('div');
+  toolbarSpacer.className = '_chat-toolbar-spacer';
   toolbarSpacer.style.cssText = 'flex:1;min-width:8px';
   toolbar.appendChild(toolbarSpacer);
 
@@ -1325,6 +1090,8 @@ function renderAiChat(container) {
   toolbar.appendChild(settingsBtn);
 
   wrap.appendChild(toolbar);
+  const context=document.createElement('div');context.id='_chatContextControls';wrap.append(context);queueMicrotask(_chatMountContext);
+  const storageStatus=document.createElement('p');storageStatus.id='_chatStorageStatus';storageStatus.className='_chat-notice';storageStatus.setAttribute('role','status');wrap.append(storageStatus);
 
   // No-key warning is handled at send time (Agent lazy-loads, AG may not be ready at render)
 
@@ -1348,13 +1115,17 @@ function renderAiChat(container) {
         if (inp) { inp.value = btn.textContent; inp.focus(); inp.dispatchEvent(new Event('input')); }
       };
     });
+    const setup = document.createElement('button'); setup.id = '_chatSetup'; setup.className = '_chat-btn-primary'; setup.textContent = _chatSay('配置 AI 连接', 'Configure AI connection'); setup.onclick = _chatOpenSettings;
+    welcome.appendChild(setup);
     msgInner.appendChild(welcome);
   } else {
-    for (const m of _chatMessages) {
-      _chatRenderMsg(m, msgInner);
-    }
+    _chatRenderHistory(msgInner);
   }
   wrap.appendChild(msgList);
+  const jump = document.createElement('button'); jump.id = '_chatJumpBottom'; jump.className = '_chat-jump'; jump.textContent = _chatSay('↓ 回到最新消息', '↓ Latest messages'); jump.hidden = true;
+  jump.onclick = () => { _chatScrollBottom(true); jump.hidden = true; };
+  msgList.addEventListener('scroll', () => { _chatSticky = msgList.scrollHeight - msgList.scrollTop - msgList.clientHeight < 80; jump.hidden = _chatSticky; }, { passive: true });
+  wrap.appendChild(jump);
 
   // ── Image preview area ──
   const imgPreview = document.createElement('div');
@@ -1380,7 +1151,7 @@ function renderAiChat(container) {
   // Textarea
   const textarea = document.createElement('textarea');
   textarea.id = '_chatInput';
-  textarea.rows = 1;
+  textarea.rows = 1; textarea.value = _chatDraft; textarea.setAttribute('aria-label', _chatTl('input_placeholder'));
   textarea.placeholder = _chatTl('input_placeholder');
   textarea.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -1389,6 +1160,7 @@ function renderAiChat(container) {
     }
   });
   textarea.addEventListener('input', () => {
+    _chatDraft = textarea.value;
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   });
@@ -1431,10 +1203,12 @@ function renderAiChat(container) {
 
   // Scroll to bottom if history loaded
   if (_chatMessages.length > 0) {
-    requestAnimationFrame(() => _chatScrollBottom());
+    requestAnimationFrame(() => _chatScrollBottom(true));
   }
-  // Remove welcome on first send
-  const origSend = _chatSend;
+  _chatUpdateImgPreview(); _chatSyncConfig();
+  window._activeCleanup = () => {
+    _chatDraft = textarea.value; _chatStop(); _chatImageEpoch++; cancelAnimationFrame(_chatScrollFrame);
+  };
   // Focus input
-  requestAnimationFrame(() => textarea.focus());
+  requestAnimationFrame(() => { if (textarea.isConnected) { textarea.dispatchEvent(new Event('input')); textarea.focus(); } });
 }

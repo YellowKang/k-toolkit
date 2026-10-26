@@ -61,9 +61,11 @@ const _hashI18nDict = {
 };
 
 let _hashT = null;
+let _hashRevision = 0, _hmacRevision = 0, _hashFileRun = null;
+const _hashSay = (zh, en) => window.getCurrentLang?.() === 'en' ? en : zh;
 
 function renderHash(el) {
-  window._activeCleanup = () => { clearTimeout(_hashTimer); clearTimeout(_hmacTimer); };
+  window._activeCleanup = () => { clearTimeout(_hashTimer); clearTimeout(_hmacTimer); _hashRevision++; _hmacRevision++; _hashFileRun?.controller.abort(); _hashFileRun = null; };
   _hashT = makeToolI18n(_hashI18nDict);
   const T = _hashT;
 
@@ -85,17 +87,21 @@ function renderHash(el) {
         <div class="panel-label" style="margin:0">${T('file_hash')}</div>
         <span style="font-size:12px;color:var(--text-muted)">${T('file_support')}</span>
       </div>
-      <div id="hashDropZone" style="border:2px dashed rgba(102,126,234,0.3);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all 0.2s" onclick="document.getElementById('hashFileInput').click()" ondragover="hashDragOver(event)" ondragleave="hashDragLeave(event)" ondrop="hashDrop(event)">
+      <div id="hashDropZone" role="button" tabindex="0" onkeydown="if((event.key==='Enter'||event.key===' ')&&!event.isComposing){event.preventDefault();document.getElementById('hashFileInput').click()}" style="border:2px dashed rgba(102,126,234,0.3);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all 0.2s" onclick="document.getElementById('hashFileInput').click()" ondragover="hashDragOver(event)" ondragleave="hashDragLeave(event)" ondrop="hashDrop(event)">
         <div style="font-size:28px;margin-bottom:8px">\ud83d\udcc2</div>
         <div style="font-size:13px;color:var(--text-muted)">${T('file_drop_hint')}</div>
       </div>
       <input type="file" id="hashFileInput" style="display:none" multiple onchange="hashFileSelected(this)">
+      <p style="font-size:12px;color:var(--text-muted)">${_hashSay('最多 10 个文件，每个不超过 32 MB；逐个计算。', 'Up to 10 files, 32 MB per file; processed sequentially.')}</p>
+      <div class="tool-actions"><span id="hashFileStatus" role="status"></span><button id="hashFileCancel" class="btn btn-secondary" hidden onclick="cancelHashFiles()">${_hashSay('停止计算', 'Stop')}</button></div>
       <div id="fileHashResult" style="margin-top:12px"></div>
     </div>
     <div class="tool-card-panel">
       <div class="panel-label" style="margin-bottom:10px">${T('hash_verify')}</div>
+      <label for="hashVerifySource" style="font-size:12px;color:var(--text-muted)">${_hashSay('校验来源', 'Compare against')}</label>
+      <select id="hashVerifySource" class="tool-input" onchange="_hashVerify()" style="margin-bottom:8px"><option value="text">${T('text_hash')}</option><option value="file">${T('file_hash')}</option></select>
       <input class="tool-input" id="hashVerifyInput" placeholder="${T('verify_placeholder')}" style="margin-bottom:8px">
-      <div id="hashVerifyResult"></div>
+      <div id="hashVerifyResult" role="status"></div>
     </div>
     <div class="tool-card-panel">
       <div class="panel-label" style="margin-bottom:12px">${T('hmac_title')}</div>
@@ -110,7 +116,7 @@ function renderHash(el) {
       </div>
       <div style="margin-bottom:10px">
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">${T('hmac_key')}</div>
-        <input class="tool-input" id="hmacKeyInput" placeholder="${T('hmac_key_placeholder')}" oninput="_hmacRealtime()">
+        <input class="tool-input" type="password" autocomplete="off" id="hmacKeyInput" placeholder="${T('hmac_key_placeholder')}" oninput="_hmacRealtime()">
       </div>
       <div style="margin-bottom:12px">
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">${T('hmac_msg')}</div>
@@ -129,35 +135,35 @@ function renderHash(el) {
       </div>
     </div>`;
 
-  // hash verify listener
-  document.getElementById('hashVerifyInput').addEventListener('input', () => {
-    const T = _hashT || makeToolI18n(_hashI18nDict);
-    const known = document.getElementById('hashVerifyInput').value.trim().toLowerCase();
-    const results = document.getElementById('hashResults').querySelectorAll('[data-hash]');
-    if (!known || !results.length) { document.getElementById('hashVerifyResult').innerHTML = ''; return; }
-    let found = false;
-    results.forEach(el => {
-      if (el.dataset.hash === known) {
-        document.getElementById('hashVerifyResult').innerHTML = `<div style="color:#10b981;font-size:13px;padding:8px 12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:8px">${T('verify_match', el.dataset.algo)}</div>`;
-        found = true;
-      }
-    });
-    if (!found && known.length > 10) {
-      document.getElementById('hashVerifyResult').innerHTML = `<div style="color:#ef4444;font-size:13px;padding:8px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:8px">${T('verify_no_match')}</div>`;
-    }
-  });
+  const staged=FileSession.mount(el,{multiple:true,onUse:hashFiles}),cleanup=window._activeCleanup;window._activeCleanup=()=>{cleanup?.();staged.dispose();};
+  document.getElementById('hashVerifyInput').addEventListener('input', _hashVerify);
+}
+
+function _hashVerify() {
+  const expected = document.getElementById('hashVerifyInput'); if (!expected) return;
+  const output = document.getElementById('hashVerifyResult'); output.textContent = ''; output.style.color = 'var(--text-muted)';
+  const known = expected.value.trim().toLowerCase(); if (!known) return;
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64}|[a-f0-9]{96}|[a-f0-9]{128})$/.test(known)) { output.textContent = _hashSay('请输入 40 / 64 / 96 / 128 位十六进制摘要。', 'Enter a 40 / 64 / 96 / 128 character hex digest.'); return; }
+  const file = document.getElementById('hashVerifySource').value === 'file';
+  const results = document.querySelectorAll((file ? '#fileHashResult' : '#hashResults') + ' [data-hash]');
+  if (!results.length) { output.textContent = _hashSay('请先计算所选来源的哈希。', 'Calculate hashes for the selected source first.'); return; }
+  const matches = [...results].filter(el => el.dataset.hash === known);
+  output.style.color = matches.length ? 'var(--success,#10b981)' : 'var(--danger,#ef4444)';
+  output.textContent = matches.length ? matches.map(el => _hashT('verify_match', el.dataset.algo) + (el.dataset.file ? ' · ' + el.dataset.file : '')).join('；') : _hashT('verify_no_match');
 }
 
 /* ── Text Hash ── */
 async function calcHash() {
-  const text = document.getElementById('hashInput').value;
-  if (!text) return;
+  clearTimeout(_hashTimer);
+  const input = document.getElementById('hashInput'); if (!input) return;
+  const revision = ++_hashRevision, text = input.value;
   const enc = new TextEncoder().encode(text);
-  const algos = ['SHA-1','SHA-256','SHA-384','SHA-512'];
-  const hashes = await Promise.all(algos.map(async a => ({
-    name: a, hex: bufToHex(await crypto.subtle.digest(a, enc))
-  })));
-  if (document.getElementById('hashInput')) _showHashResults(hashes);
+  if (enc.byteLength > 2 * 1024 * 1024) { window.showToast?.(_hashSay('文本超过 2 MB，请使用文件哈希。', 'Text exceeds 2 MB. Use file hashing.'), 'error'); return; }
+  try {
+    const hashes = await Promise.all(['SHA-1','SHA-256','SHA-384','SHA-512'].map(async name => ({ name, hex: bufToHex(await crypto.subtle.digest(name, enc)) })));
+    if (revision !== _hashRevision || !input.isConnected || input.value !== text) return;
+    _showHashResults(hashes); _hashVerify();
+  } catch { if (revision === _hashRevision) window.showToast?.(_hashSay('哈希计算失败，请使用 HTTPS 或本地环境。', 'Hashing failed. Use HTTPS or localhost.'), 'error'); }
 }
 
 function _showHashResults(hashes) {
@@ -197,41 +203,40 @@ async function hashFile(file) {
   await hashFiles([file]);
 }
 
+function cancelHashFiles() {
+  _hashFileRun?.controller.abort();_hashFileRun = null;
+  const button = document.getElementById('hashFileCancel'); if (button) button.hidden = true;
+  const status = document.getElementById('hashFileStatus'); if (status) status.textContent = _hashSay('已停止，保留已完成的结果。', 'Stopped. Completed results kept.');
+}
 async function hashFiles(fileList) {
-  const T = _hashT || makeToolI18n(_hashI18nDict);
-  const zone = document.getElementById('hashDropZone');
   const files = Array.from(fileList);
-  zone.innerHTML = `<div style="color:var(--text-muted);font-size:13px">${T('computing')} (${files.length})...</div>`;
-
-  const algos = ['SHA-1','SHA-256','SHA-512'];
-  const results = [];
-
-  for (const file of files) {
-    const buf = await file.arrayBuffer();
-    const hashes = await Promise.all(algos.map(async a => ({
-      name: a,
-      hex: bufToHex(await crypto.subtle.digest(a, buf))
-    })));
-    results.push({ file, hashes });
-  }
-
-  zone.innerHTML = results.map(r => {
-    const f = r.file;
-    const sizeStr = f.size < 1024 * 1024
-      ? (f.size / 1024).toFixed(2) + ' KB'
-      : (f.size / 1024 / 1024).toFixed(2) + ' MB';
-    return `
-      <div style="margin-bottom:14px;padding:10px 14px;background:rgba(102,126,234,0.08);border:1px solid rgba(102,126,234,0.2);border-radius:8px">
-        <div style="font-size:13px;font-weight:600;margin-bottom:2px">${escHtml(f.name)}</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${sizeStr} \u00b7 ${f.type || T('unknown_type')}</div>
-        ${r.hashes.map(h => `
-          <div class="result-row" style="margin-bottom:6px;display:flex;align-items:center;gap:10px">
-            <span style="color:var(--text-muted);width:76px;flex-shrink:0;font-size:12px;font-weight:600">${h.name}</span>
-            <span style="font-family:monospace;font-size:12px;word-break:break-all;flex:1;color:var(--neon)">${h.hex}</span>
-            <button class="copy-inline" onclick="copyText('${h.hex}',this)">${T('copy')}</button>
-          </div>`).join('')}
-      </div>`;
-  }).join('');
+  if (!files.length) return;
+  if (files.length > 10 || files.some(file => file.size > 32 * 1024 * 1024)) { window.showToast?.(_hashSay('最多 10 个文件，每个不超过 32 MB。', 'Up to 10 files, at most 32 MB each.'), 'error'); return; }
+  try{FileSession.replace(files);}catch(e){showToast(e.message,'error');return;}
+  _hashFileRun?.controller.abort();const run = {controller:new AbortController()}; _hashFileRun = run;
+  const output = document.getElementById('fileHashResult'), status = document.getElementById('hashFileStatus'), cancel = document.getElementById('hashFileCancel');
+  output.replaceChildren(); cancel.hidden = false;
+  document.getElementById('hashVerifySource').value = 'file'; _hashVerify();
+  try {
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index]; status.textContent = _hashT('computing') + ' ' + (index + 1) + '/' + files.length + ' · ' + file.name;
+      const data=await(await ToolCompute.load('file')).run(file,'hash',{algorithms:['SHA-1','SHA-256','SHA-384','SHA-512']},{signal:run.controller.signal});
+      if(_hashFileRun!==run)return;
+      const hashes=data.hashes.map(h=>({name:h.algorithm,hex:h.hash}));
+      const card = document.createElement('div'); card.className = 'tool-card-panel';
+      const title = document.createElement('p'); title.textContent = file.name + ' · ' + (file.size / 1024 / 1024).toFixed(2) + ' MB'; title.style.overflowWrap = 'anywhere'; card.appendChild(title);
+      for (const hash of hashes) {
+        const row = document.createElement('div'); row.className = 'result-row'; row.style.cssText = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px';
+        const label = document.createElement('span'); label.textContent = hash.name; label.style.fontSize = '12px';
+        const code = document.createElement('code'); code.textContent = hash.hex; code.dataset.hash = hash.hex; code.dataset.algo = hash.name; code.dataset.file = file.name; code.style.cssText = 'flex:1;min-width:120px;overflow-wrap:anywhere;font-size:12px';
+        const button = document.createElement('button'); button.className = 'copy-inline'; button.textContent = _hashT('copy'); button.onclick = () => copyText(hash.hex, button);
+        row.append(label, code, button); card.appendChild(row);
+      }
+      output.appendChild(card); _hashVerify();
+    }
+    status.textContent = _hashSay('已完成 ', 'Completed ') + files.length + '/' + files.length;
+  } catch { if (_hashFileRun === run) status.textContent = _hashSay('文件读取或计算失败，已保留完成结果。', 'Could not read or hash a file. Completed results kept.'); }
+  finally { if (_hashFileRun === run) { _hashFileRun = null; cancel.hidden = true; document.getElementById('hashFileInput').value = ''; } }
 }
 
 /* ── HMAC ── */
@@ -243,7 +248,9 @@ async function calcHmac() {
   const keyStr = document.getElementById('hmacKeyInput').value;
   const msg = document.getElementById('hmacMsgInput').value;
   if (!keyStr) { if (typeof showToast === 'function') showToast(T('hmac_empty_key'), 'error'); return; }
-  if (!msg) { if (typeof showToast === 'function') showToast(T('hmac_empty_msg'), 'error'); return; }
+  clearTimeout(_hmacTimer); const revision = ++_hmacRevision;
+  const source = document.getElementById('hmacMsgInput');
+  try {
 
   const enc = new TextEncoder();
   const cryptoKey = await crypto.subtle.importKey(
@@ -255,16 +262,19 @@ async function calcHmac() {
   const hex = bufToHex(sig);
 
   const output = document.getElementById('hmacResultHex');
-  if (!output) return;
+  if (!output || !source.isConnected || revision !== _hmacRevision) return;
   output.textContent = hex;
   document.getElementById('hmacResultPanel').style.display = '';
+  } catch { if (revision === _hmacRevision) window.showToast?.(_hashSay('HMAC 计算失败。', 'HMAC calculation failed.'), 'error'); }
 }
 
 function _hmacRealtime() {
+  _hmacRevision++;
+  document.getElementById('hmacResultPanel').style.display = 'none';
   clearTimeout(_hmacTimer);
   const keyStr = document.getElementById('hmacKeyInput').value;
   const msg = document.getElementById('hmacMsgInput').value;
-  if (!keyStr || !msg) {
+  if (!keyStr) {
     document.getElementById('hmacResultPanel').style.display = 'none';
     return;
   }
@@ -272,6 +282,7 @@ function _hmacRealtime() {
 }
 
 function clearHmac() {
+  _hmacRevision++; clearTimeout(_hmacTimer);
   document.getElementById('hmacKeyInput').value = '';
   document.getElementById('hmacMsgInput').value = '';
   document.getElementById('hmacResultPanel').style.display = 'none';
@@ -289,6 +300,9 @@ function bufToHex(buf) {
 
 let _hashTimer = null;
 function _hashRealtime() {
+  _hashRevision++;
+  document.getElementById('hashResults').replaceChildren();
+  document.getElementById('hashResultPanel').style.display = 'none'; _hashVerify();
   clearTimeout(_hashTimer);
   const val = document.getElementById('hashInput').value;
   if (!val) { document.getElementById('hashResultPanel').style.display='none'; return; }
@@ -296,6 +310,8 @@ function _hashRealtime() {
 }
 
 function clearHash() {
+  _hashRevision++; clearTimeout(_hashTimer);
+  document.getElementById('hashResults').replaceChildren(); _hashVerify();
   document.getElementById('hashInput').value='';
   document.getElementById('hashResultPanel').style.display='none';
 }

@@ -6,42 +6,6 @@
 const _formats = () => ToolCompute.load('formats');
 const _formatError = e => (e.line ? `第 ${e.line} 行：` : '') + e.message;
 
-// ─── SQL 格式化 ──────────────────────────────────────────────────
-const _SQL_KW = ['SELECT','FROM','WHERE','JOIN','LEFT JOIN','RIGHT JOIN','INNER JOIN','ON','AND','OR','ORDER BY','GROUP BY','HAVING','LIMIT','OFFSET','INSERT INTO','VALUES','UPDATE','SET','DELETE FROM','CREATE TABLE','DISTINCT','AS','UNION','UNION ALL','WITH','CASE','WHEN','THEN','ELSE','END'];
-
-function _sqlFormat(sql, minify) {
-  if (minify) return sql.replace(/\s+/g, ' ').trim();
-  let out = sql;
-  _SQL_KW.forEach(kw => {
-    out = out.replace(new RegExp('\\b' + kw.replace(/ /g, '\\s+') + '\\b', 'gi'), kw);
-  });
-  ['SELECT','FROM','WHERE','JOIN','LEFT JOIN','RIGHT JOIN','INNER JOIN','ON','AND','OR','ORDER BY','GROUP BY','HAVING','LIMIT','UNION','INSERT INTO','VALUES','UPDATE','SET','DELETE FROM'].forEach(kw => {
-    out = out.replace(new RegExp('\\s*\\b' + kw.replace(/ /g, '\\s+') + '\\b', 'gi'), '\n' + kw);
-  });
-  out = out.replace(/\n(AND|OR)\b/g, '\n  $1');
-  out = out.replace(/,\s*/g, ',\n  ');
-  return out.replace(/^\s*\n/, '').trim();
-}
-
-// ─── JSON Diff ──────────────────────────────────────────────────
-function _jsonDiff(a, b, path) {
-  path = path || '';
-  const diffs = [];
-  const ka = Object.keys(a), kb = Object.keys(b);
-  const allKeys = new Set([...ka, ...kb]);
-  for (const k of allKeys) {
-    const p = path ? path + '.' + k : k;
-    if (!(k in a)) { diffs.push({ path: p, type: 'added', value: b[k] }); continue; }
-    if (!(k in b)) { diffs.push({ path: p, type: 'removed', value: a[k] }); continue; }
-    if (typeof a[k] === 'object' && typeof b[k] === 'object' && a[k] !== null && b[k] !== null && !Array.isArray(a[k]) && !Array.isArray(b[k])) {
-      diffs.push(..._jsonDiff(a[k], b[k], p));
-    } else if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) {
-      diffs.push({ path: p, type: 'changed', from: a[k], to: b[k] });
-    }
-  }
-  return diffs;
-}
-
 // ─── Morse 编解码 ───────────────────────────────────────────────
 const _MORSE_MAP = {A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..',0:'-----',1:'.----',2:'..---',3:'...--',4:'....-',5:'.....',6:'-....',7:'--...',8:'---..',9:'----.','.':'.-.-.-',',':'--..--','?':'..--..','/':'-..-.','-':'-....-','(':'-.--.',')':'-.--.-'};
 const _MORSE_REV = Object.fromEntries(Object.entries(_MORSE_MAP).map(([k,v])=>[v,k]));
@@ -131,9 +95,9 @@ const ConvertActions = [
     name: 'sql_format',
     description: 'SQL 格式化/压缩',
     meta: { tier: 'standard', tags: ['sql','format','美化','database'], category: 'convert' },
-    parameters: { type: 'object', properties: { input: { type: 'string' }, minify: { type: 'boolean', default: false } }, required: ['input'] },
-    execute({ input, minify = false }) {
-      try { const r = _sqlFormat(input, minify); return { success: true, data: { result: r }, display: minify ? 'SQL 已压缩' : 'SQL 已格式化' }; }
+    parameters: { type: 'object', properties: { input: { type: 'string' }, minify: { type: 'boolean', default: false }, dialect: { type: 'string', enum: ['sql','mysql','pgsql'], default: 'sql' }, keywordCase: { type: 'string', enum: ['upper','lower','keep'], default: 'upper' }, indent: { type: 'integer', enum: [2,4], default: 2 } }, required: ['input'] },
+    async execute({ input, minify = false, dialect = 'sql', keywordCase = 'upper', indent = 2 }) {
+      try { const compute = await ToolCompute.load('sql'); const r = minify ? compute.minify(input, dialect) : compute.pretty(input, {dialect,keywordCase,indent}); return { success: true, data: { result: r }, display: minify ? 'SQL 已压缩' : 'SQL 已格式化' }; }
       catch (e) { return { success: false, data: { error: e.message }, display: 'SQL 错误: ' + e.message }; }
     },
   },
@@ -146,9 +110,9 @@ const ConvertActions = [
       properties: { a: { type: 'string', description: '原 JSON' }, b: { type: 'string', description: '新 JSON' } },
       required: ['a', 'b'],
     },
-    execute({ a, b }) {
+    async execute({ a, b }) {
       try {
-        const diffs = _jsonDiff(JSON.parse(a), JSON.parse(b));
+        const diffs = (await ToolCompute.load('json-diff')).compareText(a, b);
         const summary = diffs.length === 0 ? '完全相同' : `${diffs.filter(d=>d.type==='added').length} 新增, ${diffs.filter(d=>d.type==='removed').length} 删除, ${diffs.filter(d=>d.type==='changed').length} 变更`;
         return { success: true, data: { diffs, summary, count: diffs.length }, display: summary };
       } catch (e) { return { success: false, data: { error: e.message }, display: 'JSON 解析失败: ' + e.message }; }
@@ -234,18 +198,15 @@ const ConvertActions = [
         text: { type: 'string' },
         type: { type: 'string', enum: ['json','html','url','regex','shell'], description: '转义类型' },
         unescape: { type: 'boolean', default: false, description: '反转义模式' },
+        quotes: { type: 'boolean', default: false, description: 'JSON 转义时保留外层引号' },
       },
       required: ['text', 'type'],
     },
-    execute({ text, type, unescape: unesc = false }) {
-      let r;
-      if (type === 'json') r = unesc ? text.replace(/\\"/g, '"').replace(/\\\\/g, '\\').replace(/\\n/g, '\n').replace(/\\t/g, '\t') : JSON.stringify(text).slice(1, -1);
-      else if (type === 'html') r = unesc ? text.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"') : text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-      else if (type === 'url') r = unesc ? decodeURIComponent(text) : encodeURIComponent(text);
-      else if (type === 'regex') r = unesc ? text.replace(/\\([.*+?^${}()|[\]\\])/g, '$1') : text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      else if (type === 'shell') r = unesc ? text.replace(/\\(['"\\ $`!])/g, '$1') : text.replace(/(['"\\ $`!])/g, '\\$1');
-      else r = text;
-      return { success: true, data: { result: r }, display: (unesc ? '反转义' : '转义') + '完成' };
+    async execute({ text, type, unescape: unesc = false, quotes = false }) {
+      try {
+        const result = await (await ToolCompute.load('escape')).run(text, {type, unescape:unesc, quotes});
+        return {success:true,data:{result},display:unesc ? '反转义完成' : '转义完成'};
+      } catch(error) { return {success:false,error:error.code || error.message,display:'转换失败: ' + (error.code || error.message)}; }
     },
   },
 ];

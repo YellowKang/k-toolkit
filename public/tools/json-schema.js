@@ -1,177 +1,44 @@
-/* ── JSON Schema Generator — Infer Draft-07 Schema & Validate ── */
+/* Draft-07 inference and validation use the same modules as the Agent. */
 function renderJsonSchema(el) {
-  const tl = makeToolI18n({
-    zh: {
-      title:'JSON Schema 生成器', input_label:'输入 JSON', input_ph:'粘贴 JSON 示例...',
-      sample:'示例', generate:'生成 Schema', output_label:'生成的 Schema（可编辑）',
-      output_ph:'Schema 将在此显示...', validate:'校验 JSON', copy_schema:'复制 Schema',
-      result_label:'校验结果', valid:'JSON 符合 Schema', invalid:'JSON 不符合 Schema',
-      err_input:'输入的 JSON 格式无效', err_schema:'Schema 格式无效',
-      err_empty:'请先输入 JSON 并生成 Schema', copied:'已复制', generated:'Schema 已生成',
-      type_mismatch:(p,e,a) => `${p}: 期望类型 "${e}"，实际为 "${a}"`,
-      required_miss:(p,k) => `${p}: 缺少必填字段 "${k}"`,
-    },
-    en: {
-      title:'JSON Schema Generator', input_label:'Input JSON', input_ph:'Paste a JSON example...',
-      sample:'Sample', generate:'Generate Schema', output_label:'Generated Schema (editable)',
-      output_ph:'Schema will appear here...', validate:'Validate JSON', copy_schema:'Copy Schema',
-      result_label:'Validation Result', valid:'JSON matches the Schema',
-      invalid:'JSON does not match the Schema', err_input:'Invalid JSON input',
-      err_schema:'Invalid Schema format', err_empty:'Enter JSON and generate a Schema first',
-      copied:'Copied', generated:'Schema generated',
-      type_mismatch:(p,e,a) => `${p}: expected type "${e}", got "${a}"`,
-      required_miss:(p,k) => `${p}: missing required field "${k}"`,
-    },
+  const T=makeToolI18n({
+    zh:{input:'JSON 数据 / 推断样本',schema:'Schema（Draft-07，可编辑）',sample:'示例',generate:'生成 Schema',validate:'校验 JSON',copy:'复制 Schema',download:'下载 Schema',stop:'取消校验',running:'校验中…',generated:'Schema 已生成',valid:'JSON 符合 Schema',invalid:'JSON 不符合 Schema',cancelled:'已取消',empty:'请输入 JSON 和 Schema',hint:'从全部样本合并类型与可选字段。推断结果需按业务要求补充约束。',scope:'支持 Draft-07、标准 format 和本地引用；远程引用与未知规则会报错。Ctrl / ⌘ + Enter 校验。',limit:'最多显示前 100 条错误',data:'粘贴 JSON 数据…',rules:'粘贴 Schema，或从左侧样本生成…'},
+    en:{input:'JSON data / inference samples',schema:'Schema (Draft-07, editable)',sample:'Sample',generate:'Generate Schema',validate:'Validate JSON',copy:'Copy Schema',download:'Download Schema',stop:'Cancel validation',running:'Validating…',generated:'Schema generated',valid:'JSON matches the Schema',invalid:'JSON does not match the Schema',cancelled:'Cancelled',empty:'Enter JSON and a schema',hint:'Types and optional fields are inferred from all samples. Add constraints for your business rules.',scope:'Draft-07, standard formats and local references. Remote references and unknown rules return errors. Ctrl / ⌘ + Enter validates.',limit:'Showing the first 100 errors',data:'Paste JSON data…',rules:'Paste a schema, or infer one from the samples…'}
   });
-
-  el.innerHTML = `
-    <div class="tool-card-panel">
-      <div class="panel-label" style="margin-bottom:10px">${tl('title')}</div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--text-muted)">${tl('input_label')}</span>
-        <button class="btn btn-secondary" onclick="_jsSample()" style="padding:3px 12px;font-size:12px">${tl('sample')}</button>
-      </div>
-      <textarea class="tool-textarea" id="jsInput" rows="8" placeholder="${tl('input_ph')}"></textarea>
-      <div class="tool-actions" style="margin-top:10px">
-        <button class="btn btn-primary" onclick="_jsGenerate()">${tl('generate')}</button>
-      </div>
-    </div>
-    <div class="tool-card-panel">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span class="panel-label" style="margin:0">${tl('output_label')}</span>
-        <button class="btn btn-secondary" onclick="_jsCopy(this)" style="padding:3px 12px;font-size:12px">${tl('copy_schema')}</button>
-      </div>
-      <textarea class="tool-textarea" id="jsOutput" rows="10" placeholder="${tl('output_ph')}"></textarea>
-      <div class="tool-actions" style="margin-top:10px">
-        <button class="btn btn-primary" onclick="_jsValidate()">${tl('validate')}</button>
-      </div>
-    </div>
-    <div class="tool-card-panel" id="jsResultPanel" style="display:none">
-      <div class="panel-label" style="margin-bottom:8px">${tl('result_label')}</div>
-      <div id="jsResult" class="result-box" style="padding:12px 16px;border-radius:10px;font-size:13px;line-height:1.8"></div>
-    </div>`;
-
-  window._jsTl = tl;
-}
-
-/* ── Sample data ── */
-function _jsSample() {
-  document.getElementById('jsInput').value = JSON.stringify({
-    name: "Alice", age: 30, active: true, email: "alice@example.com",
-    tags: ["admin", "user"], address: { city: "Shanghai", zip: "200000" }
-  }, null, 2);
-}
-
-/* ── Schema inference (Draft-07) ── */
-function _jsInferSchema(value) {
-  if (value === null) return { type: 'null' };
-  if (typeof value === 'boolean') return { type: 'boolean' };
-  if (typeof value === 'number') return { type: Number.isInteger(value) ? 'integer' : 'number' };
-  if (typeof value === 'string') return { type: 'string' };
-  if (Array.isArray(value)) {
-    if (value.length === 0) return { type: 'array' };
-    return { type: 'array', items: _jsInferSchema(value[0]) };
-  }
-  if (typeof value === 'object') {
-    const props = {}, keys = Object.keys(value);
-    for (const k of keys) props[k] = _jsInferSchema(value[k]);
-    return { type: 'object', properties: props, required: keys };
-  }
-  return {};
-}
-
-function _jsGenerate() {
-  const tl = window._jsTl;
-  const raw = document.getElementById('jsInput').value.trim();
-  if (!raw) return;
-  let data;
-  try { data = JSON.parse(raw); } catch {
-    showToast(tl('err_input'), 'error'); return;
-  }
-  const schema = { $schema: 'http://json-schema.org/draft-07/schema#', ..._jsInferSchema(data) };
-  document.getElementById('jsOutput').value = JSON.stringify(schema, null, 2);
-  document.getElementById('jsResultPanel').style.display = 'none';
-  showToast(tl('generated'), 'success');
-}
-
-/* ── Copy schema ── */
-function _jsCopy(btn) {
-  const text = document.getElementById('jsOutput').value;
-  if (text) copyText(text, btn);
-}
-
-/* ── Validation logic ── */
-function _jsTypeOf(val) {
-  if (val === null) return 'null';
-  if (Array.isArray(val)) return 'array';
-  if (typeof val === 'number' && Number.isInteger(val)) return 'integer';
-  return typeof val;
-}
-
-function _jsValidateRec(data, schema, path) {
-  const errors = [];
-  if (!schema || typeof schema !== 'object') return errors;
-  const tl = window._jsTl;
-
-  if (schema.type) {
-    const actual = _jsTypeOf(data);
-    const types = Array.isArray(schema.type) ? schema.type : [schema.type];
-    const match = types.some(t => (t === 'number' && actual === 'integer') || t === actual);
-    if (!match) {
-      errors.push(tl('type_mismatch', path || '/', types.join('|'), actual));
-      return errors;
-    }
-  }
-
-  // object: required + properties
-  if (schema.type === 'object' && typeof data === 'object' && data !== null && !Array.isArray(data)) {
-    if (schema.required) {
-      for (const k of schema.required) {
-        if (!(k in data)) errors.push(tl('required_miss', path || '/', k));
+  el.innerHTML=`<p class="workspace-notice">${T('hint')}</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:16px">
+    <section class="tool-card-panel"><label class="panel-label" for="jsInput">${T('input')}</label><textarea class="tool-textarea" id="jsInput" rows="14" spellcheck="false" placeholder="${T('data')}"></textarea><div class="tool-actions"><button class="btn btn-primary" onclick="_jsGenerate()">${T('generate')}</button><button class="btn btn-secondary" onclick="_jsSample()">${T('sample')}</button></div></section>
+    <section class="tool-card-panel"><label class="panel-label" for="jsOutput">${T('schema')}</label><textarea class="tool-textarea" id="jsOutput" rows="14" spellcheck="false" placeholder="${T('rules')}"></textarea><div class="tool-actions"><button class="btn btn-secondary" onclick="_jsCopy(this)">${T('copy')}</button><button class="btn btn-secondary" id="jsDownload">${T('download')}</button></div></section></div>
+    <section class="tool-card-panel"><div class="tool-actions"><button id="jsValidate" class="btn btn-primary" data-tool-submit onclick="_jsValidate()">${T('validate')}</button><button id="jsCancel" class="btn btn-secondary" hidden>${T('stop')}</button></div><p class="workspace-notice">${T('scope')}</p><div id="jsResultPanel" style="display:none"><div id="jsResult" role="status" style="overflow-wrap:anywhere"></div></div></section>`;
+  const input=el.querySelector('#jsInput'),rules=el.querySelector('#jsOutput'),panel=el.querySelector('#jsResultPanel'),result=el.querySelector('#jsResult'),cancel=el.querySelector('#jsCancel');
+  let controller,revision=0;
+  const invalidate=()=>{if(el._schemaState)el._schemaState.output='';revision++;controller?.abort();controller=null;cancel.hidden=true;el.querySelector('#jsValidate').disabled=false;panel.style.display='none';};
+  input.addEventListener('input',invalidate);rules.addEventListener('input',invalidate);
+  async function run(mode) {
+    invalidate();const stamp=revision;panel.style.display='';result.replaceChildren();
+    if(!input.value.trim()||(mode==='validate'&&!rules.value.trim())){result.textContent=T('empty');return;}
+    controller=new AbortController();const signal=controller.signal;
+    result.textContent=T('running');cancel.hidden=mode!=='validate';el.querySelector('#jsValidate').disabled=true;
+    try {
+      const compute=await ToolCompute.load('schema');if(signal.aborted)return;
+      const data=mode==='infer'?compute.infer(input.value):await compute.validate(input.value,rules.value,{signal});
+      if(stamp!==revision||!el.isConnected)return;
+      if(mode==='infer'){rules.value=data.result;result.textContent=T('generated');}
+      else {
+        const title=document.createElement('p');title.textContent=data.valid?T('valid'):T('invalid')+' · '+data.errorCount;title.style.color=data.valid?'#22c55e':'#ef4444';result.replaceChildren(title);
+        for(const error of data.errors){const row=document.createElement('p');row.className='workspace-notice';row.textContent=(error.path||'/')+' · '+error.keyword+': '+error.message+' '+JSON.stringify(error.params);result.append(row);}
+        if(data.truncated){const note=document.createElement('p');note.textContent=T('limit');result.append(note);}
       }
-    }
-    if (schema.properties) {
-      for (const k of Object.keys(schema.properties)) {
-        if (k in data) errors.push(..._jsValidateRec(data[k], schema.properties[k], path ? path + '.' + k : k));
-      }
-    }
+      el._schemaState.output=mode==='infer'?data.result:JSON.stringify(data,null,2);
+      return data;
+    }catch(error){if(stamp===revision&&el.isConnected)result.textContent=error.name==='AbortError'?T('cancelled'):error.message;}
+    finally{if(stamp===revision){controller=null;cancel.hidden=true;el.querySelector('#jsValidate').disabled=false;}}
   }
-
-  // array: items
-  if (schema.type === 'array' && Array.isArray(data) && schema.items) {
-    data.forEach((item, i) => {
-      errors.push(..._jsValidateRec(item, schema.items, (path || '') + '[' + i + ']'));
-    });
-  }
-
-  return errors;
+  el._schemaState={run,invalidate,output:''};
+  el._toolOutput=()=>el._schemaState.output;
+  cancel.onclick=()=>controller?.abort();
+  el.querySelector('#jsDownload').onclick=()=>{if(!rules.value)return;const a=document.createElement('a'),url=URL.createObjectURL(new Blob([rules.value],{type:'application/schema+json'}));a.href=url;a.download='schema.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+  window._activeCleanup=invalidate;
 }
-
-function _jsValidate() {
-  const tl = window._jsTl;
-  const inputRaw = document.getElementById('jsInput').value.trim();
-  const schemaRaw = document.getElementById('jsOutput').value.trim();
-  const panel = document.getElementById('jsResultPanel');
-  const result = document.getElementById('jsResult');
-  panel.style.display = '';
-
-  if (!inputRaw || !schemaRaw) {
-    result.innerHTML = `<span style="color:var(--text-muted)">${tl('err_empty')}</span>`; return;
-  }
-  let data, schema;
-  try { data = JSON.parse(inputRaw); } catch {
-    result.innerHTML = `<span style="color:#ef4444">${tl('err_input')}</span>`; return;
-  }
-  try { schema = JSON.parse(schemaRaw); } catch {
-    result.innerHTML = `<span style="color:#ef4444">${tl('err_schema')}</span>`; return;
-  }
-
-  const errors = _jsValidateRec(data, schema, '');
-  if (errors.length === 0) {
-    result.innerHTML = `<span style="color:#22c55e">${tl('valid')}</span>`;
-  } else {
-    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    result.innerHTML = `<div style="color:#ef4444;margin-bottom:6px">${tl('invalid')}</div>` +
-      errors.map(e => `<div style="font-family:monospace;font-size:12px;color:var(--text-muted);padding:2px 0">${esc(e)}</div>`).join('');
-  }
-}
+function _jsSample(){const input=document.getElementById('jsInput');input.value=JSON.stringify([{name:'Alice',age:30,tags:['admin','user']},{name:'Bob',age:null,email:'bob@example.com',tags:[]}],null,2);input.dispatchEvent(new Event('input',{bubbles:true}));}
+function _jsGenerate(){return document.getElementById('toolBody')._schemaState.run('infer');}
+function _jsValidate(){return document.getElementById('toolBody')._schemaState.run('validate');}
+function _jsCopy(btn){const value=document.getElementById('jsOutput').value;if(value)copyText(value,btn);}

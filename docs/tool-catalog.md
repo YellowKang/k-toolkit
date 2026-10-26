@@ -2,14 +2,18 @@
 
 > 由 `npm run docs:catalog` 从 `public/tool-catalog.js` 生成；请勿手工修改。
 
-93 个能力入口；86 个分类导航入口 + 1 个 AI 入口；10 个分类；5 组工作台。
+93 个能力入口；73 个分类导航入口 + 1 个 AI 入口；10 个分类；9 组工作台。
 
-工作台合并导航入口，各子工具仍使用原 ID。搜索、收藏、最近使用与 Agent 可以直接访问子工具。图片压缩、WebP 和图片 Base64 支持显式复用当前标签页暂存文件；其他工具仍保留独立输入。
+工作台合并导航入口，各子工具仍使用原 ID。搜索、收藏、最近使用与 Agent 可以直接访问子工具。图片压缩与 WebP 共用批量队列，HTTP/cURL 共用请求配置，单位工具复用完整存储与带宽换算。普通文本工具保留当前标签页草稿，通过“继续处理”显式传递输入或结果；敏感工具不进入通用草稿。
 
 ## 工作台 / Workbenches
 
 | 工作台 | 能力 ID（首项为主入口） |
 | --- | --- |
+| 数据格式工作台 / Data Format Workbench | `json` · `json-csv` · `yaml-json` · `toml-json` · `xml-format` · `env-parse` · `json-schema` · `diff-json` |
+| 文本处理工作台 / Text Workbench | `case-convert` · `slug-gen` · `line-sort` · `wordcount` |
+| 编码与转义 / Encoding & Escaping | `text-escape` · `html-entity` · `unicode-convert` |
+| 单位与容量换算 / Units & Storage | `unit-convert` · `byte-convert` |
 | 图片压缩与转换 / Image Compression & Conversion | `img-compress` · `img-webp` |
 | 哈希与 HMAC / Hash & HMAC | `hash` · `hmac-gen` |
 | 二维码工具 / QR Code Tools | `qrcode` · `qrcode-decode` |
@@ -18,39 +22,39 @@
 
 ## 保持独立的能力
 
-图片 Base64、EXIF、Favicon 具有不同输入输出；JWT、AES 与哈希的语义不同；JSON/YAML/TOML/CSV 的格式语义不同。本轮归类并关联入口，继续保留各自工具，不以减少卡片数量牺牲功能。
+图片 Base64、EXIF、Favicon 具有不同输入输出；JWT、AES 与哈希的语义不同；JSON/YAML/TOML/CSV 的格式语义不同。工作台保留各自解析和处理语义，旧链接与收藏继续有效。
 
 ## 文本处理 / Text
 
-9 项能力，9 个导航入口。
+9 项能力，6 个导航入口。
 
 | 能力 | ID | 处理位置 | 工作台 |
 | --- | --- | --- | --- |
-| 字数统计 | `wordcount` | 本地处理 | — |
+| 字数统计 | `wordcount` | 本地处理 | 文本处理工作台 |
 | 正则测试器 | `regex` | 本地处理 | — |
 | 文本对比 | `text-diff` | 本地处理 | — |
 | Markdown 预览 | `markdown` | 本地处理 | — |
-| 大小写转换 | `case-convert` | 本地处理 | — |
+| 大小写转换 | `case-convert` | 本地处理 | 文本处理工作台 |
 | 占位文本生成 | `lorem` | 本地处理 | — |
-| Slug 生成器 | `slug-gen` | 本地处理 | — |
-| 行排序去重 | `line-sort` | 本地处理 | — |
+| Slug 生成器 | `slug-gen` | 本地处理 | 文本处理工作台 |
+| 行排序去重 | `line-sort` | 本地处理 | 文本处理工作台 |
 | 字符串检查器 | `string-inspect` | 本地处理 | — |
 
 ## 数据格式 / Data & Formats
 
-9 项能力，9 个导航入口。
+9 项能力，2 个导航入口。
 
 | 能力 | ID | 处理位置 | 工作台 |
 | --- | --- | --- | --- |
-| JSON 格式化 | `json` | 本地处理 | — |
-| JSON/CSV 互转 | `json-csv` | 本地处理 | — |
-| YAML/JSON 互转 | `yaml-json` | 本地处理 | — |
+| JSON 格式化 | `json` | 本地处理 | 数据格式工作台 |
+| JSON/CSV 互转 | `json-csv` | 本地处理 | 数据格式工作台 |
+| YAML/JSON 互转 | `yaml-json` | 本地处理 | 数据格式工作台 |
 | SQL 格式化 | `sql-format` | 本地处理 | — |
-| XML 格式化 | `xml-format` | 本地处理 | — |
-| JSON 对比 | `diff-json` | 本地处理 | — |
-| TOML ↔ JSON | `toml-json` | 本地处理 | — |
-| ENV 解析器 | `env-parse` | 本地处理 | — |
-| JSON Schema 生成 | `json-schema` | 本地处理 | — |
+| XML 格式化 | `xml-format` | 本地处理 | 数据格式工作台 |
+| JSON 对比 | `diff-json` | 本地处理 | 数据格式工作台 |
+| TOML ↔ JSON | `toml-json` | 本地处理 | 数据格式工作台 |
+| ENV 解析器 | `env-parse` | 本地处理 | 数据格式工作台 |
+| JSON Schema 生成 | `json-schema` | 本地处理 | 数据格式工作台 |
 
 ## 开发工具 / Development
 
@@ -70,20 +74,20 @@
 
 ## 编码加密 / Encoding & Crypto
 
-11 项能力，10 个导航入口。
+11 项能力，8 个导航入口。
 
 | 能力 | ID | 处理位置 | 工作台 |
 | --- | --- | --- | --- |
 | Base64 编解码 | `base64` | 本地处理 | — |
-| Unicode 转换 | `unicode-convert` | 本地处理 | — |
-| HTML 实体转换 | `html-entity` | 本地处理 | — |
+| Unicode 转换 | `unicode-convert` | 本地处理 | 编码与转义 |
+| HTML 实体转换 | `html-entity` | 本地处理 | 编码与转义 |
 | 哈希生成器 | `hash` | 本地处理 | 哈希与 HMAC |
 | JWT 工具 | `jwt` | 本地处理 | — |
 | 密码生成器 | `password-gen` | 本地 / 可选联网 | — |
 | 2FA 工具 | `totp` | 本地处理 | — |
 | AES 加解密 | `aes` | 本地处理 | — |
 | 摩斯电码 | `morse` | 本地处理 | — |
-| 字符串转义 | `text-escape` | 本地处理 | — |
+| 字符串转义 | `text-escape` | 本地处理 | 编码与转义 |
 | HMAC 生成器 | `hmac-gen` | 本地处理 | 哈希与 HMAC |
 
 ## 图片工具 / Images
@@ -157,15 +161,15 @@
 
 ## 计算工具 / Calculators
 
-9 项能力，9 个导航入口。
+9 项能力，8 个导航入口。
 
 | 能力 | ID | 处理位置 | 工作台 |
 | --- | --- | --- | --- |
 | 进制转换 | `number-base` | 本地处理 | — |
 | 科学计算器 | `calculator` | 本地处理 | — |
-| 单位换算 | `unit-convert` | 本地处理 | — |
+| 单位换算 | `unit-convert` | 本地处理 | 单位与容量换算 |
 | 贷款计算器 | `loan-calc` | 本地处理 | — |
-| 存储换算 | `byte-convert` | 本地处理 | — |
+| 存储换算 | `byte-convert` | 本地处理 | 单位与容量换算 |
 | 数字大写 | `number-chinese` | 本地处理 | — |
 | 比例计算 | `aspect-ratio` | 本地处理 | — |
 | 年龄计算器 | `age-calc` | 本地处理 | — |

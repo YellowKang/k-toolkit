@@ -19,6 +19,10 @@ function _cmdOpen() {
   const overlay = document.createElement('div');
   overlay.className = 'cmd-palette-overlay';
   overlay.id = 'cmdPalette';
+  overlay._returnFocus = document.activeElement;
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', t('cmd_placeholder'));
   overlay.innerHTML = `
     <div class="cmd-palette" onclick="event.stopPropagation()">
       <div class="cmd-input-wrap">
@@ -47,15 +51,8 @@ function _cmdRender(q) {
   if (!res) return;
   _cmdIdx = -1;
   let html = '';
-  const scoreT = tool => {
-    if (!ql) return 0;
-    if (tool.name.toLowerCase() === ql) return 100;
-    if (tool.name.toLowerCase().startsWith(ql)) return 80;
-    if (tool.name.toLowerCase().includes(ql)) return 60;
-    if (tool.category.toLowerCase().includes(ql)) return 40;
-    if (tool.desc.toLowerCase().includes(ql)) return 20;
-    return 0;
-  };
+  const tokens = ql.split(/[\s,，、]+/).filter(Boolean);
+  const scoreT = tool => _scoreToolSearch(tool, tokens);
   const tools = ql ? getLocalizedTools(TOOLS).map(tool => ({t: tool, s: scoreT(tool)})).filter(x => x.s > 0).sort((a,b) => b.s-a.s).slice(0,8).map(x=>x.t) : [];
   const actions = ql ? _paletteActions.filter(a => a.label.includes(ql) || a.sub.includes(ql)) : _paletteActions;
   const recentTools = !ql ? recent.slice(0,5).map(id => getLocalizedTools(TOOLS).find(tool => tool.id===id)).filter(Boolean) : [];
@@ -89,7 +86,9 @@ function _cmdRender(q) {
 
 function _cmdKey(e) {
   const items = document.querySelectorAll('.cmd-item');
-  if (e.key === 'Escape') { closeCmdPalette(); return; }
+  if (e.isComposing) return;
+  if (e.key === 'Tab') { e.preventDefault(); return; }
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeCmdPalette(); return; }
   if (e.key === 'ArrowDown') { e.preventDefault(); _cmdIdx = Math.min(_cmdIdx+1, items.length-1); _cmdHighlight(items); }
   else if (e.key === 'ArrowUp') { e.preventDefault(); _cmdIdx = Math.max(_cmdIdx-1, 0); _cmdHighlight(items); }
   else if (e.key === 'Enter') {

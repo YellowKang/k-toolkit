@@ -30,5 +30,21 @@
     "file": "smol-toml/smol-toml.js",
     "global": "smolToml",
     "sha256": "690b76d0fac1eec8066b877e7345a4a127691007a363a045d0fea900d48186cb"
+  },
+  "ajv": {
+    "version": "8.20.0",
+    "license": "MIT",
+    "source": "npm:ajv@8.20.0 (browser bundle via scripts/vendor-schema.cjs, esbuild@0.28.2)",
+    "file": "ajv/ajv7.min.js",
+    "global": "ajv7",
+    "sha256": "6a101f72798da8e3340bf7380ec87612e817b2cbe37a537f04a25e3665a9a6a7"
+  },
+  "ajv-formats": {
+    "version": "3.0.1",
+    "license": "MIT",
+    "source": "npm:ajv-formats@3.0.1/dist/formats.js (wrapped between upstream markers)",
+    "file": "ajv-formats/formats.js",
+    "global": "AjvFormats",
+    "sha256": "b61693a26869970a92cc1fe832c931ccd3afe8b6d66802b19c48306349e84880"
   }
 }

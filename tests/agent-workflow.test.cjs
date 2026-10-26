@@ -7,7 +7,7 @@ const { webcrypto, createHash, createHmac } = require('node:crypto');
 function setup() {
  const context={window:{},crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,URL,AbortController,btoa,atob,setTimeout,clearTimeout,console};
  vm.createContext(context);
- for(const file of ['tool-compute.js','agent/actions/text.js','agent/actions/dev.js','agent/actions/composite.js','agent/actions/data.js','agent/agent-workflow.js','agent/actions/index.js','agent/agent-core.js','agent/agent-cmd-parser.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../public',file),'utf8'),context,{filename:file});
+ for(const file of ['tool-compute.js','compute/url.js','agent/actions/text.js','agent/actions/dev.js','agent/actions/composite.js','agent/actions/data.js','agent/agent-workflow.js','agent/actions/index.js','agent/agent-core.js','agent/agent-cmd-parser.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../public',file),'utf8'),context,{filename:file});
  context.window.AgentActions.registerActions();
  return {window:context.window,action:name=>context.window._AGENT_ALL_ACTIONS.get(name),context};
 }
@@ -56,6 +56,18 @@ test('workflow composes decode → extract → format → hash using actual refe
  assert.equal(result.success,true);assert.equal(result.data.result.hash,createHash('sha256').update('{"some":"中文","n":0}').digest('hex'));assert.equal(result.data.completed,4);assert.equal(progress.filter(p=>p.state==='completed').length,4);
  assert.equal(JSON.stringify(result.data.steps).includes('中文'),false,'step trace must not repeat input/output data');
 });
+test('workflow returns requested intermediate outputs once, within its combined limit',async()=>{
+ const {window,action}=setup();let executions=0;const original=action('json_format').execute;
+ action('json_format').execute=p=>{executions++;return original(p)};
+ const steps=[{id:'json',action:'json_format',params:{input:'{ "ok": true }',minify:true}},{id:'hash',action:'hash_generate',params:{text:{$ref:'json.data.result'}}}];
+ const result=await window.AgentWorkflow.run({steps,returnSteps:['json','hash']});
+ assert.equal(result.success,true);assert.equal(executions,1);assert.equal(result.data.outputs.json.result,'{"ok":true}');assert.equal(result.data.outputs.hash.hash,result.data.result.hash);
+ for(const returnSteps of [['missing'],['json','json'],'json',['__proto__']])assert.equal((await window.AgentWorkflow.run({steps,returnSteps})).success,false);
+ assert.equal(executions,1,'invalid selection must fail before execution');
+ action('base64_encode').execute=()=>({success:true,data:{result:'x'.repeat(33000)}});
+ const large=await window.AgentWorkflow.run({steps:[{id:'one',action:'base64_encode',params:{text:'x'}}],returnSteps:['one']});
+ assert.equal(large.success,false);assert.match(large.error,/65536/);
+});
 test('invalid plans are rejected before executing anything',async()=>{
  const {window,action}=setup();let executed=0;const original=action('base64_encode').execute;action('base64_encode').execute=p=>{executed++;return original(p)};
  const first={id:'encode',action:'base64_encode',params:{text:'valid'}};
@@ -102,7 +114,7 @@ test('local templates preserve multiline input and never call a model',async()=>
  const command=window.CmdParser.parse('/workflow clean-base64  beta \nalpha\n beta\n');assert.equal(command.params.input,' beta \nalpha\n beta\n');
  const events=[];session.on('tool_progress',p=>events.push(p));
  const result=await session.executeLocal(command.action,command.params);assert.equal(result.success,true);assert.equal(window.ToolCompute.base64Decode(result.data.result.result),'beta\nalpha');assert.equal(called,0);assert.equal(events.at(-1).completed,2);
- const listing=await session.executeLocal('list_workflows',{});assert.equal(listing.data.templates.length,3);
+ const listing=await session.executeLocal('list_workflows',{});assert.equal(listing.data.templates.length,5);
  assert.equal((await session.executeLocal('run_workflow_template',{template:'decode-json',input:'bm90IGpzb24='})).success,false);
 });
 test('model discovers schemas and executes a referenced workflow without page navigation',async()=>{

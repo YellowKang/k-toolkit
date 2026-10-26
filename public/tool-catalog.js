@@ -5,13 +5,13 @@
   { id: 'ai-chat',         render: 'renderAiChat',         icon: '💬', color: '#6366f1', name: 'AI 对话',           desc: '直接与 AI 模型对话，支持多轮、发图、Markdown 渲染',        category: 'AI 助手', file: 'ai-chat.js',         isNew: true, tags: ['ai','chat','gpt','claude','gemini','对话','聊天'] },
   // 文本处理
   { id: 'uuid', render: 'renderUUID',          icon: '🎲', color: '#f59e0b', name: 'UUID 生成器',    desc: '批量生成 UUID v4，一键复制，支持自定义数量', category: '开发工具', file: 'uuid.js', tags: ['uuid','guid','id','唯一标识','随机id','generate'] },
-  { id: 'json', render: 'renderJSON',          icon: '📋', color: '#3b82f6', name: 'JSON 格式化',   desc: '格式化、压缩、校验 JSON，语法错误即时提示', category: '数据格式', file: 'json-format.js', tags: ['json','format','prettify','minify','validate','校验','美化','压缩'] },
+  { id: 'json', render: 'renderJSON',          icon: '📋', color: '#3b82f6', name: 'JSON 格式化',   desc: '格式化、去转义、展开嵌套 JSON，快速复制字段值与路径', category: '数据格式', file: 'json-format.js', tags: ['json','format','prettify','minify','validate','校验','美化','压缩','嵌套','nested','去转义','unescape','复制'] },
   { id: 'base64', render: 'renderBase64',        icon: '🔤', color: '#8b5cf6', name: 'Base64 编解码',  desc: '文本与 Base64 互转，支持 URL 安全模式', category: '编码加密', file: 'base64.js', tags: ['base64','encode','decode','编码','解码','b64'] },
   { id: 'wordcount', render: 'renderWordCount',     icon: '📝', color: '#10b981', name: '字数统计',      desc: '统计字符数、单词数、行数、段落数、中文字数', category: '文本处理', file: 'word-count.js', tags: ['word','count','字数','字符','统计','行数','words'] },
-  { id: 'regex', render: 'renderRegex',         icon: '🔍', color: '#6366f1', name: '正则测试器',    desc: '实时高亮匹配，捕获组详情，多 flag 切换', category: '文本处理', file: 'regex.js', tags: ['regex','regexp','正则','匹配','pattern','regular expression'] },
+  { id: 'regex', render: 'renderRegex',         icon: '🔍', color: '#6366f1', name: '正则测试器',    desc: '捕获组、命名分组与替换，支持零宽匹配和超时保护', category: '文本处理', file: 'regex.js', tags: ['regex','regexp','正则','匹配','pattern','regular expression'] },
   { id: 'json-csv', render: 'renderJsonCsv',      icon: '🔄', color: '#0ea5e9', name: 'JSON/CSV 互转', desc: 'JSON 与 CSV 双向转换，支持引号换行、分隔符识别与 Excel 下载', category: '数据格式', file: 'json-csv.js', tags: ['json','csv','转换','convert','表格','excel'] },
-  { id: 'text-diff', render: 'renderTextDiff',     icon: '📊', color: '#f97316', name: '文本对比',      desc: '逐行对比两段文本，高亮差异内容', category: '文本处理', file: 'text-diff.js', tags: ['diff','compare','对比','比较','差异','文本'] },
-  { id: 'markdown', render: 'renderMarkdown',      icon: '✍️',  color: '#14b8a6', name: 'Markdown 预览', desc: '实时渲染 Markdown，支持代码高亮', category: '文本处理', file: 'markdown.js', tags: ['markdown','md','预览','preview','渲染'] },
+  { id: 'text-diff', render: 'renderTextDiff',     icon: '📊', color: '#f97316', name: '文本对比',      desc: '按行、词或字符精确对比，分页查看与完整差异导出', category: '文本处理', file: 'text-diff.js', tags: ['diff','compare','对比','比较','差异','文本'] },
+  { id: 'markdown', render: 'renderMarkdown',      icon: '✍️',  color: '#14b8a6', name: 'Markdown 预览', desc: '分栏编辑与预览，支持表格、任务清单和 HTML 复制', category: '文本处理', file: 'markdown.js', tags: ['markdown','md','预览','preview','渲染'] },
   { id: 'case-convert', render: 'renderCaseConvert',  icon: '🔡', color: '#64748b', name: '大小写转换',    desc: '驼峰、下划线、全大写等多种格式互转', category: '文本处理', file: 'case-convert.js', tags: ['case','camel','snake','kebab','pascal','大小写','驼峰','下划线','命名'] },
   { id: 'unicode-convert', render: 'renderUnicode',icon: '🌐', color: '#7c3aed', name: 'Unicode 转换', desc: 'Unicode 码点与字符互转，支持转义序列', category: '编码加密', file: 'unicode-convert.js', tags: ['unicode','码点','转义','字符','codepoint','escape'] },
   { id: 'html-entity', render: 'renderHTMLEntity',   icon: '🏷️', color: '#dc2626', name: 'HTML 实体转换', desc: 'HTML 实体编解码，< > & " \'等特殊字符处理', category: '编码加密', file: 'html-entity.js', tags: ['html','entity','实体','转义','escape','特殊字符'] },
@@ -23,7 +23,7 @@
   { id: 'jwt', render: 'renderJWT',           icon: '🎫', color: '#8b5cf6', name: 'JWT 工具',      desc: '解析/生成 JWT Token，支持 HS256 签名', category: '编码加密', file: 'jwt.js', tags: ['jwt','token','解码','decode','auth','认证','json web token','生成','generate','签名','sign','secret'] },
   { id: 'number-base', render: 'renderNumberBase',   icon: '🔢', color: '#f97316', name: '进制转换',      desc: '二/八/十/十六进制任意精度互转，ASCII/Unicode 码点', category: '计算工具', file: 'number-base.js', tags: ['hex','binary','octal','decimal','进制','十六进制','二进制','八进制','0x'] },
   { id: 'yaml-json', render: 'renderYAMLJSON',     icon: '📑', color: '#65a30d', name: 'YAML/JSON 互转',desc: 'YAML 与 JSON 双向转换，支持锚点合并与多文档', category: '数据格式', file: 'yaml-json.js', tags: ['yaml','yml','json','配置','config','convert'] },
-  { id: 'sql-format', render: 'renderSQLFormat',    icon: '🗄️', color: '#b45309', name: 'SQL 格式化',    desc: 'SQL 美化/压缩，支持 SELECT/INSERT/UPDATE/DELETE', category: '数据格式', file: 'sql-format.js', tags: ['sql','format','数据库','query','查询','美化','database'] },
+  { id: 'sql-format', render: 'renderSQLFormat',    icon: '🗄️', color: '#b45309', name: 'SQL 格式化',    desc: '保留字符串与注释的 SQL 排版，支持方言、大小写与缩进', category: '数据格式', file: 'sql-format.js', tags: ['sql','format','数据库','query','查询','美化','database'] },
   { id: 'curl-gen', render: 'renderCurlGen',      icon: '🌀', color: '#0369a1', name: 'cURL 生成器',   desc: '可视化配置生成 curl / fetch / axios 代码片段', category: '网络工具', file: 'curl-gen.js', tags: ['curl','http','fetch','axios','api','请求','request'] },
   { id: 'http-status', render: 'renderHttpStatus',   icon: '📡', color: '#be185d', name: 'HTTP 状态码',   desc: '查询 HTTP 状态码含义，支持搜索和分类浏览', category: '网络工具', file: 'http-status.js', tags: ['http','status','状态码','200','404','500','response'] },
   { id: 'cron', render: 'renderCron',          icon: '⏰', color: '#d97706', name: 'Cron 表达式',   desc: '解析 Linux/Spring/Quartz Cron，校验字段并推算下次执行时间', category: '时间效率', file: 'cron.js', tags: ['cron','crontab','定时','schedule','调度','定时任务'] },
@@ -44,7 +44,7 @@
   { id: 'morse', render: 'renderMorse',          icon: '📡', color: '#b45309', name: '摩斯电码',       desc: '文本与摩斯电码互转，支持播放音频', category: '编码加密', file: 'morse.js', tags: ['morse','摩斯','电码','编码','点划'] },
   { id: 'xml-format', render: 'renderXmlFormat',     icon: '📰', color: '#0369a1', name: 'XML 格式化',     desc: 'XML 美化/压缩/转 JSON，保留注释与 CDATA', category: '数据格式', file: 'xml-format.js', tags: ['xml','format','格式化','美化','markup'] },
   // 计算工具
-  { id: 'calculator', render: 'renderCalculator',     icon: '🧮', color: '#6366f1', name: '科学计算器',     desc: '键盘/鼠标双控，支持基础及百分比运算', category: '计算工具', file: 'calculator.js', tags: ['calculator','calc','计算','数学','math','加减乘除'] },
+  { id: 'calculator', render: 'renderCalculator',     icon: '🧮', color: '#6366f1', name: '科学计算器',     desc: '可编辑表达式、科学函数、幂与百分比，和 Agent 共用解析器', category: '计算工具', file: 'calculator.js', tags: ['calculator','calc','计算','数学','math','加减乘除'] },
   { id: 'unit-convert', render: 'renderUnitConvert',   icon: '📏', color: '#10b981', name: '单位换算',       desc: '长度/重量/温度/面积/体积/时间/存储/速度换算与数字格式化', category: '计算工具', file: 'unit-convert.js', tags: ['unit','convert','单位','换算','长度','重量','温度','面积','数字格式化','千分位','currency','货币','number format'] },
   { id: 'loan-calc', render: 'renderLoanCalc',      icon: '🏦', color: '#f59e0b', name: '贷款计算器',     desc: '等额本息/本金还款，含完整还款计划表', category: '计算工具', file: 'loan-calc.js', tags: ['loan','贷款','房贷','还款','利率','mortgage','等额本息'] },
   { id: 'byte-convert', render: 'renderByteConvert',   icon: '💾', color: '#64748b', name: '存储换算',       desc: '存储单位 1024/1000 两种进制互转，含网速与传输时间', category: '计算工具', file: 'byte-convert.js', tags: ['byte','kb','mb','gb','tb','存储','容量','storage','网速'] },
@@ -65,11 +65,11 @@
   { id: 'ascii-art', render: 'renderAsciiArt',      icon: '🎨', color: '#0f172a', name: 'ASCII 艺术字',   desc: '文字转 ASCII 艺术字，4 种字体风格', category: '趣味工具', file: 'ascii-art.js', tags: ['ascii','art','艺术字','figlet','字符画'] },
   // 新增工具
   { id: 'ip-info', render: 'renderIpInfo',        icon: '📡', color: '#0891b2', name: 'IP 信息',        desc: '查询本机 IP 及地理位置信息', category: '网络工具', file: 'ip-info.js', tags: ['ip','info','地理','位置','location','myip','公网'] },
-  { id: 'text-escape', render: 'renderTextEscape',    icon: '↩️', color: '#64748b', name: '字符串转义',     desc: 'JSON/正则/HTML/URL 字符串转义与反转义', category: '编码加密', file: 'text-escape.js', tags: ['escape','unescape','转义','反转义','字符串','backslash'] },
+  { id: 'text-escape', render: 'renderTextEscape',    icon: '↩️', color: '#64748b', name: '字符串转义',     desc: 'JSON/HTML/URL/正则转义，逐层去转义、直接复制与继续处理', category: '编码加密', file: 'text-escape.js', tags: ['escape','unescape','转义','反转义','去转义','字符串','backslash','嵌套','nested'] },
   { id: 'svg-preview', render: 'renderSvgPreview',    icon: '🖼️', color: '#7c3aed', name: 'SVG 预览',       desc: '粘贴 SVG 代码实时预览，支持缩放', category: '图片工具', file: 'svg-preview.js', tags: ['svg','preview','预览','矢量','vector','icon'] },
   { id: 'aspect-ratio', render: 'renderAspectRatio',   icon: '📐', color: '#10b981', name: '比例计算',       desc: '屏幕/图片尺寸比例换算，4:3/16:9 等常用比例', category: '计算工具', file: 'aspect-ratio.js', tags: ['aspect','ratio','比例','尺寸','屏幕','分辨率','16:9','4:3'] },
   { id: 'palette-gen', render: 'renderPaletteGen',    icon: '🎨', color: '#ec4899', name: '调色板生成器',   desc: '输入主色生成完整色阶、互补色、CSS 变量', category: 'CSS 工具', file: 'palette-gen.js', isNew: true, tags: ['palette','调色板','色阶','互补色','配色','color scheme'] },
-  { id: 'img-webp', render: 'renderImgWebp',        icon: '🔄', color: '#0ea5e9', name: '图片转 WebP',    desc: '批量转换图片为 WebP 格式，支持质量调节和对比', category: '图片工具', file: 'img-webp.js', isNew: true, tags: ['webp','image','图片','转换','format','convert'] },
+  { id: 'img-webp', render: 'renderImgWebp',        icon: '🔄', color: '#0ea5e9', name: '图片转 WebP',    desc: '批量转换图片为 WebP 格式，支持质量调节和对比', category: '图片工具', file: 'img-compress.js', isNew: true, tags: ['webp','image','图片','转换','format','convert'] },
   { id: 'git-commit', render: 'renderGitCommit',      icon: '💬', color: '#f97316', name: 'Git Commit 生成', desc: 'Conventional Commits 规范，含 type/scope/breaking，一键复制', category: '开发工具', file: 'git-commit.js', isNew: true, tags: ['git','commit','提交','conventional','message','版本'] },
   { id: 'nginx-gen',  render: 'renderNginxGen',       icon: '⚙️',  color: '#22c55e', name: 'Nginx 配置生成', desc: '静态站/SPA/反向代理/HTTPS/负载均衡五种场景，一键生成 nginx.conf', category: '开发工具', file: 'nginx-gen.js', isNew: true, tags: ['nginx','config','配置','反向代理','proxy','https','server'] },
   { id: 'clip-path',  render: 'renderClipPath',       icon: '✂️',  color: '#a855f7', name: 'clip-path 生成器', desc: '可视化生成 CSS clip-path，支持多边形/圆形/椭圆/内嵌，拖拽控制点', category: 'CSS 工具', file: 'clip-path.js', isNew: true, tags: ['clip-path','裁剪','css','polygon','circle','shape'] },
@@ -108,7 +108,7 @@
   { id: 'chmod-calc',      render: 'renderChmodCalc',      icon: '🔑', color: '#f59e0b', name: 'Chmod 计算器',     desc: 'Linux 文件权限计算，数字与符号模式双向转换',                  category: '开发工具', file: 'chmod-calc.js',      isNew: true, tags: ['chmod','permission','权限','linux','rwx','755','644'] },
   { id: 'placeholder-img', render: 'renderPlaceholderImg', icon: '🖼️', color: '#06b6d4', name: '占位图生成',       desc: '自定义尺寸/颜色/文字的占位图，Canvas 绘制+下载',             category: '图片工具', file: 'placeholder-img.js', isNew: true, tags: ['placeholder','占位图','image','尺寸','dummy','thumbnail'] },
   { id: 'string-inspect',  render: 'renderStringInspect',  icon: '🔬', color: '#ec4899', name: '字符串检查器',     desc: '逐字符检查 Unicode 码点/字节数/不可见字符高亮',              category: '文本处理', file: 'string-inspect.js',  isNew: true, tags: ['string','inspect','unicode','字符','不可见','zero-width','BOM','检查'] },
-  { id: 'json-schema',     render: 'renderJsonSchema',     icon: '📐', color: '#3b82f6', name: 'JSON Schema 生成', desc: '从 JSON 示例自动推断 Schema（Draft-07），支持校验',          category: '数据格式', file: 'json-schema.js',     isNew: true, tags: ['json','schema','类型','type','validate','draft-07','推断'] },
+  { id: 'json-schema',     render: 'renderJsonSchema',     icon: '📐', color: '#3b82f6', name: 'JSON Schema 生成', desc: '从全部样本推断 Schema，完整 Draft-07 校验、错误路径与取消',          category: '数据格式', file: 'json-schema.js',     isNew: true, tags: ['json','schema','类型','type','validate','draft-07','推断'] },
   { id: 'favicon-gen',     render: 'renderFaviconGen',     icon: '⭐', color: '#f43f5e', name: 'Favicon 生成器',   desc: '文字/Emoji 生成多尺寸 Favicon，导出 ICO/PNG/SVG',            category: '图片工具', file: 'favicon-gen.js',     isNew: true, tags: ['favicon','icon','图标','ico','generate','网站'] },
   { id: 'llm-token',       render: 'renderLlmToken',       icon: '🤖', color: '#10b981', name: 'LLM Token 计数',   desc: '估算文本 Token 数和 API 调用价格（GPT/Claude）',             category: '开发工具', file: 'llm-token.js',       isNew: true, tags: ['token','llm','gpt','claude','ai','价格','计数','tokenizer'] },
   { id: 'hmac-gen',        render: 'renderHmacGen',        icon: '🔏', color: '#7c3aed', name: 'HMAC 生成器',      desc: 'HMAC-SHA256/384/512/SHA1 消息认证码生成',                    category: '编码加密', file: 'hmac-gen.js',        isNew: true, tags: ['hmac','sha256','mac','签名','signature','hash','认证'] },
@@ -159,6 +159,10 @@
   }
 };
   const workbenches = [
+  { id: 'formats', tools: ['json','json-csv','yaml-json','toml-json','xml-format','env-parse','json-schema','diff-json'], name: {zh:'数据格式工作台', en:'Data Format Workbench'}, desc: {zh:'格式化、转换、结构对比与 Schema，结果可继续处理', en:'Format, convert, compare and generate schemas with reusable results'} },
+  { id: 'text', tools: ['case-convert','slug-gen','line-sort','wordcount'], name: {zh:'文本处理工作台', en:'Text Workbench'}, desc: {zh:'命名转换、Slug、行清洗与字数统计', en:'Naming styles, slugs, line cleanup and text statistics'} },
+  { id: 'escaping', tools: ['text-escape','html-entity','unicode-convert'], name: {zh:'编码与转义', en:'Encoding & Escaping'}, desc: {zh:'JSON、HTML、URL、正则与 Unicode 转义', en:'JSON, HTML, URL, regex and Unicode escaping'} },
+  { id: 'units', tools: ['unit-convert','byte-convert'], name: {zh:'单位与容量换算', en:'Units & Storage'}, desc: {zh:'常用单位、1000/1024 容量与带宽换算', en:'Unit conversion, decimal/binary storage and bandwidth'} },
   {
     "id": "images",
     "tools": [

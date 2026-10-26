@@ -184,7 +184,7 @@ const BUILD_VERSION = hashSrc.digest('hex').slice(0, 8);
 console.log(`\nBuild version: ${BUILD_VERSION}`);
 
 // ── Minify CSS ──
-const cssFiles = ['dashboard-base.css', 'dashboard-components.css', 'dashboard-theme.css'];
+const cssFiles = ['dashboard-base.css', 'dashboard-components.css', 'dashboard-theme.css', 'dashboard-ux.css'];
 console.log('\nCSS Minification:');
 let totalSavedCSS = 0;
 for (const name of cssFiles) {
@@ -202,7 +202,7 @@ for (const name of cssFiles) {
 }
 
 // ── Minify core JS ──
-const jsFiles = ['tool-compute.js', 'app-updates.js', 'image-session.js', 'tool-catalog.js', 'dashboard.js', 'dashboard-cmd.js', 'i18n.js'];
+const jsFiles = ['tool-compute.js', 'app-updates.js', 'image-session.js', 'file-session.js', 'tool-workspace.js', 'request-session.js', 'tool-catalog.js', 'dashboard.js', 'dashboard-cmd.js', 'i18n.js'];
 console.log('\nJS Minification:');
 let totalSavedJS = 0;
 for (const name of jsFiles) {

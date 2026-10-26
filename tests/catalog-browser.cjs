@@ -31,7 +31,7 @@ const express = require('express');
     await page.goto(`http://127.0.0.1:${server.address().port}/k-toolkit/dashboard.html`, { waitUntil: 'domcontentloaded' });
     await page.locator('.nav-cat').first().waitFor();
     assert.equal(await page.locator('.nav-cat').count(), 10);
-    assert.equal(await page.locator('.nav-tool-item').count(), 86);
+    assert.equal(await page.locator('.nav-tool-item').count(), 73);
     const categories = await page.evaluate(() => Object.keys(ToolCatalog.categories));
     for (const category of categories) {
       await page.evaluate(category => setCatFilter(category), category);
@@ -44,8 +44,8 @@ const express = require('express');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
     assert.ok((await page.locator('.nav-cat-label').allTextContents()).includes('Data & Formats'));
     await page.evaluate(() => setCatFilter('数据格式'));
-    await page.waitForFunction(() => document.querySelector('[data-lazy-cat="数据格式"] .tool-card-name')?.textContent === 'JSON Formatter');
-    assert.equal(await page.locator('[data-lazy-cat] .tool-card').count(), 9);
+    await page.waitForFunction(() => document.querySelector('[data-lazy-cat="数据格式"] .tool-card-name')?.textContent === 'Data Format Workbench');
+    assert.equal(await page.locator('[data-lazy-cat] .tool-card').count(), 2);
     await page.evaluate(() => setLang('zh'));
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'zh-CN');
     const route = async (id, selector) => {
@@ -143,8 +143,8 @@ const express = require('express');
     await route('json', '#jsonInput');
     await page.locator('#jsonInput').fill(JSON.stringify({ 'k" onmouseover="window.__jsonPwned=1" x="': 1 }));
     await page.evaluate(() => { formatJSON(); jsonToggleView(); });
-    await page.locator('#jsonTreeOutput .jt-clickable').first().hover();
-    await page.locator('#jsonTreeOutput .jt-clickable').first().click();
+    await page.locator('#jsonTreeOutput .jt-select').first().hover();
+    await page.locator('#jsonTreeOutput .jt-select').first().click();
     assert.equal(await page.evaluate(() => window.__jsonPwned), undefined);
     await route('jwt', '#jwtInput');
     const b64url = s => Buffer.from(s).toString('base64url');
@@ -171,9 +171,12 @@ const express = require('express');
     await route('clip-path', '#cpCanvas');
     await page.locator('#cpSvgEl circle[data-idx="0"]').waitFor({ state: 'attached' });
     assert.equal(await page.locator('#cpSvgEl circle[data-idx]').count(), 5);
+    // Mouse coordinates must be measured after the page's entrance transform settles.
+    await page.locator('#content').evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
     const handle = await page.locator('#cpSvgEl circle[data-idx="0"]').boundingBox();
     const canvasBox = await page.locator('#cpCanvas').boundingBox();
-    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    // The first handle straddles the clipped top edge; grab its visible interior.
+    await page.mouse.move(handle.x + handle.width / 2, Math.max(handle.y + handle.height / 2, canvasBox.y + 4));
     await page.mouse.down();
     await page.mouse.move(canvasBox.x + canvasBox.width * 0.25, canvasBox.y + canvasBox.height * 0.25, { steps: 4 });
     await page.mouse.up();
@@ -235,7 +238,7 @@ const express = require('express');
     }
     if (process.env.TEST_SCREENSHOT) await page.screenshot({ path: process.env.TEST_SCREENSHOT, fullPage: true, animations: 'disabled' });
     assert.deepEqual(errors, []);
-    console.log('PASS: 10 categories, 5 workbenches, all legacy child routes/favorites, bilingual catalog, HMAC/hash, AES interop/legacy/AES-192, >30 script loads, SVG isolation, mobile widths');
+    console.log('PASS: 10 categories, 9 workbenches, all legacy child routes/favorites, bilingual catalog, HMAC/hash, AES interop/legacy/AES-192, >30 script loads, SVG isolation, mobile widths');
   } finally {
     if (browser) await browser.close();
     if (server) await new Promise(resolve => server.close(resolve));

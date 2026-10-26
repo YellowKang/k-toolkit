@@ -27,11 +27,14 @@ const _bcDict = {
   },
 };
 
-const _BC_UNITS = [['B', 1], ['KiB', 1024], ['MiB', 1024 ** 2], ['GiB', 1024 ** 3], ['TiB', 1024 ** 4], ['PiB', 1024 ** 5],
-  ['kB', 1e3], ['MB', 1e6], ['GB', 1e9], ['TB', 1e12], ['PB', 1e15], ['bit', 1 / 8]];
+let _BC_UNITS = [];
 const _bcNum = v => v === 0 ? '0' : Math.abs(v) < 1e-6 || Math.abs(v) >= 1e21 ? v.toExponential(6) : String(Number(v.toPrecision(12)));
 
-function renderByteConvert(el) {
+let _bcDraft = {};
+async function renderByteConvert(el) {
+  try { _BC_UNITS = (await ToolCompute.load('units')).storageUnits; }
+  catch(error) { if(el.isConnected) el.textContent=error.message;return; }
+  if(!el.isConnected)return;
   const T = makeToolI18n(_bcDict);
   el.innerHTML = `
     <div class="tool-card-panel">
@@ -64,21 +67,27 @@ function renderByteConvert(el) {
       </div>
       <div id="bpsResult"></div>
     </div>`;
+  for (const [id, value] of Object.entries(_bcDraft)) { const field = el.querySelector('#' + id); if (field) field.value = value; }
+  const save = () => { for (const id of ['bcVal','bcUnit','bpsVal','bpsUnit']) _bcDraft[id] = el.querySelector('#' + id).value; };
+  el.addEventListener('input', save); el.addEventListener('change', save);
   bcCalc(); bpsCalc();
 }
 
 function bcCalc() {
   const T = makeToolI18n(_bcDict);
-  const bytes = (parseFloat(document.getElementById('bcVal').value) || 0) * parseFloat(document.getElementById('bcUnit').value);
+  const input = document.getElementById('bcVal'), select = document.getElementById('bcUnit');
+  if (!input.value.trim() || Number(input.value)<0 || !Number.isFinite(Number(input.value))) { for(const id of ['bcMain','bcAll','bcAllSi'])document.getElementById(id).replaceChildren();return; }
+  const bytes = window.KCompute.units.convert('storage',Number(input.value),select.selectedOptions[0].textContent,'B');
   document.getElementById('bcMain').textContent = T('bytes', bytes.toLocaleString('en-US', { maximumFractionDigits: 3 }));
-  const row = ([u, f]) => { const v = _bcNum(bytes / f); return `<div class="result-row" style="margin-bottom:6px"><span style="color:var(--text-muted);width:70px">${u}</span><span style="color:var(--neon);font-weight:600;flex:1;word-break:break-all">${v}</span><button class="copy-inline" data-copy="${v}" onclick="copyText(this.dataset.copy,this)">${T('copy')}</button></div>`; };
+  const row = ([u, f]) => { const v = _bcNum(window.KCompute.units.convert('storage',bytes,'B',u)); return `<div class="result-row" style="margin-bottom:6px"><span style="color:var(--text-muted);width:70px">${u}</span><span style="color:var(--neon);font-weight:600;flex:1;word-break:break-all">${v}</span><button class="copy-inline" data-copy="${v}" onclick="copyText(this.dataset.copy,this)">${T('copy')}</button></div>`; };
   document.getElementById('bcAll').innerHTML = _BC_UNITS.slice(0, 6).reverse().map(row).join('');
   document.getElementById('bcAllSi').innerHTML = _BC_UNITS.slice(6).reverse().map(row).join('');
 }
 
 function bpsCalc() {
   const T = makeToolI18n(_bcDict);
-  const bps = (parseFloat(document.getElementById('bpsVal').value) || 0) * parseFloat(document.getElementById('bpsUnit').value);
+  const input=document.getElementById('bpsVal'),bps=Number(input.value)*Number(document.getElementById('bpsUnit').value);
+  if(!input.value.trim()||bps<0||!Number.isFinite(bps)){document.getElementById('bpsResult').replaceChildren();return;}
   const Bps = bps / 8;
   const items = [
     [T('per_sec'), `${_bcNum(Bps / 1e6)} MB/s · ${_bcNum(Bps / 1024 ** 2)} MiB/s`],

@@ -12,7 +12,7 @@ const _ipDict = {
     type_title: 'IP 类型判断',
     type_ph: '输入 IP 地址',
     types: { private: '私有地址', cgnat: '运营商级 NAT (100.64/10)', loopback: '回环地址', link: '链路本地地址', multicast: '多播地址',
-      broadcast: '受限广播地址', this: '本网络 (0.0.0.0/8)', doc: '文档示例地址', reserved: '保留地址 (240/4)', benchmark: '基准测试 (198.18/15)', public: '公网地址' },
+      broadcast: '受限广播地址', this: '本网络 (0.0.0.0/8)', doc: '文档示例地址', reserved: '保留地址 (240/4)', benchmark: '基准测试 (198.18/15)', protocol: '协议分配地址', public: '其他地址（不保证公网可路由）' },
     cls: c => `${c} 类`,
   },
   en: {
@@ -26,47 +26,20 @@ const _ipDict = {
     type_title: 'Address Type',
     type_ph: 'IP address',
     types: { private: 'Private', cgnat: 'Carrier-grade NAT (100.64/10)', loopback: 'Loopback', link: 'Link-local', multicast: 'Multicast',
-      broadcast: 'Limited broadcast', this: '"This" network (0.0.0.0/8)', doc: 'Documentation', reserved: 'Reserved (240/4)', benchmark: 'Benchmarking (198.18/15)', public: 'Public' },
+      broadcast: 'Limited broadcast', this: '"This" network (0.0.0.0/8)', doc: 'Documentation', reserved: 'Reserved (240/4)', benchmark: 'Benchmarking (198.18/15)', protocol: 'Protocol assignments', public: 'Other (not a routing guarantee)' },
     cls: c => `Class ${c}`,
   },
 };
 
-/** IPv4 dotted quad → unsigned 32-bit number, or null. */
-function ipParse(ip) {
-  const parts = String(ip ?? '').trim().split('.');
-  if (parts.length !== 4 || !parts.every(p => /^\d{1,3}$/.test(p) && +p <= 255)) return null;
-  return parts.reduce((acc, p) => acc * 256 + +p, 0);
-}
-function ipToNum(ip) { return ipParse(ip) ?? 0; }
-function numToIp(n) { return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.'); }
+function ipParse(ip){return KCompute.ip.parse(ip);}
+function ipToNum(ip){return ipParse(ip)??0;}
+function numToIp(n){return KCompute.ip.format(n);}
+function ipSubnet(n,cidr){return KCompute.ip.subnet(n,cidr);}
+function ipTypes(n){return KCompute.ip.types(n);}
 
-/** Subnet facts for an address and prefix; /31 and /32 follow RFC 3021 (no network/broadcast reservation). */
-function ipSubnet(ipNum, cidr) {
-  const mask = cidr === 0 ? 0 : (0xFFFFFFFF << (32 - cidr)) >>> 0;
-  const network = (ipNum & mask) >>> 0, broadcast = (network | (~mask >>> 0)) >>> 0;
-  const size = 2 ** (32 - cidr);
-  return { mask, wildcard: (~mask) >>> 0, network, broadcast, hosts: cidr >= 31 ? size : size - 2,
-    first: cidr >= 31 ? network : network + 1, last: cidr >= 31 ? broadcast : broadcast - 1 };
-}
-
-function ipTypes(n) {
-  const a = n >>> 24, b = (n >>> 16) & 255, c = (n >>> 8) & 255;
-  const t = [];
-  if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) t.push('private');
-  if (a === 100 && b >= 64 && b <= 127) t.push('cgnat');
-  if (a === 127) t.push('loopback');
-  if (a === 169 && b === 254) t.push('link');
-  if (a >= 224 && a <= 239) t.push('multicast');
-  if (n === 0xFFFFFFFF) t.push('broadcast');
-  else if (a >= 240) t.push('reserved');
-  if (a === 0) t.push('this');
-  if ((a === 192 && b === 0 && c === 2) || (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113)) t.push('doc');
-  if (a === 198 && (b === 18 || b === 19)) t.push('benchmark');
-  if (!t.length) t.push('public');
-  return t;
-}
-
-function renderIpCalc(el) {
+async function renderIpCalc(el) {
+  await ToolCompute.load('ip');if(!el.isConnected||window.currentPage!=='ip-calc')return;
+  el._toolOutput=()=>el._ipOutput||'';
   const T = makeToolI18n(_ipDict);
   el.innerHTML = `
     <div class="tool-card-panel">
@@ -101,17 +74,18 @@ function ipCalc() {
   // Accept "a.b.c.d/nn" in the address box.
   const slash = ip.match(/^(.+)\/(\d{1,2})$/);
   if (slash) { ip = slash[1]; cidrEl.value = slash[2]; }
-  const cidr = parseInt(cidrEl.value, 10);
+  const cidr = /^(0|[1-9]\d?)$/.test(cidrEl.value) ? Number(cidrEl.value) : NaN;
+  document.getElementById('toolBody')._ipOutput='';
   const ipNum = ipParse(ip), error = document.getElementById('ipError'), result = document.getElementById('ipResult');
   if (ipNum === null || !(cidr >= 0 && cidr <= 32)) {
     error.textContent = T('invalid'); error.style.display = ip ? '' : 'none'; result.style.display = 'none';
-    return;
+    return {success:false,error:T('invalid')};
   }
   error.style.display = 'none';
   const s = ipSubnet(ipNum, cidr), labels = T('rows');
   const rows = [
     [labels.ip, numToIp(ipNum) + '/' + cidr], [labels.mask, numToIp(s.mask)], [labels.wildcard, numToIp(s.wildcard)],
-    [labels.network, numToIp(s.network)], [labels.broadcast, numToIp(s.broadcast)],
+    [labels.network, numToIp(s.network)], [cidr>=31?(getCurrentLang()==='en'?'Last address (no broadcast reservation)':'末地址（不保留广播地址）'):labels.broadcast, numToIp(s.broadcast)],
     [labels.range, numToIp(s.first) + ' ~ ' + numToIp(s.last)], [labels.hosts, s.hosts.toLocaleString()],
     [labels.binary, numToIp(ipNum).split('.').map(o => (+o).toString(2).padStart(8, '0')).join('.')],
   ];
@@ -119,6 +93,7 @@ function ipCalc() {
     `<div class="result-row" style="margin-bottom:8px"><span style="color:var(--text-muted);min-width:120px">${l}</span><span style="color:var(--neon);font-weight:600;flex:1;font-family:monospace;word-break:break-all">${v}</span><button class="copy-inline" data-copy="${v}" onclick="copyText(this.dataset.copy,this)">${T('copy')}</button></div>`
   ).join('');
   result.style.display = '';
+  const data=KCompute.ip.calculate(ip+'/'+cidr);document.getElementById('toolBody')._ipOutput=JSON.stringify(data,null,2);return {success:true,data};
 }
 
 function ipTypeCheck() {

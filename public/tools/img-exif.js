@@ -1,6 +1,6 @@
 const _exifDict = {
   zh: {
-    title: 'EXIF 信息查看器', drop: '点击或拖拽图片到此处', drop_hint: '支持 JPEG（含 EXIF 数据）',
+    title: 'EXIF 信息查看器', drop: '点击或拖拽图片到此处', drop_hint: '查看图片尺寸与 JPEG EXIF，文件仅在本地处理', dimensions: '图片尺寸', loading: '读取中…', none: '未包含支持的 EXIF 标签',
     file_name: '文件名', file_size: '文件大小', mime: 'MIME 类型', modified: '最后修改',
     tags: {
       0x010F:'相机厂商',0x0110:'相机型号',0x0112:'方向',0x0131:'软件',0x0132:'修改时间',
@@ -9,7 +9,7 @@ const _exifDict = {
     },
   },
   en: {
-    title: 'EXIF viewer', drop: 'Click or drop an image here', drop_hint: 'JPEG files with EXIF data',
+    title: 'EXIF viewer', drop: 'Click or drop an image here', drop_hint: 'Image dimensions and JPEG EXIF, processed locally', dimensions: 'Dimensions', loading: 'Reading…', none: 'No supported EXIF tags found',
     file_name: 'File name', file_size: 'File size', mime: 'MIME type', modified: 'Last modified',
     tags: {
       0x010F:'Camera make',0x0110:'Camera model',0x0112:'Orientation',0x0131:'Software',0x0132:'Modified',
@@ -24,17 +24,19 @@ window.renderImgExif = function(el) {
   el.innerHTML = `
     <div class="tool-card-panel">
       <div class="panel-label">${T('title')}</div>
-      <div id="exifDrop" onclick="document.getElementById('exifFile').click()" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='var(--glass-border)'" ondrop="exifHandleDrop(event)" style="border:2px dashed var(--glass-border);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:border-color 0.2s">
+      <div id="exifDrop" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('exifFile').click()}" onclick="document.getElementById('exifFile').click()" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='var(--glass-border)'" ondrop="exifHandleDrop(event)" style="border:2px dashed var(--glass-border);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:border-color 0.2s">
         <div style="font-size:32px;margin-bottom:8px">🖼️</div>
         <div style="color:var(--text-muted);font-size:14px">${T('drop')}</div>
         <div style="color:var(--text-muted);font-size:12px;margin-top:4px">${T('drop_hint')}</div>
-        <input type="file" id="exifFile" accept="image/*" style="display:none" onchange="exifLoad(this.files[0])">
+        <input type="file" id="exifFile" accept="image/*" style="display:none" onchange="exifLoad(this.files[0]);this.value=''">
       </div>
     </div>
     <div class="tool-card-panel" id="exifResult" style="display:none">
       <div class="panel-label" id="exifFilename" style="margin-bottom:10px"></div>
-      <div id="exifData"></div>
+      <div id="exifData" role="status" aria-live="polite"></div>
     </div>`;
+  _exifShared = ImageSession.mount(el, { onUse: files => exifLoad(files[0], false) });
+  window._activeCleanup = () => { _exifController?.abort(); _exifShared?.dispose(); };
 };
 
 function exifHandleDrop(e) {
@@ -44,72 +46,32 @@ function exifHandleDrop(e) {
   if (file) exifLoad(file);
 }
 
-function exifLoad(file) {
+let _exifController = null, _exifShared = null;
+async function exifLoad(file, remember = true) {
   if (!file) return;
+  _exifController?.abort();
+  const controller = _exifController = new AbortController(), T = makeToolI18n(_exifDict);
+  const output = document.getElementById('exifData');
+  output._metadata = null;
   document.getElementById('exifFilename').textContent = file.name;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const T = makeToolI18n(_exifDict);
+  document.getElementById('exifResult').style.display = '';
+  output.textContent = T('loading');
+  if (remember && !_exifShared.remember([file])) { output.textContent = ''; return; }
+  try {
+    const data = await (await ToolCompute.load('image')).metadata(file, { signal: controller.signal });
+    if (controller.signal.aborted || !output.isConnected) return;
     const info = [
-      {label:T('file_name'), val: file.name},
-      {label:T('file_size'), val: (file.size/1024).toFixed(1)+' KB'},
-      {label:T('mime'), val: file.type},
-      {label:T('modified'), val: new Date(file.lastModified).toLocaleString()},
+      { label: T('file_name'), val: data.name }, { label: T('file_size'), val: (data.size / 1024).toFixed(1) + ' KB' },
+      { label: T('mime'), val: data.type }, { label: T('dimensions'), val: data.width + ' × ' + data.height },
+      { label: T('modified'), val: new Date(file.lastModified).toLocaleString() },
+      ...Object.entries(data.tags).map(([tag, val]) => ({ label: T('tags')[tag], val })),
     ];
-    try {
-      const data = new DataView(ev.target.result);
-      if (data.getUint16(0) === 0xFFD8) info.push(..._exifParseJpeg(data));
-    } catch {}
-    document.getElementById('exifData').innerHTML = info.map(r =>
-      `<div style="display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--glass-border)"><span style="font-size:12px;color:var(--text-muted);min-width:130px;flex-shrink:0">${r.label}</span><span style="font-size:13px;color:var(--text);word-break:break-all">${escHtml(r.val)}</span></div>`
-    ).join('');
-    document.getElementById('exifResult').style.display = '';
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-function _exifParseJpeg(data) {
-  const TAGS = makeToolI18n(_exifDict)('tags');
-  const results = [];
-  let offset = 2;
-  while (offset < data.byteLength - 4) {
-    const marker = data.getUint16(offset);
-    const len = data.getUint16(offset + 2);
-    if (marker === 0xFFE1) {
-      const exifBase = offset + 4;
-      if (data.getUint32(exifBase) !== 0x45786966) break;
-      const tiff = exifBase + 6;
-      const little = data.getUint16(tiff) === 0x4949;
-      const g16 = o => data.getUint16(tiff + o, little);
-      const g32 = o => data.getUint32(tiff + o, little);
-      const ifdOff = g32(4);
-      const count = g16(ifdOff);
-      for (let i = 0; i < count; i++) {
-        const e = ifdOff + 2 + i * 12;
-        const tag = g16(e);
-        const name = TAGS[tag];
-        if (!name) continue;
-        const type = g16(e + 2);
-        const raw = g32(e + 8);
-        let val = raw;
-        if (type === 2) {
-          const strOff = tiff + raw;
-          let s = '';
-          for (let c = 0; c < 64 && strOff + c < data.byteLength; c++) {
-            const ch = data.getUint8(strOff + c);
-            if (!ch) break;
-            s += String.fromCharCode(ch);
-          }
-          val = s;
-        } else if (type === 5) {
-          const num = g32(raw); const den = g32(raw + 4);
-          val = den ? (num/den).toFixed(4) : num;
-        }
-        results.push({label: name, val: String(val)});
-      }
-      break;
+    output.replaceChildren(); output._metadata = data;
+    for (const item of info) {
+      const row = document.createElement('div'); row.className = 'image-metadata-row';
+      const label = document.createElement('span'), value = document.createElement('span');
+      label.textContent = item.label; value.textContent = String(item.val); row.append(label, value); output.append(row);
     }
-    offset += 2 + len;
-  }
-  return results;
+    if (!Object.keys(data.tags).length) { const note = document.createElement('p'); note.textContent = T('none'); output.append(note); }
+  } catch (error) { if (!controller.signal.aborted && output.isConnected) { output._metadata = null; output.textContent = error.message; } }
 }

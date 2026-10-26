@@ -16,13 +16,8 @@ function appendBubble(type, text) {
   if (type === 'assistant') {
     const copyBtn = document.createElement('button');
     copyBtn.className = 'ag-bubble-copy';
-    copyBtn.textContent = 'Copy';
-    copyBtn.onclick = () => {
-      navigator.clipboard.writeText(text).then(() => {
-        copyBtn.textContent = '\u2713';
-        setTimeout(() => copyBtn.textContent = 'Copy', 1500);
-      });
-    };
+    copyBtn.textContent = _agT('copy');
+    copyBtn.onclick = () => window.copyText(text, copyBtn);
     el.appendChild(copyBtn);
   }
   msgs.appendChild(el);
@@ -127,46 +122,23 @@ function finishCard(tc, result) {
   body.style.display = 'block';
 
   const display = result.display || (result.success ? _agT('done') : (result.error || 'Failed'));
-  const detailId = 'ag-detail-' + Date.now() + '-' + Math.random().toString(36).slice(2);
-
-  let copyBtn = null;
-  if (result.success && result.data) {
-    copyBtn = document.createElement('button');
-    copyBtn.className = 'ag-btn';
-    copyBtn.textContent = _agT('copy');
-    copyBtn.addEventListener('click', () => {
-      const data = result.data.steps && result.success ? result.data.result : result.data;
-      const value = data?.result ?? data?.hash ?? data;
-      const txt = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-      navigator.clipboard.writeText(txt).then(() => { window.showToast && window.showToast(_agT('copied')); });
-    });
-  }
-
-  body.innerHTML = `
-    <div class="ag-card-display">${escHtml(display)}</div>
-    <div class="ag-card-actions" id="ag-actions-${detailId}">
-      <button type="button" class="ag-btn" data-details>${_agT('details')}</button>
-    </div>
-    <div class="ag-card-detail" id="${detailId}">
-      <pre>${escHtml(JSON.stringify(result.data || result, null, 2))}</pre>
-    </div>
-  `;
-  body.querySelector('[data-details]').addEventListener('click', () => body.querySelector('.ag-card-detail').classList.toggle('open'));
+  body.replaceChildren();
+  const label = document.createElement('div'); label.className = 'ag-card-display'; label.textContent = display; body.append(label);
   if (result.data?.steps) {
     const trace = document.createElement('ol');
-    for (const step of result.data.steps) { const li = document.createElement('li'); li.textContent = (step.id || step.step) + (step.action ? ': ' + step.action : '') + ' ' + (step.success === false || step.ok === false ? '✗' : '✓') + (step.durationMs !== undefined ? ' (' + step.durationMs + 'ms)' : ''); trace.appendChild(li); }
-    if (result.data.failedStep) { const failed = document.createElement('li'); failed.textContent = result.data.failedStep + ' ✗ ' + (result.error || ''); trace.appendChild(failed); }
-    body.querySelector('.ag-card-display').after(trace);
-    if (result.success) {
-      const output = result.data.result;
-      const value = output?.result ?? output?.hash ?? output;
-      const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
-      const preview = document.createElement('pre'); preview.className = 'ag-workflow-preview';
-      preview.setAttribute('aria-label', _agT('workflow_result'));
-      preview.textContent = text.length > 800 ? text.slice(0, 800) + '…' : text;
-      trace.after(preview);
+    for (const step of result.data.steps) {
+      const li = document.createElement('li');
+      li.textContent = (step.id || step.step) + (step.action ? ': ' + step.action : '') + ' ' + (step.success === false || step.ok === false ? '✗' : '✓') + (step.durationMs !== undefined ? ' (' + step.durationMs + 'ms)' : ''); trace.append(li);
     }
+    if (result.data.failedStep) { const failed = document.createElement('li'); failed.textContent = result.data.failedStep + ' ✗ ' + (result.error || ''); trace.append(failed); }
+    body.append(trace);
   }
+  const actions = document.createElement('div'); actions.className = 'ag-card-actions'; body.append(actions);
+  window.AgentResults.mount(body, { tc, result, onRun: async (name, params) => {
+    if (_busy) throw new Error(window.getCurrentLang?.() === 'en' ? 'Wait for the current task to finish.' : '请等待当前任务完成。');
+    setBusy(true);
+    try { await _session.executeLocal(name, params); } finally { setBusy(false); }
+  } });
   if (tc.name === 'list_workflows' || tc.function?.name === 'list_workflows') {
     for (const template of result.data?.templates || []) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'ag-btn';
@@ -174,9 +146,6 @@ function finishCard(tc, result) {
       button.addEventListener('click', () => { const input = document.getElementById('agInput'); input.value = '/workflow ' + template.id + ' '; input.focus(); });
       body.querySelector('.ag-card-actions').appendChild(button);
     }
-  }
-  if (copyBtn) {
-    document.getElementById('ag-actions-' + detailId).prepend(copyBtn);
   }
   scrollBottom();
 }
@@ -239,6 +208,12 @@ function doSend() {
     }
   }
 
+  const cfg = window.AgentConfig.AG.load();
+  if (!cfg.apiKey && cfg.adapter !== 'custom') {
+    input.value = text; openConfig(); return;
+  }
+  if (_session.config.adapter !== cfg.adapter || _session.config.model !== cfg.model || _session.config.baseUrl !== cfg.baseUrl) _session._responseId = null;
+  _session.adapter = window.AgentAdapters.getAdapter(cfg.adapter); _session.config = cfg;
   appendBubble('user', text);
   setBusy(true);
   _session.send(text);
@@ -256,16 +231,13 @@ function _handleMetaCmd(cmd, args) {
       window._agOpenConfig && window._agOpenConfig();
       break;
     case 'retry':
-      if (_session && _session.messages.length) {
-        const last = [..._session.messages].reverse().find(m => m.role === 'user');
-        if (last) { setBusy(true); _session.send(last.content); }
-      }
+      if (_session?._retryState) { setBusy(true); _session.retryLast(); }
+      else appendBubble('assistant', _agT('no_retry'));
       break;
     case 'copy': {
       const bubbles = document.querySelectorAll('#agMessages .ag-bubble.assistant');
       if (bubbles.length) {
-        navigator.clipboard.writeText(bubbles[bubbles.length-1].innerText);
-        window.showToast && window.showToast(_agT('copied'));
+        window.copyText(bubbles[bubbles.length-1].innerText);
       }
       break;
     }
@@ -274,8 +246,10 @@ function _handleMetaCmd(cmd, args) {
       break;
     case 'model':
       if (args[0] && _session) {
-        _session.config.model = args[0];
-        appendBubble('assistant', _agT('model_switched') + args[0]);
+        try {
+          const AG = window.AgentConfig.AG; AG.save({ ...AG.load(), model: args[0] });
+          appendBubble('assistant', _agT('model_switched') + args[0]);
+        } catch (e) { appendErrorBubble(e.message); }
       }
       break;
     case 'skin':
@@ -325,6 +299,7 @@ function wireSession(session) {
     const status = card.querySelector('.ag-card-status');
     status.textContent = _agT('workflow_step') + ' ' + progress.completed + '/' + progress.total;
   });
+  session.on('context', stats => document.getElementById('agentPanel')?._contextUpdate?.(stats));
   session.on('tool_done', ({ results }) => {
     removeThinking();
     results.forEach(r => finishCard(r, r.result));
@@ -336,7 +311,12 @@ function wireSession(session) {
   session.on('error', ({ reason, message }) => {
     removeThinking();
     const msg = message || `错误: ${reason}`;
-    appendErrorBubble(msg, reason !== 'max_iterations' ? () => {} : null);
+    appendErrorBubble(msg, ['network','max_tokens'].includes(reason) ? () => {
+      if (_busy || !session._retryState) return;
+      const cfg = window.AgentConfig.AG.load();
+      session.config = cfg; session.adapter = window.AgentAdapters.getAdapter(cfg.adapter); session._responseId = null;
+      setBusy(true); session.retryLast();
+    } : null);
     setBusy(false);
     const stopBtn = document.getElementById('agStopBtn');
     if (stopBtn) stopBtn.classList.remove('visible');

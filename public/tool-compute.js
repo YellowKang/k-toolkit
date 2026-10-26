@@ -40,7 +40,7 @@
   }
   // Calendar dates are local days: `new Date('YYYY-MM-DD')` is UTC midnight and toISOString() is the UTC day.
   const pad2 = n => String(n).padStart(2, '0');
-  const localDate = (date = new Date()) => `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  const localDate = (date = new Date()) => `${String(date.getFullYear()).padStart(4, '0')}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
   function parseLocalDate(text) {
     const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(text ?? '').trim());
     if (!m) return null;
@@ -48,9 +48,9 @@
     date.setFullYear(+m[1], +m[2] - 1, +m[3]);
     return date.getMonth() === +m[2] - 1 && date.getDate() === +m[3] ? date : null;
   }
-  const dayNumber = date => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000;
+  const dayNumber = date => { const utc = new Date(0); utc.setUTCFullYear(date.getFullYear(), date.getMonth(), date.getDate()); return utc.getTime() / 86400000; };
   function addMonths(date, months) {
-    const result = new Date(date.getFullYear(), date.getMonth() + months, 1);
+    const result = new Date(2000, 0, 1); result.setFullYear(date.getFullYear(), date.getMonth() + months, 1);
     result.setDate(Math.min(date.getDate(), new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate()));
     return result;
   }

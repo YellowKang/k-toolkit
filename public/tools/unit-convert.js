@@ -1,34 +1,6 @@
 /* ── 单位换算：精确换算系数（国际定义值），结果按 12 位有效数字消除浮点噪声 ── */
 
-const _UC_CATS = {
-  length: { base: 'm', units: [
-    ['m', 1, '米', 'Meter'], ['km', 1000, '千米', 'Kilometer'], ['cm', 0.01, '厘米', 'Centimeter'], ['mm', 0.001, '毫米', 'Millimeter'],
-    ['um', 1e-6, '微米', 'Micrometer'], ['in', 0.0254, '英寸', 'Inch'], ['ft', 0.3048, '英尺', 'Foot'], ['yd', 0.9144, '码', 'Yard'],
-    ['mi', 1609.344, '英里', 'Mile'], ['nmi', 1852, '海里', 'Nautical mile'], ['li', 500, '里（市制）', 'Li (Chinese mile)'],
-    ['chi', 1 / 3, '尺（市制）', 'Chi (Chinese foot)'], ['cun', 1 / 30, '寸（市制）', 'Cun (Chinese inch)'] ] },
-  mass: { units: [
-    ['kg', 1, '千克', 'Kilogram'], ['g', 0.001, '克', 'Gram'], ['mg', 1e-6, '毫克', 'Milligram'], ['t', 1000, '吨', 'Tonne'],
-    ['lb', 0.45359237, '磅', 'Pound'], ['oz', 0.028349523125, '盎司', 'Ounce'], ['jin', 0.5, '斤', 'Jin (斤)'], ['liang', 0.05, '两', 'Liang (两)'] ] },
-  temperature: { units: [['c', null, '摄氏度 °C', 'Celsius °C'], ['f', null, '华氏度 °F', 'Fahrenheit °F'], ['k', null, '开尔文 K', 'Kelvin K']] },
-  area: { units: [
-    ['m2', 1, '平方米', 'Square meter'], ['km2', 1e6, '平方千米', 'Square kilometer'], ['cm2', 1e-4, '平方厘米', 'Square centimeter'],
-    ['ha', 1e4, '公顷', 'Hectare'], ['mu', 2000 / 3, '亩', 'Mu (亩)'], ['ft2', 0.09290304, '平方英尺', 'Square foot'],
-    ['in2', 0.00064516, '平方英寸', 'Square inch'], ['acre', 4046.8564224, '英亩', 'Acre'] ] },
-  volume: { units: [
-    ['l', 1, '升', 'Liter'], ['ml', 0.001, '毫升', 'Milliliter'], ['m3', 1000, '立方米', 'Cubic meter'],
-    ['usgal', 3.785411784, '美制加仑', 'US gallon'], ['ukgal', 4.54609, '英制加仑', 'UK gallon'],
-    ['usfloz', 0.0295735295625, '美制液量盎司', 'US fluid ounce'], ['uscup', 0.2365882365, '美制杯', 'US cup'] ] },
-  time: { units: [
-    ['ms', 0.001, '毫秒', 'Millisecond'], ['s', 1, '秒', 'Second'], ['min', 60, '分钟', 'Minute'], ['h', 3600, '小时', 'Hour'],
-    ['d', 86400, '天', 'Day'], ['wk', 604800, '周', 'Week'], ['yr', 31536000, '年（365 天）', 'Year (365 days)'] ] },
-  storage: { units: [
-    ['bit', 0.125, '比特 bit', 'Bit'], ['b', 1, '字节 B', 'Byte'], ['kb', 1024, 'KB（1024）', 'KB (1024)'], ['mb', 1024 ** 2, 'MB', 'MB'],
-    ['gb', 1024 ** 3, 'GB', 'GB'], ['tb', 1024 ** 4, 'TB', 'TB'], ['pb', 1024 ** 5, 'PB', 'PB'] ] },
-  speed: { units: [
-    ['mps', 1, '米/秒', 'Meters/second'], ['kmh', 1 / 3.6, '千米/小时', 'Kilometers/hour'], ['mph', 0.44704, '英里/小时', 'Miles/hour'],
-    ['kn', 1852 / 3600, '节', 'Knot'], ['fps', 0.3048, '英尺/秒', 'Feet/second'] ] },
-  numfmt: { units: null },
-};
+let _UC_CATS = {};
 
 const _ucDict = {
   zh: {
@@ -59,22 +31,13 @@ const _ucDict = {
 
 const _ucUnitName = unit => (typeof getCurrentLang === 'function' && getCurrentLang() === 'en') ? unit[3] : unit[2];
 /** Round away binary floating-point noise for display: 3.5999999999 → 3.6. */
-const ucClean = v => Number.isFinite(v) ? Number(v.toPrecision(12)) : v;
+const ucClean = v => window.KCompute.units.clean(v);
+function ucConvertValue(category, value, from, to) { return window.KCompute.units.convert(category, value, from, to); }
 
-/** Convert `value` between unit ids in a category; temperature uses offsets. */
-function ucConvertValue(category, value, from, to) {
-  const cat = _UC_CATS[category];
-  if (!cat?.units) throw new Error('Unknown category: ' + category);
-  if (category === 'temperature') {
-    const c = from === 'c' ? value : from === 'f' ? (value - 32) * 5 / 9 : value - 273.15;
-    return ucClean(to === 'c' ? c : to === 'f' ? c * 9 / 5 + 32 : c + 273.15);
-  }
-  const f = cat.units.find(u => u[0] === from), t = cat.units.find(u => u[0] === to);
-  if (!f || !t) throw new Error('Unknown unit');
-  return ucClean(value * f[1] / t[1]);
-}
-
-function renderUnitConvert(el) {
+async function renderUnitConvert(el) {
+  try { _UC_CATS = (await ToolCompute.load('units')).categories; }
+  catch (error) { if(el.isConnected) el.textContent=error.message; return; }
+  if (!el.isConnected) return;
   const T = makeToolI18n(_ucDict);
   el.innerHTML = `
     <div class="tool-card-panel">
@@ -102,10 +65,12 @@ function renderUnitConvert(el) {
         </div>
       </div>
     </div>
+    <div id="ucStorageRoot" hidden></div>
     <div class="tool-card-panel" id="ucAllPanel">
       <div class="panel-label" style="margin-bottom:10px" id="ucAllLabel">${T('all')}</div>
       <div id="ucAllResults"></div>
     </div>`;
+  el._toolOutput=()=>!el.querySelector('#ucStorageRoot').hidden?(el.querySelector('#bcMain')?.textContent||''):window._ucCur==='numfmt'?el.querySelector('#ucAllResults').textContent:el.querySelector('#ucToVal').value;
   ucSetCat(window._ucCur && _UC_CATS[window._ucCur] ? window._ucCur : 'length');
 }
 
@@ -114,6 +79,15 @@ function ucSetCat(cat) {
   const T = makeToolI18n(_ucDict);
   window._ucCur = cat;
   document.querySelectorAll('#ucCats button').forEach(b => b.className = 'btn ' + (b.dataset.cat === cat ? 'btn-primary' : 'btn-secondary'));
+  const storage = document.getElementById('ucStorageRoot');
+  storage.hidden = cat !== 'storage';
+  document.getElementById('ucAllPanel').hidden = cat === 'storage';
+  if (cat === 'storage') {
+    document.getElementById('ucConvertPanel').style.display = 'none';
+    document.getElementById('ucNumFmtPanel').style.display = 'none';
+    if (!storage.children.length) loadTool('byte-convert').then(() => { if (storage.isConnected && window._ucCur === 'storage') renderByteConvert(storage); }).catch(error => { if (storage.isConnected) storage.textContent = error.message; });
+    return;
+  }
   const isNumFmt = cat === 'numfmt';
   document.getElementById('ucConvertPanel').style.display = isNumFmt ? 'none' : '';
   document.getElementById('ucNumFmtPanel').style.display = isNumFmt ? '' : 'none';
@@ -139,9 +113,11 @@ function ucConvert() {
   const cat = window._ucCur;
   if (!_UC_CATS[cat]?.units) return;
   const from = document.getElementById('ucFromUnit').value, to = document.getElementById('ucToUnit').value;
-  const val = parseFloat(document.getElementById('ucFromVal').value) || 0;
+  const raw = document.getElementById('ucFromVal').value;
+  if (!raw.trim()) { document.getElementById('ucToVal').value='';document.getElementById('ucAllResults').replaceChildren();return; }
+  const val = Number(raw);
   let result;
-  try { result = ucConvertValue(cat, val, from, to); } catch { return; }
+  try { result = ucConvertValue(cat, val, from, to); } catch(error) { document.getElementById('ucToVal').value='';document.getElementById('ucAllResults').textContent=error.message;return; }
   document.getElementById('ucToVal').value = String(result);
   document.getElementById('ucAllResults').innerHTML = _UC_CATS[cat].units.map(u => {
     const r = String(ucConvertValue(cat, val, from, u[0]));

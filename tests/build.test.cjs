@@ -22,6 +22,9 @@ test('build preserves CSS math, emits valid JS and versions every source categor
     assert.ok(html.includes('name="toolkit-version" content="' + version + '"'));
     assert.ok(html.includes('app-updates.js?v=' + version));
     assert.ok(html.includes('image-session.js?v=' + version));
+    for (const [, asset] of html.matchAll(/(?:src|href)="([^"?:]+\.(?:js|css))(?:\?[^\"]*)?"/g)) {
+      assert.ok(fs.existsSync(path.join(temp, 'dist', asset)), `HTML references missing release asset: ${asset}`);
+    }
     assert.ok(fs.existsSync(path.join(temp, 'dist/.nojekyll')));
     assert.match(fs.readFileSync(path.join(temp, 'dist/dashboard-components.css'), 'utf8'), /calc\(100% \+ 8px\)/);
     const checkJs = dir => {

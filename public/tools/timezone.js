@@ -37,6 +37,7 @@ function renderTimezone(el) {
           </select>
         </div>
       </div>
+      <label for="tzDst">${getCurrentLang()==='en'?'DST overlap':'夏令时重复时间'}</label><select id="tzDst" class="tool-input" onchange="tzConvert()"><option value="reject">${getCurrentLang()==='en'?'Require an explicit choice':'要求明确选择'}</option><option value="earlier">${getCurrentLang()==='en'?'Earlier instant':'较早时刻'}</option><option value="later">${getCurrentLang()==='en'?'Later instant':'较晚时刻'}</option></select>
       <button class="btn btn-primary" onclick="tzConvert()">${T('convert')}</button>
     </div>
     <div class="tool-card-panel" id="tzResult" style="display:none">
@@ -47,20 +48,21 @@ function renderTimezone(el) {
   now.setMinutes(now.getMinutes()-now.getTimezoneOffset());
   document.getElementById('tzInput').value = now.toISOString().slice(0,16);
   document.getElementById('tzFrom').value = 'Asia/Shanghai';
+  el._toolOutput=()=>el._tzOutput||'';
   tzConvert();
 }
 
-function tzConvert() {
+async function tzConvert() {
   const val = document.getElementById('tzInput').value;
   const fromZone = document.getElementById('tzFrom').value;
-  if (!val) return;
+  const root=document.getElementById('toolBody'),output=document.getElementById('tzOutput'),revision=(root._tzRevision||0)+1;root._tzRevision=revision;root._tzOutput='';
+  if(!val){output.textContent='';return;}
   const T = makeToolI18n(_tzDict);
   const zones = Object.entries(T('places'));
   try {
-    // The entered wall-clock time belongs to the selected source zone, not to this browser's zone.
-    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(val);
-    if (!m) return;
-    const date = new Date(ToolCompute.zonedTimeToUtc({ year: +m[1], month: +m[2], day: +m[3], hour: +m[4], minute: +m[5], second: +(m[6] || 0) }, fromZone));
+    const compute=await ToolCompute.load('date');
+    if(!output.isConnected||root._tzRevision!==revision)return;
+    const date=new Date(compute.instant(val,{timeZone:fromZone,disambiguation:document.getElementById('tzDst').value}));
     const html = zones.map(([tz,label]) => {
       try {
         const str = date.toLocaleString('zh-CN',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
@@ -70,6 +72,8 @@ function tzConvert() {
       } catch(e) { return ''; }
     }).join('');
     document.getElementById('tzOutput').innerHTML = html;
+    root._tzOutput=JSON.stringify({iso:date.toISOString(),from:fromZone});
     document.getElementById('tzResult').style.display = '';
-  } catch(e) { console.error(e); }
+    return {success:true,data:{iso:date.toISOString(),from:fromZone}};
+  } catch(e) {if(output.isConnected&&root._tzRevision===revision){output.textContent=e.message;document.getElementById('tzResult').style.display='';}return {success:false,error:e.message};}
 }

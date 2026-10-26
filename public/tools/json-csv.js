@@ -64,7 +64,7 @@ function renderJsonCsv(el) {
         <label class="jc-json-opt" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="jcFlatten" checked>${T('flatten')}</label>
       </div>
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="convertJsonCsv()">${T('convert')}</button>
+        <button class="btn btn-primary" data-tool-submit onclick="convertJsonCsv()">${T('convert')}</button>
         <button class="btn btn-secondary" onclick="clearJC()">${T('clear')}</button>
         <button class="btn btn-secondary" onclick="loadJCDemo()">${T('demo')}</button>
       </div>
@@ -80,12 +80,17 @@ function renderJsonCsv(el) {
       <textarea class="tool-textarea" id="jcOutput" rows="10" readonly style="font-family:monospace;font-size:12.5px"></textarea>
     </div>`;
   window._jcMode = 'json2csv';
+  const input=el.querySelector('#jcInput');input.dataset.mode='json2csv';
+  const invalidate=()=>{input._revision=(input._revision||0)+1;el.querySelector('#jcResultPanel').style.display='none';el.querySelector('#jcOutput').value='';};
+  el.addEventListener('input',invalidate);el.addEventListener('change',invalidate);window._activeCleanup=invalidate;
+  el._toolOutput=()=>el.querySelector('#jcOutput').value;
   ToolCompute.load('csv').catch(() => {});
 }
 
 function setJsonCsvMode(mode, keepInput = false) {
   const T = makeToolI18n(_jcDict);
   window._jcMode = mode;
+  const input=document.getElementById('jcInput');input.dataset.mode=mode;input._revision=(input._revision||0)+1;
   const toCsv = mode === 'json2csv';
   document.getElementById('modeJsonToCsv').className = toCsv ? 'btn btn-primary' : 'btn btn-secondary';
   document.getElementById('modeCsvToJson').className = toCsv ? 'btn btn-secondary' : 'btn btn-primary';
@@ -100,51 +105,31 @@ function setJsonCsvMode(mode, keepInput = false) {
 }
 
 async function convertJsonCsv() {
-  const T = makeToolI18n(_jcDict);
-  const input = document.getElementById('jcInput').value.trim();
-  const status = document.getElementById('jcStatus'), output = document.getElementById('jcOutput'), panel = document.getElementById('jcResultPanel');
-  if (!input) return;
-  // Follow the content when it clearly belongs to the other direction (also used by the Agent runner).
-  const looksJson = /^[[{]/.test(input);
-  let switched = false;
-  if ((window._jcMode === 'json2csv') !== looksJson) { setJsonCsvMode(looksJson ? 'json2csv' : 'csv2json', true); switched = true; }
+  const T=makeToolI18n(_jcDict),inputNode=document.getElementById('jcInput'),input=inputNode.value;
+  const status=document.getElementById('jcStatus'),output=document.getElementById('jcOutput'),panel=document.getElementById('jcResultPanel');
+  if(!input.trim())return;
+  const looksJson=/^\s*[[{]/.test(input);let switched=false;
+  if((inputNode.dataset.mode==='json2csv')!==looksJson){setJsonCsvMode(looksJson?'json2csv':'csv2json',true);switched=true;}
+  const stamp=(inputNode._revision||0)+1;inputNode._revision=stamp;
+  const options={direction:inputNode.dataset.mode,delimiter:document.getElementById('jcDelimiter').value,header:document.getElementById('jcHeader').checked,infer:document.getElementById('jcInfer').checked,flat:document.getElementById('jcFlatten').checked};
+  panel.style.display='';status.textContent=getCurrentLang()==='en'?'Converting…':'转换中…';output.value='';
   try {
-    const csv = await ToolCompute.load('csv');
-    const chosen = document.getElementById('jcDelimiter').value;
-    let result, message;
-    if (window._jcMode === 'json2csv') {
-      const data = JSON.parse(input);
-      if (data === null || typeof data !== 'object') throw new Error(T('need_array'));
-      const records = Array.isArray(data) ? data : [data];
-      if (!records.length) throw new Error(T('need_array'));
-      const delimiter = chosen === 'auto' ? ',' : chosen;
-      result = csv.stringify(records, { delimiter, flat: document.getElementById('jcFlatten').checked });
-      message = T('ok_csv', records.length, csv.parse(result, { delimiter }).rows[0]?.length || 0);
-      window._jcExt = 'csv';
-    } else {
-      const parsed = csv.parse(input, { delimiter: chosen });
-      const header = document.getElementById('jcHeader').checked;
-      const rows = csv.toObjects(parsed.rows, { header, infer: document.getElementById('jcInfer').checked });
-      if (!rows.length) throw new Error(T('need_rows'));
-      result = JSON.stringify(rows, null, 2);
-      message = T('ok_json', rows.length, T('delimiters')[parsed.delimiter] || parsed.delimiter);
-      window._jcExt = 'json';
-    }
-    output.value = result;
-    status.innerHTML = `<span style="color:#10b981">${escHtml(message)}</span>` + (switched ? ` <span style="font-size:11px;color:var(--text-muted)">${T('switched')}</span>` : '');
-    window._jcLastResult = result;
-  } catch (e) {
-    status.innerHTML = `<span style="color:#e74c3c">${escHtml(T('err', e.message))}</span>`;
-    output.value = '';
-    window._jcLastResult = '';
-  }
-  panel.style.display = '';
+    const csv=await ToolCompute.load('csv');
+    if(!inputNode.isConnected||stamp!==inputNode._revision)return;
+    const data=csv.convert(input,options);
+    if(!inputNode.isConnected||stamp!==inputNode._revision)return;
+    output.value=data.result;output.dataset.extension=data.extension;
+    const message=data.extension==='csv'?T('ok_csv',data.rows,data.columns):T('ok_json',data.rows,T('delimiters')[data.delimiter]||data.delimiter);
+    status.textContent=message+(switched?' · '+T('switched'):'');
+    window._jcLastResult=data.result;window._jcExt=data.extension;
+    return data;
+  }catch(error){if(inputNode.isConnected&&stamp===inputNode._revision){status.textContent=T('err',error.message);output.value='';window._jcLastResult='';}}
 }
 
 function downloadJC() {
-  const content = window._jcLastResult;
+  const output=document.getElementById('jcOutput'),content=output.value;
   if (!content) return;
-  const ext = window._jcExt || 'txt';
+  const ext = output.dataset.extension || 'txt';
   const blob = new Blob([ext === 'csv' ? '﻿' + content : content], { type: ext === 'csv' ? 'text/csv;charset=utf-8' : 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -155,7 +140,7 @@ function downloadJC() {
 
 function clearJC() {
   document.getElementById('jcInput').value = '';
-  document.getElementById('jcResultPanel').style.display = 'none';
+  document.getElementById('jcInput').dispatchEvent(new Event('input',{bubbles:true}));
 }
 
 function loadJCDemo() {

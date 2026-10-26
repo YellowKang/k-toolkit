@@ -72,6 +72,7 @@ function renderDateDiff(el) {
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${T('workdays_note')}</div>
       <div id="ddWorkdays" style="color:var(--neon);font-weight:700;font-size:18px"></div>
     </div>`;
+  el._toolOutput=()=>el._dateOutput||'';
   ddSetToday();
 }
 
@@ -88,18 +89,13 @@ function ddSwap() {
   ddCalc();
 }
 
-function ddCalc() {
+async function ddCalc() {
   const T = makeToolI18n(_ddDict);
-  const from = ToolCompute.parseLocalDate(document.getElementById('ddFrom').value);
-  const to = ToolCompute.parseLocalDate(document.getElementById('ddTo').value);
-  const output = document.getElementById('ddOutput');
-  if (!from || !to) {
-    output.innerHTML = `<div style="color:#ef4444;font-size:13px">${T('invalid')}</div>`;
-    document.getElementById('ddWorkdays').textContent = '';
-    document.getElementById('ddResult').style.display = '';
-    return;
-  }
-  const diff = ToolCompute.calendarDiff(from, to);
+  const root=document.getElementById('toolBody'),fromValue=document.getElementById('ddFrom').value,toValue=document.getElementById('ddTo').value;
+  const revision=(root._dateRevision||0)+1;root._dateRevision=revision;root._dateOutput='';
+  const output=document.getElementById('ddOutput');let data,diff;
+  try { const compute=await ToolCompute.load('date'); if(root._dateRevision!==revision||!output.isConnected)return;data=compute.diff(fromValue,toValue);diff=data.calendar;root._dateOutput=JSON.stringify(data,null,2); }
+  catch(e){if(!output.isConnected||root._dateRevision!==revision)return;output.textContent=e.message;document.getElementById('ddWorkdays').textContent='';document.getElementById('ddResult').style.display='';return {success:false,error:e.message};}
   const abs = diff.totalDays;
   const direction = abs === 0 ? T('same_day') : diff.sign > 0 ? T('after') : T('before');
   output.innerHTML = [
@@ -109,5 +105,6 @@ function ddCalc() {
     [T('total_months'), T('months', diff.totalMonths), 'var(--text)'],
   ].map(([label, value, color]) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:10px 14px;background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:10px;margin-bottom:8px"><span style="color:var(--text-muted)">${label}</span><span style="font-weight:700;color:${color};text-align:right">${value}</span></div>`).join('');
   document.getElementById('ddResult').style.display = '';
-  document.getElementById('ddWorkdays').textContent = T('workdays_val', ToolCompute.weekdaysBetween(from, to));
+  document.getElementById('ddWorkdays').textContent = T('workdays_val', data.weekdays);
+  return {success:true,data};
 }

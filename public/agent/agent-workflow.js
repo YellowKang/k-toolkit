@@ -3,11 +3,18 @@
 // Explicit allowlist: discovering an action does not make it safe to compose.
 window.AgentWorkflow = (() => {
   const outputs = {
+    date_diff: ['data.days','data.calendar','data.weekdays'], color_convert: ['data.result','data.formats'], ip_calc: ['data.network','data.usableHosts'], timestamp_convert: ['data.result','data.iso'], timezone_convert: ['data.result','data.iso'],
     base64_encode: ['data.result'], base64_decode: ['data.result'],
     json_format: ['data.result'], json_validate: ['data.valid'], json_extract: ['data.result', 'data.value'],
+    json_unescape: ['data.result'], json_expand: ['data.result', 'data.count', 'data.layers'],
+    string_escape: ['data.result'], sql_format: ['data.result'],
     text_lines: ['data.result'], case_convert: ['data.result'], wordcount: ['data'],
     hash_generate: ['data.hash'], hash_all: ['data.results'], hmac_generate: ['data.hash'],
-    url_encode: ['data.result'], url_decode: ['data.result'],
+    url_encode: ['data.result'], url_decode: ['data.result'], url_parse: ['data.entries','data.params','data.result'], url_build: ['data.result'],
+    json_to_csv: ['data.result','data.rows'], csv_to_json: ['data.result','data.rows'],
+    json_schema_generate: ['data.result'], json_schema_validate: ['data.valid','data.errors'],
+    yaml_to_json: ['data.result'], json_to_yaml: ['data.result'], toml_to_json: ['data.result'], json_to_toml: ['data.result','data.dropped'],
+    xml_format: ['data.result'], xml_to_json: ['data.result'], calculate: ['data.result'], unit_convert: ['data.result'],
   };
   const LIMIT = 65536;
   const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
@@ -34,7 +41,7 @@ window.AgentWorkflow = (() => {
     if (parts.length < 2 || parts[1] !== 'data' || parts.some(part => !part || !safeKey(part))) throw new Error('Invalid result reference: ' + ref);
     return parts;
   }
-  async function run({ steps }, { signal, onProgress } = {}) {
+  async function run({ steps, returnSteps }, { signal, onProgress } = {}) {
     const log = [];
     let activeStep = null;
     try {
@@ -58,6 +65,7 @@ window.AgentWorkflow = (() => {
         if (!hasRefs) validateAgentInput(step.params, action.parameters);
         known.add(step.id); actions.set(step.id, action);
       }
+      if (returnSteps !== undefined && (!Array.isArray(returnSteps) || returnSteps.length > 12 || new Set(returnSteps).size !== returnSteps.length || returnSteps.some(id => !known.has(id)))) throw new Error('returnSteps must contain unique existing step IDs (up to 12)');
       const results = new Map();
       for (const step of steps) {
         checkCancelled(signal);
@@ -89,7 +97,10 @@ window.AgentWorkflow = (() => {
         await new Promise(resolve => setTimeout(resolve, 0));
       }
       checkCancelled(signal);
-      return { success: true, data: { result: results.get(steps.at(-1).id).data, steps: log, completed: log.length, total: steps.length }, display: summary(log.length, steps.length, true) };
+      const data = { result: results.get(steps.at(-1).id).data, steps: log, completed: log.length, total: steps.length };
+      if (returnSteps?.length) data.outputs = Object.fromEntries(returnSteps.map(id => [id, results.get(id).data]));
+      checkSize(data);
+      return { success: true, data, display: summary(log.length, steps.length, true) };
     } catch (error) {
       onProgress?.({ step: activeStep, state: error.name === 'AbortError' ? 'cancelled' : 'failed', completed: log.length, total: steps?.length || 0 });
       return { success: false, error: error.message, data: { steps: log, failedStep: activeStep, completed: log.length, total: steps?.length || 0 }, display: summary(log.length, steps?.length || 0, false) + ': ' + error.message };
@@ -109,6 +120,14 @@ window.AgentWorkflow = (() => {
       { id: 'clean', action: 'text_lines', params: { input, trim: true, removeEmpty: true, deduplicate: true } },
       { id: 'encode', action: 'base64_encode', params: { text: ref('clean') } },
     ] },
+    { id: 'csv-json-schema', name: 'CSV → JSON → infer Schema', build: input => [
+      { id:'csv',action:'csv_to_json',params:{input} },
+      { id:'schema',action:'json_schema_generate',params:{input:ref('csv')} },
+    ] },
+    { id: 'yaml-json', name: 'YAML → JSON → format', build: input => [
+      { id:'yaml',action:'yaml_to_json',params:{input} },
+      { id:'format',action:'json_format',params:{input:ref('yaml')} },
+    ] },
     { id: 'json-sha256', name: 'Minify JSON → SHA-256 (preserves key order)', build: input => [
       { id: 'json', action: 'json_format', params: { input, minify: true } },
       { id: 'hash', action: 'hash_generate', params: { text: ref('json'), algo: 'SHA-256' } },
@@ -120,9 +139,9 @@ window.AgentWorkflow = (() => {
 window.WorkflowActions = [
   {
     name: 'run_workflow',
-    description: '串联已发现的本地计算动作（最多12步）。params 内可用 {"$ref":"earlierStep.data.result"} 引用前一步结果，hash_generate 用 data.hash。仅支持 search_tools 返回 workflow:true 的动作；失败立即停止，不发起网络或页面操作。',
+    description: '串联已发现的本地计算动作（最多12步）。params 内可用 {"$ref":"earlierStep.data.result"} 引用前一步结果，hash_generate 用 data.hash。默认返回最后一步；需要中间结果时用 returnSteps 指定步骤 ID，一次返回 data.outputs[id]，无需重复执行。仅支持 search_tools 返回 workflow:true 的动作；失败立即停止，不发起网络或页面操作。',
     meta: { tier: 'standard', tags: ['workflow', 'pipeline', 'chain', '串联', '流程', '先', '再'], category: 'composite' },
-    parameters: { type: 'object', properties: { steps: { type: 'array', minItems: 1, maxItems: 12, items: { type: 'object', properties: { id: { type: 'string', minLength: 1, maxLength: 40 }, action: { type: 'string' }, params: { type: 'object' } }, required: ['id', 'action', 'params'], additionalProperties: false } } }, required: ['steps'], additionalProperties: false },
+    parameters: { type: 'object', properties: { steps: { type: 'array', minItems: 1, maxItems: 12, items: { type: 'object', properties: { id: { type: 'string', minLength: 1, maxLength: 40 }, action: { type: 'string' }, params: { type: 'object' } }, required: ['id', 'action', 'params'], additionalProperties: false } }, returnSteps: { type: 'array', maxItems: 12, items: { type: 'string' }, description: '需要同时返回的步骤 ID，例如 ["format","hash"]。可选，默认只返回最后一步。' } }, required: ['steps'], additionalProperties: false },
     execute: (params, context) => window.AgentWorkflow.run(params, context),
   },
   {
@@ -132,9 +151,9 @@ window.WorkflowActions = [
     execute: () => ({ success: true, data: { templates: window.AgentWorkflow.list(), actions: window.AgentWorkflow.outputs }, display: window.AgentWorkflow.list().map(t => t.id + ': ' + t.name).join('\n') }),
   },
   {
-    name: 'run_workflow_template', description: '执行内置本地模板：decode-json、clean-base64 或 json-sha256。通过引用传递结果，失败即停止。',
+    name: 'run_workflow_template', description: '执行内置本地模板：decode-json、clean-base64、json-sha256、csv-json-schema 或 yaml-json。通过引用传递结果，失败即停止。',
     meta: { tier: 'standard', tags: ['workflow', 'template', 'base64', 'json', 'hash', '模板', '串联'], category: 'composite' },
-    parameters: { type: 'object', properties: { template: { type: 'string', enum: ['decode-json', 'clean-base64', 'json-sha256'] }, input: { type: 'string', maxLength: 65536 } }, required: ['template', 'input'], additionalProperties: false },
+    parameters: { type: 'object', properties: { template: { type: 'string', enum: ['decode-json', 'clean-base64', 'json-sha256', 'csv-json-schema', 'yaml-json'] }, input: { type: 'string', maxLength: 65536 } }, required: ['template', 'input'], additionalProperties: false },
     execute: ({ template, input }, context) => {
       const selected = window.AgentWorkflow.templates.find(item => item.id === template);
       if (!selected) return { success: false, error: 'Unknown workflow template' };

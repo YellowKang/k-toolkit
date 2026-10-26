@@ -4,6 +4,9 @@
 function registerActions() {
   const all = [
     ...(window.DataActions || []),
+    ...(window.FileActions || []),
+    ...(window.GeneralFileActions || []),
+    ...(window.ResultActions || []),
     ...(window.WorkflowActions || []),
     ...(window.TextActions      || []),
     ...(window.DevActions       || []),

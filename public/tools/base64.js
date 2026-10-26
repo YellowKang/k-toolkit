@@ -73,7 +73,7 @@ const _b64I18nDict = {
   },
 };
 
-let _b64T = null;
+let _b64T = null, _b64FileRun=null;
 
 function renderBase64(el) {
   _b64T = makeToolI18n(_b64I18nDict);
@@ -94,7 +94,7 @@ function renderBase64(el) {
       </div>
       <textarea class="tool-textarea" id="b64Input" rows="6" placeholder="${T('input_ph')}"></textarea>
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="encodeB64()">${T('encode')}</button>
+        <button class="btn btn-primary" data-tool-submit onclick="encodeB64()">${T('encode')}</button>
         <button class="btn btn-primary" onclick="decodeB64()">${T('decode')}</button>
         <button class="btn btn-secondary" onclick="b64Swap()">${T('swap')}</button>
         <button class="btn btn-secondary" onclick="clearB64()">${T('clear')}</button>
@@ -153,6 +153,8 @@ function renderBase64(el) {
 
   document.getElementById('b64Input').addEventListener('input', _b64OnChange);
   window._b64LastOp = 'encode';
+  const staged=FileSession.mount(el,{onUse:files=>_b64HandleFile(files[0])});
+  window._activeCleanup=()=>{_b64FileRun?.abort();_b64FileRun=null;staged.dispose();};
 }
 
 /* ── Text mode functions (unchanged logic) ── */
@@ -249,96 +251,31 @@ function _b64FileDrop(e) {
   if (file) _b64HandleFile(file);
 }
 
-function _b64HandleFile(file) {
-  if (!file) return;
-  const T = _b64T || makeToolI18n(_b64I18nDict);
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const dataUrl = e.target.result;
-    const previewImg = document.getElementById('b64FilePreview');
-    const isImage = file.type.startsWith('image/');
-
-    // Show thumbnail if image
-    if (isImage) {
-      previewImg.src = dataUrl;
-      previewImg.style.display = '';
-    } else {
-      previewImg.style.display = 'none';
-    }
-
-    // File info
-    const sizeKB = (file.size / 1024).toFixed(2);
-    document.getElementById('b64FileInfo').innerHTML =
-      `<div>${T('file_name')}: <strong>${escHtml(file.name)}</strong></div>
-       <div>${T('file_size')}: <strong>${sizeKB} KB</strong></div>
-       <div>${T('file_type')}: <strong>${escHtml(file.type || 'unknown')}</strong></div>
-       <div>${T('b64_length')}: <strong>${dataUrl.length}</strong> ${T('chars', '')}</div>`;
-
-    document.getElementById('b64FileDataUrl').value = dataUrl;
-    document.getElementById('b64FileResultPanel').style.display = '';
-  };
-  reader.readAsDataURL(file);
+async function _b64HandleFile(file) {
+  if(!file)return;_b64FileRun?.abort();const controller=new AbortController();_b64FileRun=controller;
+  const T=_b64T,root=document.getElementById('b64FileResultPanel'),info=document.getElementById('b64FileInfo'),preview=document.getElementById('b64FileDataUrl');
+  root.style.display='';info.textContent=getCurrentLang()==='en'?'Processing…':'处理中…';preview.value='';document.getElementById('b64FilePreview').style.display='none';
+  root.querySelector('button[onclick]').disabled=true;
+  root.querySelector('[data-file-controls]')?.remove();const controls=document.createElement('div');controls.dataset.fileControls='';controls.className='tool-actions';const cancel=document.createElement('button');cancel.className='btn btn-secondary';cancel.textContent=getCurrentLang()==='en'?'Cancel':'取消';cancel.onclick=()=>{controller.abort();info.textContent=getCurrentLang()==='en'?'Cancelled':'已取消';cancel.disabled=true;};controls.append(cancel);root.append(controls);
+  try{
+    FileSession.replace([file]);const generation=FileSession.generation(),source=FileSession.list().find(x=>x.origin==='selected');
+    const output=await(await ToolCompute.load('file')).convert(file,'base64_encode',{dataUrl:true},{signal:controller.signal});
+    if(controller.signal.aborted||!root.isConnected||_b64FileRun!==controller)return;FileSession.getFile(source.id);
+    const artifact=FileSession.addResult(output.blob,output.name,generation);const text=await output.blob.slice(0,64000).text();
+    if(controller.signal.aborted||!root.isConnected||_b64FileRun!==controller)return;
+    preview.value=text;info.textContent=file.name+' · '+file.size+' B'+(output.blob.size>64000?(getCurrentLang()==='en'?' · Preview truncated; copy / download keeps full output.':' · 预览已截断，复制和下载保留完整内容。'):'');
+    const copy=root.querySelector('button[onclick]');copy.disabled=false;copy.onclick=async()=>{try{const full=await FileSession.getFile(artifact.id).text();copyText(full,copy);}catch(e){showToast(e.message,'error');}};
+    controls.replaceChildren();const download=document.createElement('button');download.className='btn btn-secondary';download.dataset.fileDownload=artifact.id;download.textContent=getCurrentLang()==='en'?'Download / reuse result':'下载结果（可继续复用）';download.onclick=()=>{try{FileSession.download(artifact.id);}catch(e){showToast(e.message,'error');}};controls.append(download);
+    return {success:true,data:{files:[artifact]}};
+  }catch(e){if(!controller.signal.aborted&&root.isConnected&&_b64FileRun===controller)info.textContent=e.message;return {success:false,error:e.message};}
 }
-
-function _b64RestoreFile() {
-  const T = _b64T || makeToolI18n(_b64I18nDict);
-  const val = document.getElementById('b64RestoreInput').value.trim();
-  const previewDiv = document.getElementById('b64RestorePreview');
-
-  // Validate data URL format
-  const match = val.match(/^data:([^;,]+)?;base64,(.+)$/s);
-  if (!match) {
-    showToast(T('restore_fail'), 'error');
-    previewDiv.innerHTML = '';
-    return;
-  }
-
-  const mime = match[1] || 'application/octet-stream';
-  const b64Data = match[2];
-
-  // Decode base64 to binary
-  let byteString;
-  try {
-    byteString = atob(b64Data);
-  } catch {
-    showToast(T('restore_fail'), 'error');
-    previewDiv.innerHTML = '';
-    return;
-  }
-
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-  const blob = new Blob([ab], { type: mime });
-
-  // Determine filename extension from MIME
-  const ext = _b64MimeToExt(mime);
-  const filename = 'restored-file' + ext;
-
-  // Trigger download
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-
-  showToast(T('restore_ok'), 'success');
-
-  // If it's an image, show preview
-  if (mime.startsWith('image/')) {
-    previewDiv.replaceChildren();
-    const label = document.createElement('div'); label.className = 'panel-label'; label.textContent = T('preview');
-    const image = document.createElement('img'); image.src = val;
-    image.style.cssText = 'max-width:100%;max-height:300px;border-radius:10px;display:block';
-    image.addEventListener('error', () => image.remove()); previewDiv.append(label, image);
-  } else {
-    previewDiv.innerHTML = '';
-  }
+async function _b64RestoreFile(){
+  _b64FileRun?.abort();const controller=new AbortController();_b64FileRun=controller;const root=document.getElementById('b64RestorePreview'),input=document.getElementById('b64RestoreInput'),value=input.value,generation=FileSession.generation();root.textContent='';
+  try{
+    const compute=await ToolCompute.load('file'),file=new File([value],'restored-file.txt',{type:'text/plain'}),output=await compute.convert(file,'base64_decode',{}, {signal:controller.signal});
+    if(controller.signal.aborted||!root.isConnected||input.value!==value)return;
+    const artifact=FileSession.addResult(output.blob,'restored-file'+(_b64MimeToExt(output.blob.type)||'.bin'),generation);FileSession.download(artifact.id);root.textContent=_b64T('restore_ok');return {success:true,data:{files:[artifact]}};
+  }catch(e){if(!controller.signal.aborted&&root.isConnected)root.textContent=e.message;return {success:false,error:e.message};}
 }
 
 function _b64MimeToExt(mime) {

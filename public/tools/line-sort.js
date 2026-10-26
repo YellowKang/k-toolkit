@@ -22,7 +22,7 @@ window.renderLineSort = function(el) {
         <label><input type="checkbox" id="lsEmpty" checked> ${t('noempty')}</label>
         <label><input type="checkbox" id="lsDedup" checked> ${t('dedup')}</label>
         <label>${t('order')} <select id="lsSort" class="tool-input">${['none','asc','desc','reverse'].map(op=>`<option value="${op}">${t(op)}</option>`).join('')}</select></label>
-        <button type="button" class="btn btn-primary" id="lsClean">${t('clean')}</button>
+        <button type="button" class="btn btn-primary" id="lsClean" data-tool-submit>${t('clean')}</button>
       </div>
     </div>`;
   el.querySelectorAll('[data-line-op]').forEach(button => button.addEventListener('click',()=>doLineSort(button.dataset.lineOp)));

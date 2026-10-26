@@ -13,7 +13,8 @@ const _pgDict = {
   },
 };
 
-function renderPaletteGen(el) {
+async function renderPaletteGen(el) {
+  await ToolCompute.load('color');if(!el.isConnected||window.currentPage!=='palette-gen')return;el._toolOutput=()=>el._paletteOutput||'';
   const T = makeToolI18n(_pgDict);
   el.innerHTML = `
     <div class="tool-card-panel">
@@ -39,10 +40,7 @@ function renderPaletteGen(el) {
   });
   document.getElementById('pgHex').addEventListener('input', function() {
     const v = this.value.trim();
-    if (/^#[0-9a-f]{6}$/i.test(v)) {
-      document.getElementById('pgPicker').value = v;
-      genPalette();
-    }
+    genPalette();
   });
   document.getElementById('pgHex').addEventListener('keydown', e => { if(e.key==='Enter') genPalette(); });
   genPalette();
@@ -56,25 +54,11 @@ function pgSetColor(c) {
 
 function genPalette() {
   const T = makeToolI18n(_pgDict);
-  const hex = document.getElementById('pgHex').value.trim();
-  if (!/^#[0-9a-f]{6}$/i.test(hex)) return;
-  const [r,g,b] = [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
-  const {h,s,l} = _pgRgbToHsl(r,g,b);
-
-  // 生成 10 级 shade（深）和 tint（浅）
-  const shades = [90,80,70,60,50,40,30,20,10,5].map(lv => _pgHslToHex(h, s, lv));
-  const tints  = [95,90,85,80,70,60,50,40,30,20].map(lv => _pgHslToHex(h, Math.min(s,60), lv));
-  const scale  = [95,90,80,70,60,50,40,30,20,10].map((lv,i) => ({ hex: _pgHslToHex(h, s*0.8+i*2, lv), name: (i+1)*100 }));
-
-  // 互补色、三角色
-  const comp   = _pgHslToHex((h+180)%360, s, l);
-  const tri1   = _pgHslToHex((h+120)%360, s, l);
-  const tri2   = _pgHslToHex((h+240)%360, s, l);
-  const split1 = _pgHslToHex((h+150)%360, s, l);
-  const split2 = _pgHslToHex((h+210)%360, s, l);
-  const ana1   = _pgHslToHex((h+30)%360, s, l);
-  const ana2   = _pgHslToHex((h-30+360)%360, s, l);
-
+  const root=document.getElementById('toolBody');root._paletteOutput='';let data;
+  try{data=KCompute.color.palette(document.getElementById('pgHex').value.trim());}catch(e){document.getElementById('pgResult').style.display='';document.getElementById('pgContent').textContent=e.message;return {success:false,error:e.message};}
+  root._paletteOutput=JSON.stringify(data,null,2);const hex=data.base,scale=data.scale,{r,g,b}=KCompute.color.parse(hex),{h,s,l}=KCompute.color.rgbHsl(r,g,b);
+  document.getElementById('pgPicker').value=hex;
+  const comp=data.schemes.complementary[1].hex,[tri1,tri2]=data.schemes.triadic.slice(1).map(c=>c.hex),[split1,split2]=data.schemes.split.slice(1).map(c=>c.hex),[ana1,ana2]=data.schemes.analogous.slice(1).map(c=>c.hex);
   const luminance = (0.299*r + 0.587*g + 0.114*b)/255;
   const textOn = luminance > 0.45 ? '#1a1a2e' : '#ffffff';
 
@@ -140,22 +124,8 @@ ${scale.map(c => `  --color-${c.name}: ${c.hex};`).join('\n')}
 }</pre>
       <button class="btn btn-secondary" style="margin-top:8px" onclick="copyText(document.querySelector('.result-box').textContent,this)">${T('copy_vars')}</button>
     </div>`;
+  return {success:true,data};
 }
 
-function _pgRgbToHsl(r,g,b) {
-  r/=255;g/=255;b/=255;
-  const max=Math.max(r,g,b),min=Math.min(r,g,b);
-  let h=0,s=0,l=(max+min)/2;
-  if(max!==min){const d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);
-    if(max===r)h=(g-b)/d+(g<b?6:0);
-    else if(max===g)h=(b-r)/d+2;
-    else h=(r-g)/d+4;h=h*60;}
-  return {h:Math.round(h),s:Math.round(s*100),l:Math.round(l*100)};
-}
-
-function _pgHslToHex(h,s,l) {
-  s/=100;l/=100;
-  const a=s*Math.min(l,1-l);
-  const f=n=>{const k=(n+h/30)%12;const c=l-a*Math.max(Math.min(k-3,9-k,1),-1);return Math.round(255*c).toString(16).padStart(2,'0');};
-  return '#'+f(0)+f(8)+f(4);
-}
+function _pgRgbToHsl(r,g,b){return KCompute.color.rgbHsl(r,g,b);}
+function _pgHslToHex(h,s,l){return KCompute.color.formats({...KCompute.color.hsl(h,s,l),a:1}).hex;}

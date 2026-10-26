@@ -34,7 +34,7 @@ function renderXmlFormat(el) {
       <div class="panel-label">${T('input')}</div>
       <textarea class="tool-textarea" id="xmlInput" rows="10" spellcheck="false" style="font-family:monospace" placeholder="<root><item id=&quot;1&quot;>value</item></root>" oninput="_xmlRealtime()"></textarea>
       <div class="tool-actions">
-        <button class="btn btn-primary" onclick="doXml()">${T('run')}</button>
+        <button class="btn btn-primary" data-tool-submit onclick="doXml()">${T('run')}</button>
         <button class="btn btn-secondary" onclick="xmlLoadDemo()">${T('demo')}</button>
         <button class="btn btn-secondary" onclick="document.getElementById('xmlInput').value='';document.getElementById('xmlResult').style.display='none'">${T('clear')}</button>
       </div>

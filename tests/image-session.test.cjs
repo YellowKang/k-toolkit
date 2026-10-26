@@ -12,7 +12,8 @@ test('image session preserves File references, exposes metadata and clears refer
   const store = setup(); const file = new File(['image bytes'], '<image>.png', { type: 'image/png' });
   assert.equal(store.replace([file]), true); assert.equal(store.getFiles()[0], file);
   const returned = store.getFiles(); returned.pop(); assert.equal(store.getFiles().length, 1);
-  assert.deepEqual(JSON.parse(JSON.stringify(store.metadata())), [{ name: file.name, size: file.size, type: file.type }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(store.metadata())), [{ id: store.metadata()[0].id, name: file.name, size: file.size, type: file.type }]);
+  assert.ok(store.metadata()[0].id);
   assert.equal(JSON.stringify(store.metadata()).includes('image bytes'), false);
   store.clear(); assert.equal(store.getFiles().length, 0);
 });

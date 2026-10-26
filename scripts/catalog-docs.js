@@ -12,11 +12,11 @@ const lines = [
   '# 工具目录 / Tool catalog', '',
   '> 由 `npm run docs:catalog` 从 `public/tool-catalog.js` 生成；请勿手工修改。', '',
   `${catalog.tools.length} 个能力入口；${catalog.entries.length - 1} 个分类导航入口 + 1 个 AI 入口；${Object.keys(catalog.categories).length} 个分类；${catalog.workbenches.length} 组工作台。`, '',
-  '工作台合并导航入口，各子工具仍使用原 ID。搜索、收藏、最近使用与 Agent 可以直接访问子工具。图片压缩、WebP 和图片 Base64 支持显式复用当前标签页暂存文件；其他工具仍保留独立输入。', '',
+  '工作台合并导航入口，各子工具仍使用原 ID。搜索、收藏、最近使用与 Agent 可以直接访问子工具。图片压缩与 WebP 共用批量队列，HTTP/cURL 共用请求配置，单位工具复用完整存储与带宽换算。普通文本工具保留当前标签页草稿，通过“继续处理”显式传递输入或结果；敏感工具不进入通用草稿。', '',
   '## 工作台 / Workbenches', '', '| 工作台 | 能力 ID（首项为主入口） |', '| --- | --- |',
   ...catalog.workbenches.map(group => `| ${group.name.zh} / ${group.name.en} | ${group.tools.map(id => '`' + id + '`').join(' · ')} |`), '',
   '## 保持独立的能力', '',
-  '图片 Base64、EXIF、Favicon 具有不同输入输出；JWT、AES 与哈希的语义不同；JSON/YAML/TOML/CSV 的格式语义不同。本轮归类并关联入口，继续保留各自工具，不以减少卡片数量牺牲功能。', '',
+  '图片 Base64、EXIF、Favicon 具有不同输入输出；JWT、AES 与哈希的语义不同；JSON/YAML/TOML/CSV 的格式语义不同。工作台保留各自解析和处理语义，旧链接与收藏继续有效。', '',
 ];
 for (const [category, meta] of Object.entries(catalog.categories)) {
   const tools = catalog.tools.filter(tool => tool.category === category);

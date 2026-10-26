@@ -27,6 +27,11 @@ async function run(kind){
   await chooser.setFiles(fixture);await compress();
   assert.equal((await getDownload('[data-download]')).subarray(0,2).toString('hex'),'ffd8');
   assert.equal((await getDownload('[data-download]')).subarray(0,2).toString('hex'),'ffd8');
+  await page.getByRole('button',{name:'转为 Base64',exact:true}).click();
+  await page.locator('#imgResultPanel').waitFor();
+  assert.equal(Buffer.from((await page.locator('#imgB64Output').inputValue()).split(',')[1],'base64').subarray(0,2).toString('hex'),'ffd8');
+  await route('img-compress','#imgFileInput');
+  assert.equal((await getDownload('[data-download]')).subarray(0,2).toString('hex'),'ffd8','completed results survive navigation');
   // Reuse the generated JPEG in Base64 without choosing/uploading another file.
   await page.locator('[data-stage-result]').click();
   await route('img-base64','#imgFile'); await page.locator('[data-reuse]').click();
@@ -55,19 +60,35 @@ async function run(kind){
   await compress();assert.match(await page.locator('#imgSelectedName').textContent(),/dropped.png/);
   await route('img-webp','#iwFile');
   const [batchChooser]=await Promise.all([page.waitForEvent('filechooser'),page.locator('#iwDrop').click()]);
-  await batchChooser.setFiles([fixture,{...fixture,name:'second.png'}]);
+  await batchChooser.setFiles([fixture,{...fixture,name:'second.png'}]);await page.locator('#imgCompressRun').click();
   await page.waitForFunction(()=>document.querySelectorAll('#iwList button[data-download]:not([hidden])').length===2);
   assert.equal(await page.locator('#iwList > div').count(),2);
   const webp=await getDownload('#iwList > div:first-child button[data-download]');assert.equal(webp.subarray(8,12).toString(),'WEBP');
   assert.equal((await getDownload('#iwList > div:first-child button[data-download]')).subarray(8,12).toString(),'WEBP');
-  await page.locator('#iwFile').setInputFiles({name:'corrupt.png',mimeType:'image/png',buffer:Buffer.from('broken')});
+  await page.locator('#imgFormat').selectOption('image/png');
+  assert.equal(await page.locator('#iwQuality').isDisabled(),true);
+  await page.locator('#imgCompressRun').click();
+  await page.waitForFunction(()=>document.querySelectorAll('#iwList button[data-download]').length===2);
+  assert.equal((await getDownload('#iwList > div:first-child button[data-download]')).subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+  await page.evaluate(()=>setLang('en'));
+  await page.waitForFunction(()=>document.querySelector('#imgCompressRun')?.textContent==='Compress / convert');
+  assert.equal(await page.locator('#imgFormat').inputValue(),'image/png','language change preserves selected format');
+  await page.evaluate(()=>setLang('zh'));
+  await page.waitForFunction(()=>document.querySelector('#imgCompressRun')?.textContent==='压缩 / 转换');
+  await route('img-compress','#imgFileInput');
+  assert.equal(await page.locator('#iwList > div').count(),2,'both legacy routes share the batch');
+  await route('img-webp','#iwFile');
+  await page.locator('#iwFile').setInputFiles(Array.from({length:21},(_,i)=>({...fixture,name:`limit-${i}.png`})));
+  assert.match(await page.locator('#iwStatus').textContent(),/20/);
+  assert.equal(await page.locator('#iwList > div').count(),2,'oversized selection keeps the prior batch');
+  await page.locator('#iwFile').setInputFiles({name:'corrupt.png',mimeType:'image/png',buffer:Buffer.from('broken')});await page.locator('#imgCompressRun').click();
   await page.waitForFunction(()=>[...document.querySelectorAll('#iwList [data-info]')].some(el=>el.textContent.includes('无法解码')));
   await page.locator('#iwFile').setInputFiles([fixture,{...fixture,name:'reuse-second.png'}]);
   await route('img-base64','#imgFile');
   assert.match(await page.locator('[data-reuse]').textContent(),/第一张/);
   await page.locator('[data-reuse]').click(); await page.locator('#imgResultPanel').waitFor();
   assert.equal((await page.locator('#imgB64Output').inputValue()).split(',')[1],base64);
-  await route('img-webp','#iwFile'); await page.locator('[data-reuse]').click();
+  await route('img-webp','#iwFile'); await page.locator('[data-reuse]').click();await page.locator('#imgCompressRun').click();
   await page.waitForFunction(()=>document.querySelectorAll('#iwList button[data-download]:not([hidden])').length===2);
   await route('img-base64','#imgFile');await page.locator('#imgFile').setInputFiles(fixture);await page.locator('#imgResultPanel').waitFor();
   await route('img-compress','#imgFileInput');await page.locator('#imgFileInput').setInputFiles(fixture);await compress();
@@ -76,13 +97,18 @@ async function run(kind){
   await page.evaluate(()=>setLang('en'));await page.locator('#imgCompressRun').waitFor();assert.equal(await page.locator('#imgCompressRun').textContent(),'Compress / convert');
   // Dispose while encoding: delayed results must not write into the next page.
   await page.locator('#imgFileInput').setInputFiles(fixture);
-  await page.evaluate(()=>{const original=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(...args){setTimeout(()=>original.apply(this,args),120)}});
+  await page.evaluate(()=>{const original=HTMLCanvasElement.prototype.toBlob;HTMLCanvasElement.prototype.toBlob=function(...args){setTimeout(()=>original.apply(this,args),500)}});
+  await page.locator('#imgCompressRun').click();await page.locator('#imageCancel').click();
+  await page.waitForTimeout(650);
+  assert.equal(await page.locator('#imgCompressRun').isEnabled(),true);
+  assert.equal(await page.locator('[data-download]').count(),0,'cancelled encoding cannot publish a result');
+  assert.match(await page.locator('#iwList').textContent(),/Cancelled/);
   await page.locator('#imgCompressRun').click();await route('img-base64','#imgFile');
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(650);
   await page.reload(); await page.locator('#imgFile').waitFor({state:'attached'});
   assert.equal(await page.evaluate(()=>ImageSession.metadata().length),0,'refresh must clear in-memory files');
   assert.deepEqual(errors,[]);
-  console.log(kind+': PASS chooser, keyboard, round-trip navigation, drag/drop, multi-file WebP, repeat download, corrupt/invalid files, literal filenames, safe preview, 375/768 layouts, English, disposal');
+  console.log(kind+': PASS chooser, keyboard, shared batch, JPEG/PNG/WebP, direct Base64 handoff, limits, repeat download, invalid files, safe preview, 375/768 layouts, English, cancel, disposal');
  }finally{await browser.close()}
 }
 (async()=>{

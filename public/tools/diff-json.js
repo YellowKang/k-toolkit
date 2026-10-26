@@ -23,7 +23,7 @@ window.renderDiffJson = function(el) {
       <textarea class="tool-textarea" id="djInputB" rows="10" placeholder="${T('paste', 'JSON B')}"></textarea>
     </div>
     <div style="text-align:center;margin:8px 0">
-      <button class="btn btn-primary" onclick="djCompare()">${T('compare')}</button>
+      <button class="btn btn-primary" data-tool-submit onclick="djCompare()">${T('compare')}</button>
       <button class="btn btn-secondary" onclick="djClear()">${T('clear')}</button>
     </div>
     <div class="tool-card-panel" id="djResult" style="display:none">
@@ -32,21 +32,36 @@ window.renderDiffJson = function(el) {
       </div>
       <div id="djOutput" style="font-family:monospace;font-size:13px;line-height:1.7;max-height:420px;overflow-y:auto"></div>
     </div>`;
+  for (const id of ['djInputA', 'djInputB']) el.querySelector('#' + id).addEventListener('input', () => {
+    _djRevision++; el.querySelector('#djResult').style.display = 'none'; el.querySelector('#djOutput')._diffs = null;
+  });
 };
 
-function djCompare() {
+let _djRevision=0;
+async function djCompare() {
+  const revision=++_djRevision;
   const T = makeToolI18n(_djDict);
   var a = document.getElementById('djInputA').value.trim();
   var b = document.getElementById('djInputB').value.trim();
   var status = document.getElementById('djStatus');
   var result = document.getElementById('djResult');
   var out = document.getElementById('djOutput');
+  out._diffs = null;
   result.style.display = '';
   var objA, objB;
   try { objA = JSON.parse(a); } catch(e) { status.textContent = T('invalid', 'JSON A', e.message); status.style.color='#e74c3c'; out.innerHTML=''; return; }
   try { objB = JSON.parse(b); } catch(e) { status.textContent = T('invalid', 'JSON B', e.message); status.style.color='#e74c3c'; out.innerHTML=''; return; }
-  var lines = [];
-  djDiff(objA, objB, '', lines);
+  let lines;
+  try {
+    const compute=await ToolCompute.load('json-diff');
+    if(!out.isConnected || revision!==_djRevision || document.getElementById('djInputA').value.trim()!==a || document.getElementById('djInputB').value.trim()!==b)return {success:false,cancelled:true};
+    const diffs=compute.compareText(a,b);
+    lines=diffs.map(row=>djLine(row.path || '$',row.type==='removed'?row.value:row.from,row.type==='added'?row.value:row.to,row.type));
+    out._diffs=diffs;
+  } catch(error) {
+    if(!out.isConnected || revision!==_djRevision)return {success:false,cancelled:true};
+    status.textContent=T('invalid','JSON',error.message);status.style.color='var(--danger)';out.replaceChildren();return {success:false,error:status.textContent};
+  }
   if (lines.length === 0) {
     status.textContent = T('same');
     status.style.color = '#10b981';
@@ -56,39 +71,7 @@ function djCompare() {
     status.style.color = '#f59e0b';
     out.innerHTML = lines.join('');
   }
-}
-
-function djDiff(a, b, path, lines) {
-  var ta = djType(a), tb = djType(b);
-  if (ta !== tb) {
-    lines.push(djLine(path, a, b, 'changed'));
-    return;
-  }
-  if (ta === 'object') {
-    var keys = Object.keys(Object.assign({}, a, b));
-    keys.forEach(function(k) {
-      var p = path ? path + '.' + k : k;
-      if (!(k in a)) { lines.push(djLine(p, undefined, b[k], 'added')); }
-      else if (!(k in b)) { lines.push(djLine(p, a[k], undefined, 'removed')); }
-      else { djDiff(a[k], b[k], p, lines); }
-    });
-  } else if (ta === 'array') {
-    var len = Math.max(a.length, b.length);
-    for (var i = 0; i < len; i++) {
-      var p2 = path + '[' + i + ']';
-      if (i >= a.length) { lines.push(djLine(p2, undefined, b[i], 'added')); }
-      else if (i >= b.length) { lines.push(djLine(p2, a[i], undefined, 'removed')); }
-      else { djDiff(a[i], b[i], p2, lines); }
-    }
-  } else {
-    if (a !== b) lines.push(djLine(path, a, b, 'changed'));
-  }
-}
-
-function djType(v) {
-  if (v === null) return 'null';
-  if (Array.isArray(v)) return 'array';
-  return typeof v;
+  return {success:true,data:{diffs:out._diffs}};
 }
 
 function djLine(path, a, b, type) {
@@ -111,6 +94,7 @@ function djEscape(s) {
 }
 
 function djClear() {
+  _djRevision++;
   document.getElementById('djInputA').value = '';
   document.getElementById('djInputB').value = '';
   document.getElementById('djResult').style.display = 'none';

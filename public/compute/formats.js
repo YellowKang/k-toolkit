@@ -11,6 +11,14 @@
     constructor(message, line, column) { super(message); this.line = line; this.column = column; }
   }
 
+  function checkText(text) { if(typeof text!=='string'||text.length>1000000)throw new FormatError('Input limit: 1,000,000 characters');return text; }
+  // Count expanded occurrences, not just unique objects: YAML aliases must not explode downstream JSON output.
+  function checkValue(value) {
+    let nodes=0,characters=0;const ancestors=new Set();
+    function walk(v,depth){if(++nodes>50000||depth>64)throw new FormatError('Structure limit: 50,000 nodes / 64 levels');if(typeof v==='string'){characters+=v.length;if(characters>2000000)throw new FormatError('Expanded text exceeds 2,000,000 characters');}if(v&&typeof v==='object'){if(ancestors.has(v))throw new FormatError('Cyclic references cannot be converted to JSON');ancestors.add(v);for(const [key,item] of Object.entries(v)){characters+=key.length;walk(item,depth+1);}ancestors.delete(v);}}
+    walk(value,0);return value;
+  }
+
   // ── YAML ──
   let yamlSchema = null;
   async function yaml() {
@@ -23,20 +31,20 @@
   async function yamlParse(text) {
     const y = await yaml();
     const docs = [];
-    try { y.loadAll(String(text ?? ''), doc => docs.push(doc), { schema: yamlSchema }); }
+    try { y.loadAll(checkText(text), doc => docs.push(doc), { schema: yamlSchema }); }
     catch (e) { throw new FormatError(e.reason || e.message, e.mark ? e.mark.line + 1 : undefined, e.mark ? e.mark.column + 1 : undefined); }
-    return { value: docs.length === 1 ? docs[0] : docs, documents: docs.length };
+    return { value: checkValue(docs.length === 1 ? docs[0] : docs), documents: docs.length };
   }
 
   async function yamlStringify(value, { indent = 2 } = {}) {
     const y = await yaml();
-    return y.dump(value, { indent, lineWidth: -1, noRefs: true, schema: yamlSchema });
+    return y.dump(checkValue(value), { indent, lineWidth: -1, noRefs: true, schema: yamlSchema });
   }
 
   // ── TOML ──
   async function tomlParse(text) {
     const t = await lib('smol-toml');
-    try { return t.parse(String(text ?? '')); }
+    try { return checkValue(t.parse(checkText(text))); }
     catch (e) { throw new FormatError(String(e.message).split('\n')[0], e.line, e.column); }
   }
 
@@ -44,6 +52,7 @@
   async function tomlStringify(value) {
     const t = await lib('smol-toml');
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new FormatError('TOML needs a top-level object (table)');
+    checkValue(value);
     const dropped = [];
     const strip = (v, path) => {
       if (Array.isArray(v)) return v.filter((x, i) => { if (x === null) { dropped.push(`${path}[${i}]`); return false; } return true; }).map((x, i) => strip(x, `${path}[${i}]`));
@@ -59,7 +68,9 @@
   const escAttr = s => escText(s).replace(/"/g, '&quot;');
 
   function xmlParse(text) {
-    const doc = new DOMParser().parseFromString(String(text ?? ''), 'application/xml');
+    checkText(text);
+    if (/<!DOCTYPE|<!ENTITY/i.test(text)) throw new FormatError('DTD / entity declarations are not supported');
+    const doc = new DOMParser().parseFromString(text, 'application/xml');
     const error = doc.querySelector('parsererror');
     if (error) {
       const message = (error.textContent || 'XML parse error').replace(/\s+/g, ' ').trim();
@@ -69,6 +80,7 @@
         .replace(/^error on line \d+ at column \d+:\s*/i, '').replace(/^XML Parsing Error:\s*/i, '').replace(/\s*Location:.*$/i, '');
       throw new FormatError(reason, m ? +m[1] : undefined, m && m[2] ? +m[2] : undefined);
     }
+    let count=0;const stack=[[doc,0]];while(stack.length){const [node,depth]=stack.pop();if(++count>50000||depth>64)throw new FormatError('XML limit: 50,000 nodes / 64 levels');for(const child of node.childNodes)stack.push([child,depth+1]);}
     return doc;
   }
 
@@ -87,6 +99,8 @@
       const pad = indent.repeat(depth);
       switch (node.nodeType) {
         case 1: {
+          // Mixed content and explicit whitespace preservation are serialized intact.
+          if (node.getAttribute('xml:space') === 'preserve' || [...node.childNodes].some(c => (c.nodeType === 3 && c.nodeValue.trim()) || c.nodeType === 4)) { out.push(pad + new XMLSerializer().serializeToString(node)); return; }
           const attrs = [...node.attributes].map(a => ` ${a.name}="${escAttr(a.value)}"`).join('');
           const kids = [...node.childNodes].filter(c => !(c.nodeType === 3 && !c.nodeValue.trim()));
           if (!kids.length) { out.push(`${pad}<${node.nodeName}${attrs}/>`); return; }
@@ -110,11 +124,13 @@
   /** Minify: drops whitespace-only text between tags and comments; text content and attributes are untouched. */
   function xmlMinify(text, { keepComments = false } = {}) {
     const doc = xmlParse(text);
-    const prune = node => {
+    const prune = (node, inherited = false) => {
+      const preserve=node.getAttribute('xml:space')==='preserve'||(inherited&&node.getAttribute('xml:space')!=='default');
+      const mixed=[...node.childNodes].some(c=>c.nodeType===4||(c.nodeType===3&&c.nodeValue.trim()));
       [...node.childNodes].forEach(c => {
-        if (c.nodeType === 3 && !c.nodeValue.trim()) c.remove();
+        if (c.nodeType === 3 && !c.nodeValue.trim() && !preserve && !mixed) c.remove();
         else if (c.nodeType === 8 && !keepComments) c.remove();
-        else if (c.nodeType === 1) prune(c);
+        else if (c.nodeType === 1) prune(c,preserve);
       });
     };
     prune(doc.documentElement);
@@ -126,7 +142,7 @@
   function xmlToObject(text) {
     const doc = xmlParse(text);
     const convert = node => {
-      const obj = {};
+      const obj = Object.create(null);
       if (node.attributes.length) obj['@'] = Object.fromEntries([...node.attributes].map(a => [a.name, a.value]));
       const kids = [...node.childNodes].filter(n => (n.nodeType === 1) || ((n.nodeType === 3 || n.nodeType === 4) && n.nodeValue.trim()));
       const textValue = kids.filter(n => n.nodeType !== 1).map(n => n.nodeValue.trim()).join(' ');
@@ -135,7 +151,7 @@
       if (textValue) obj['#'] = textValue;
       for (const child of elements) {
         const v = convert(child);
-        if (child.nodeName in obj) obj[child.nodeName] = [].concat(obj[child.nodeName], [v]);
+        if (Object.prototype.hasOwnProperty.call(obj,child.nodeName)) obj[child.nodeName] = [].concat(obj[child.nodeName], [v]);
         else obj[child.nodeName] = v;
       }
       return obj;

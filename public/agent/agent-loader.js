@@ -6,6 +6,9 @@ const AG_SCRIPT_GROUPS = [
   // Group 0: 基础工具（被 adapter 依赖）
   [
     'agent/adapters/stream-utils.js',
+    'agent/agent-transport.js',
+    'agent/agent-context.js',
+    'agent/agent-result-store.js',
   ],
   // Group 1: 无依赖的独立模块（适配器 + actions + 工具模块）
   [
@@ -16,6 +19,8 @@ const AG_SCRIPT_GROUPS = [
     'agent/adapters/custom.js',
     'agent/actions/text.js',
     'agent/actions/data.js',
+    'agent/actions/files.js',
+    'agent/actions/general-files.js',
     'agent/agent-workflow.js',
     'agent/actions/dev.js',
     'agent/agent-i18n.js',
@@ -45,17 +50,22 @@ const AG_SCRIPT_GROUPS = [
     'agent/agent-ui.js',
     'agent/agent-ui-part2.js',
     'agent/agent-ui-part3.js',
+    'agent/agent-results.js',
   ],
 ];
 
+const agentScriptPromises = new Map();
 function loadScript(src) {
-  return new Promise((resolve, reject) => {
+  if (agentScriptPromises.has(src)) return agentScriptPromises.get(src);
+  const promise = new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = src + '?v=' + encodeURIComponent(document.querySelector('meta[name="toolkit-version"]')?.content || 'dev');
     s.onload = resolve;
-    s.onerror = () => reject(new Error('Failed to load: ' + src));
+    s.onerror = () => { s.remove(); agentScriptPromises.delete(src); reject(new Error('Failed to load: ' + src)); };
     document.head.appendChild(s);
   });
+  agentScriptPromises.set(src, promise);
+  return promise;
 }
 
 async function loadAgentScripts() {
@@ -75,6 +85,7 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
 // ── FAB button ───────────────────────────────────────────────────
 (function initAgentFab() {
   let loaded = false;
+  let loading = null;
 
   // Inject minimal FAB style immediately (full styles come with agent-ui.js)
   const fabStyle = document.createElement('style');
@@ -91,6 +102,9 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
   const fab = document.createElement('button');
   fab.id = 'agentFab';
   fab.title = '';
+  function labelFab() { fab.setAttribute('aria-label', window.getCurrentLang?.() === 'en' ? 'Open AI assistant' : '打开 AI 助手'); }
+  labelFab();
+  window.addEventListener('toolkit-language-change', labelFab);
   fab.innerHTML = '🤖<span class="fab-tooltip">' + _modLabel + '+J quick · Alt+A panel</span>';
 
   // ── FAB position persistence + drag ───────────────────────────
@@ -109,7 +123,7 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
       fab.style.left = Math.min(pos.x, window.innerWidth - 56) + 'px';
       fab.style.top = Math.min(pos.y, window.innerHeight - 56) + 'px';
     } else {
-      fab.style.bottom = '80px';
+      fab.style.bottom = window.innerWidth <= 768 ? '80px' : '24px';
       fab.style.right = '20px';
     }
   }
@@ -151,14 +165,9 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
     }
     _fabDrag.active = false;
   });
+  fab.addEventListener('click', e => { if(e.detail===0) openAgent(); });
   // Reset position on window resize (keep in bounds)
-  window.addEventListener('resize', () => {
-    const pos = _loadFabPos();
-    if (pos) {
-      fab.style.left = Math.min(pos.x, window.innerWidth - 56) + 'px';
-      fab.style.top = Math.min(pos.y, window.innerHeight - 56) + 'px';
-    }
-  });
+  window.addEventListener('resize', _applyFabPos);
 
   // 确保 body 已存在
   (document.body ? Promise.resolve() : new Promise(r => document.addEventListener('DOMContentLoaded', r)))
@@ -166,20 +175,16 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
 
   async function ensureLoaded() {
     if (loaded) return true;
-    fab.classList.add('loading');
-    fab.textContent = '⏳';
-    try {
-      await loadAgentScripts();
-      loaded = true;
-    } catch (e) {
-      fab.textContent = '🤖';
-      fab.classList.remove('loading');
-      alert('助手加载失败: ' + e.message);
-      return false;
-    }
-    fab.textContent = '🤖';
-    fab.classList.remove('loading');
-    return true;
+    if (loading) return loading;
+    fab.classList.add('loading'); fab.textContent = '⏳';
+    loading = (async () => {
+      try { await loadAgentScripts(); loaded = true; return true; }
+      catch {
+        window.showToast?.(window.getCurrentLang?.() === 'en' ? 'Assistant could not load. Please retry.' : '助手加载失败，请重试。', 'error');
+        return false;
+      } finally { fab.textContent = '🤖'; fab.classList.remove('loading'); loading = null; }
+    })();
+    return loading;
   }
 
   // ── Open full panel ───────────────────────────────────────────
@@ -203,6 +208,10 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
   // ── Mini dialog (chat-style) ────────────────────────────────────
   let _miniSession = null;
   let _miniThinkingEl = null;
+  let _miniDraft = "";
+  const _miniHandlers = [];
+  function _miniOn(event, handler) { _miniSession.on(event, handler); _miniHandlers.push([event, handler]); }
+  function _miniDetach() { for (const [event, handler] of _miniHandlers) _miniSession.off(event, handler); _miniHandlers.length = 0; }
 
   function _miniEsc(t) {
     return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -236,6 +245,11 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
     if (!input || input.disabled) return;
     const text = input.value.trim();
     if (!text) return;
+    const cfg = window.AgentConfig.AG.load();
+    if (!cfg.apiKey && cfg.adapter !== 'custom') { window._agOpenConfig(); return; }
+    if (_miniSession.config.adapter !== cfg.adapter || _miniSession.config.model !== cfg.model || _miniSession.config.baseUrl !== cfg.baseUrl) _miniSession._responseId = null;
+    _miniSession.adapter = window.AgentAdapters.getAdapter(cfg.adapter); _miniSession.config = cfg;
+    _miniDraft = '';
     input.value = '';
     input.disabled = true;
     const sendBtn = document.getElementById('agMiniSendBtn');
@@ -262,6 +276,7 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
 
     const overlay = document.createElement('div');
     overlay.id = 'agMiniOverlay';
+    overlay.setAttribute('role', 'dialog'); overlay.setAttribute('aria-modal', 'true'); overlay.setAttribute('aria-label', 'K Assistant');
 
     const box = document.createElement('div');
     box.id = 'agMiniBox';
@@ -299,7 +314,7 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
     input.id = 'agMiniInput';
     input.type = 'text';
     input.placeholder = _t('mini_ph');
-    input.autocomplete = 'off';
+    input.autocomplete = 'off'; input.value = _miniDraft;
 
     const sendBtn = document.createElement('button');
     sendBtn.id = 'agMiniSendBtn';
@@ -326,10 +341,11 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
     box.appendChild(footer);
     overlay.appendChild(box);
     document.body.appendChild(overlay);
+    window.AgentConfig.applySkin();
 
     // Restore previous messages or show welcome chips
-    if (_miniMessagesHtml && _miniSession && _miniSession.messages.length > 0) {
-      messages.innerHTML = _miniMessagesHtml;
+    if (_miniMessageNodes.length && _miniSession && _miniSession.messages.length > 0) {
+      messages.replaceChildren(..._miniMessageNodes); _miniMessageNodes = [];
       // Remove any lingering thinking bubbles
       messages.querySelectorAll('.ag-mini-bubble.thinking').forEach(el => el.remove());
     } else {
@@ -367,11 +383,11 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
       openAgent();
     };
 
-    // Create a lightweight session for mini mode (fresh each time)
+    // Reuse history when reopening; only event handlers are rebound.
     if (_miniSession) {
       // Clear old event handlers to avoid duplicates
-      _miniSession._handlers = {};
-      _miniSession.clearHistory();
+      _miniDetach();
+      _miniSession.abort();
     }
 
     const { AG } = window.AgentConfig;
@@ -381,21 +397,22 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
     if (!_miniSession) {
       _miniSession = new window.AgentSession({
         adapter,
-        config: { ...cfg, apiKey: AG.getKey(cfg.adapter), max_tokens: 1000 },
+        config: cfg,
       });
     }
 
     // Refresh session config each time (in case API key/model changed)
+    if (_miniSession.config.adapter !== cfg.adapter || _miniSession.config.model !== cfg.model || _miniSession.config.baseUrl !== cfg.baseUrl) _miniSession._responseId = null;
     _miniSession.adapter = adapter;
-    _miniSession.config = { ...cfg, apiKey: AG.getKey(cfg.adapter), max_tokens: 1000 };
+    _miniSession.config = cfg;
 
     // Wire mini events — append to message list
-    _miniSession.on('thinking', () => {
+    _miniOn('thinking', () => {
       _miniRemoveThinking();
-      _miniThinkingEl = _miniAppendBubble('thinking', '<div class="ag-thinking-dots"><span></span><span></span><span></span></div> <span class="ag-mini-thinking-text">thinking...</span>');
+      _miniThinkingEl = _miniAppendBubble('thinking', '<div class="ag-thinking-dots"><span></span><span></span><span></span></div> <span class="ag-mini-thinking-text">' + _t('thinking') + '</span>');
     });
 
-    _miniSession.on('tool_start', ({ tool_calls }) => {
+    _miniOn('tool_start', ({ tool_calls }) => {
       const names = tool_calls.map(tc => tc.function.name).join(', ');
       if (_miniThinkingEl) {
         const textEl = _miniThinkingEl.querySelector('.ag-mini-thinking-text');
@@ -405,14 +422,24 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
       }
     });
 
-    _miniSession.on('assistant', ({ content }) => {
+    _miniOn('tool_done', ({ results }) => {
+      _miniRemoveThinking();
+      for (const tc of results) {
+        if (!tc.result?.data && !tc.result?.needsInput) continue;
+        const bubble = _miniAppendBubble('assistant', _miniEsc(tc.result.display || tc.name));
+        if (bubble) window.AgentResults.mount(bubble, { tc, result: tc.result, onNavigate: closeMini });
+      }
+      _miniScrollBottom();
+    });
+
+    _miniOn('assistant', ({ content }) => {
       if (!content || !content.trim()) return;
       _miniRemoveThinking();
       const html = window._agMdToHtml ? window._agMdToHtml(content) : _miniEsc(content);
       _miniAppendBubble('assistant', html);
     });
 
-    _miniSession.on('error', ({ message }) => {
+    _miniOn('error', ({ message }) => {
       _miniRemoveThinking();
       _miniAppendBubble('error', _miniEsc(message || 'Error'));
       const inp = document.getElementById('agMiniInput');
@@ -421,7 +448,7 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
       if (sb) sb.disabled = false;
     });
 
-    _miniSession.on('done', () => {
+    _miniOn('done', () => {
       _miniRemoveThinking();
       const inp = document.getElementById('agMiniInput');
       const sb = document.getElementById('agMiniSendBtn');
@@ -458,19 +485,22 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
     sendBtn.addEventListener('click', _miniSend);
   }
 
-  // Store mini dialog message HTML so we can restore on reopen
-  let _miniMessagesHtml = '';
+  // Keep real nodes so output selection, copy and file controls survive reopening.
+  let _miniMessageNodes = [];
 
   function closeMini() {
-    // Save messages HTML before removing DOM
+    if (!document.getElementById('agMiniOverlay')) return;
+    // Retain message nodes and their event handlers before removing the overlay.
     const msgsEl = document.getElementById('agMiniMessages');
-    if (msgsEl) _miniMessagesHtml = msgsEl.innerHTML;
+    if (msgsEl) _miniMessageNodes = [...msgsEl.childNodes];
+    _miniDraft = document.getElementById('agMiniInput')?.value || '';
     const el = document.getElementById('agMiniOverlay');
     if (el) el.remove();
     _miniThinkingEl = null;
     // Detach event handlers but keep session history for continuity
     if (_miniSession) {
-      _miniSession._handlers = {};
+      _miniSession.abort();
+      _miniDetach();
     }
   }
 

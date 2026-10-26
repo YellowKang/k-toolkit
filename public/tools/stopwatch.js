@@ -3,6 +3,15 @@ const _swDict = {
   en: { title: 'Stopwatch', start: 'Start', pause: 'Pause', resume: 'Resume', lap: 'Lap', reset: 'Reset', laps: 'Laps' },
 };
 
+const _swState = { elapsed: 0, startAt: 0, running: false, laps: [] };
+const _swElapsed = () => _swState.running ? Date.now() - _swState.startAt : _swState.elapsed;
+let _swActivityTimer = null;
+function _swFmt(ms) {
+  return String(Math.floor(ms / 60000)).padStart(2,'0') + ':' + String(Math.floor(ms % 60000 / 1000)).padStart(2,'0') + '.' + String(ms % 1000).padStart(3,'0');
+}
+function _swActivity() {
+  window.ToolActivity?.update('stopwatch', '⏱ ' + _swFmt(_swElapsed()).split('.')[0], _swState.running);
+}
 window.renderStopwatch = function(el) {
   const T = makeToolI18n(_swDict);
   el.innerHTML = `
@@ -21,58 +30,58 @@ window.renderStopwatch = function(el) {
     </div>`;
 
   let timer = null;
-  let elapsed = 0;
-  let startAt = 0;
-  let running = false;
-  let laps = [];
-
-  function _swFmt(ms) {
-    const m = Math.floor(ms / 60000);
-    const s = Math.floor((ms % 60000) / 1000);
-    const cs = ms % 1000;
-    return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0') + '.' + String(cs).padStart(3,'0');
-  }
+  const state = _swState;
+  let laps = state.laps;
 
   window._swToggle = function() {
-    if (!running) {
-      startAt = Date.now() - elapsed;
-      timer = setInterval(() => {
-        elapsed = Date.now() - startAt;
-        document.getElementById('swDisplay').textContent = _swFmt(elapsed);
-      }, 10);
-      running = true;
+    if (!state.running) {
+      state.startAt = Date.now() - state.elapsed;
+      timer = setInterval(update, 50);
+      state.running = true;
+      _swActivityTimer = setInterval(_swActivity, 1000);
+      _swActivity();
       document.getElementById('swBtnStart').textContent = T('pause');
       document.getElementById('swBtnStart').className = 'btn btn-secondary';
       document.getElementById('swBtnLap').disabled = false;
       window._activeCleanup = () => clearInterval(timer);
     } else {
       clearInterval(timer); timer = null;
-      running = false;
+      state.elapsed = _swElapsed(); state.running = false;
+      clearInterval(_swActivityTimer); _swActivityTimer = null;
       document.getElementById('swBtnStart').textContent = T('resume');
       document.getElementById('swBtnStart').className = 'btn btn-primary';
+      document.getElementById('swBtnLap').disabled = true;
+      update();
+      window.ToolActivity?.update('stopwatch', '', false);
     }
   };
 
   window._swLap = function() {
-    if (!running) return;
-    const lapTime = elapsed;
+    if (!state.running) return;
+    const lapTime = _swElapsed();
     const prev = laps.length ? laps[laps.length-1].abs : 0;
     laps.push({ abs: lapTime, split: lapTime - prev });
+    renderLaps();
+  };
+
+  function renderLaps() {
     const panel = document.getElementById('swLapPanel');
-    panel.style.display = '';
+    panel.style.display = laps.length ? '' : 'none';
     document.getElementById('swLapList').innerHTML = laps.slice().reverse().map((l,i) => {
       const n = laps.length - i;
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--glass-border);font-variant-numeric:tabular-nums">
-        <span style="color:var(--text-muted);font-size:12px">Lap ${n}</span>
+        <span style="color:var(--text-muted);font-size:12px">${T('lap')} ${n}</span>
         <span style="font-size:13px;color:var(--text-muted)">${_swFmt(l.split)}</span>
         <span style="font-size:14px;font-weight:700;color:var(--neon)">${_swFmt(l.abs)}</span>
       </div>`;
     }).join('');
-  };
+  }
 
   window._swReset = function() {
     clearInterval(timer); timer = null;
-    running = false; elapsed = 0; laps = [];
+    clearInterval(_swActivityTimer); _swActivityTimer = null;
+    state.running = false; state.elapsed = 0; state.laps = []; laps = state.laps;
+    window.ToolActivity?.update('stopwatch', '', false);
     document.getElementById('swDisplay').textContent = '00:00.000';
     document.getElementById('swBtnStart').textContent = T('start');
     document.getElementById('swBtnStart').className = 'btn btn-primary';
@@ -81,5 +90,13 @@ window.renderStopwatch = function(el) {
     document.getElementById('swLapList').innerHTML = '';
   };
 
+  function update() {
+    document.getElementById('swDisplay').textContent = _swFmt(_swElapsed());
+  }
+  update(); renderLaps(); _swActivity();
+  document.getElementById('swBtnStart').textContent = T(state.running ? 'pause' : state.elapsed ? 'resume' : 'start');
+  document.getElementById('swBtnStart').className = state.running ? 'btn btn-secondary' : 'btn btn-primary';
+  document.getElementById('swBtnLap').disabled = !state.running;
+  if (state.running) timer = setInterval(update, 50);
   window._activeCleanup = () => clearInterval(timer);
 };

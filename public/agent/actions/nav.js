@@ -4,7 +4,7 @@
 // autoRun: true = AI 可直接填数据执行；false = 需要用户手动操作（文件上传类）
 const TOOL_CAPS = {
   'uuid':         { autoRun: true,  inputs: ['count','format'],              actions: ['generate'],                    desc: '生成 UUID v4，可指定数量和格式(standard/no-dash/upper/braces)' },
-  'json':         { autoRun: true,  inputs: ['text'],                         actions: ['format','compress','sort','toYaml','toToml','toCsv','diff','escape','tsInterface'], desc: '格式化/压缩/排序/转换 JSON，支持转 YAML/TOML/CSV、对比、转义、生成 TS Interface' },
+  'json':         { autoRun: true,  inputs: ['text'], actions: ['format','compress','sort','escape','unescape','expand'], desc: '格式化/压缩/排序 JSON，转义、去转义一层、递归展开嵌套 JSON 字符串' },
   'base64':       { autoRun: true,  inputs: ['text'],                         actions: ['encode','decode'],              desc: 'Base64 编解码，支持 URL 安全模式和文件 Base64 编解码' },
   'hash':         { autoRun: true,  inputs: ['text','key','algo'],             actions: ['calc','hmac'],                   desc: '计算 SHA-1/SHA-256/SHA-384/SHA-512 哈希，或 HMAC（action=hmac 时需 key 和 algo）' },
   'case-convert': { autoRun: true,  inputs: ['text'],                         actions: ['camel','snake','kebab','pascal','upper','lower','title'], desc: '文本大小写/命名风格转换' },
@@ -16,7 +16,7 @@ const TOOL_CAPS = {
   'password-gen': { autoRun: true,  inputs: ['length','upper','lower','digit','symbol'], actions: ['generate'], desc: '生成随机密码，可指定长度和字符集' },
   'cron':         { autoRun: true,  inputs: ['expr'],                         actions: ['parse'],                        desc: '解析 Cron 表达式，显示下次执行时间' },
   'json-csv':     { autoRun: true,  inputs: ['text'],                         actions: ['toCSV','toJSON'],               desc: 'JSON 数组与 CSV 互转' },
-  'url-parser':   { autoRun: true,  inputs: ['url','text'],                   actions: ['parse','encode','decode','build'], desc: 'URL 解析、编解码、参数构建三合一' },
+  'url-parser':   { autoRun: true,  inputs: ['url','text','base','mode','entries'],                   actions: ['parse','encode','decode','build'], desc: 'URL 解析、编解码、参数构建三合一' },
   'html-entity':  { autoRun: true,  inputs: ['text'],                         actions: ['encode','decode'],              desc: 'HTML 实体编解码' },
   'sql-format':   { autoRun: true,  inputs: ['text'],                         actions: ['format','minify'],               desc: 'SQL 格式化/压缩' },
   'jwt':          { autoRun: true,  inputs: ['token','payload','secret'],     actions: ['decode','generate'],            desc: '解码 JWT 或生成 JWT Token，action=decode 时填 token，action=generate 时填 payload(JSON) 和 secret' },
@@ -45,7 +45,7 @@ const TOOL_CAPS = {
   'qrcode':       { autoRun: true,  inputs: ['text'], actions: ['generate'], desc: '生成二维码' },
   'semver':       { autoRun: true,  inputs: ['text'], actions: ['parse'], desc: '语义版本号解析比较' },
   'slug-gen':     { autoRun: true,  inputs: ['text'], actions: ['generate'], desc: '生成 URL slug' },
-  'text-escape':  { autoRun: true,  inputs: ['text','type'], actions: ['escape','unescape'], desc: '文本转义/反转义，type: json/html/url/regex/shell' },
+  'text-escape':  { autoRun: true,  inputs: ['text','type'], actions: ['escape','unescape','expand'], desc: '文本转义/去转义一层；type: json/html/url/regex，expand 仅用于展开 JSON 内容' },
   'timezone':     { autoRun: true,  inputs: ['text'], actions: ['convert'], desc: '时区转换' },
   'unicode-convert':{ autoRun: true,inputs: ['text'], actions: ['encode','decode'], desc: 'Unicode 编解码' },
   'user-agent':   { autoRun: true,  inputs: ['text'], actions: ['parse'], desc: '解析 User-Agent 字符串' },
@@ -55,7 +55,7 @@ const TOOL_CAPS = {
   'date-diff':    { autoRun: true,  inputs: ['from','to'], actions: ['calc'], desc: '计算两个日期之间的天数/周数/月数，from/to 为日期字符串如 2024-01-01' },
   'byte-convert': { autoRun: true,  inputs: ['value','unit'], actions: ['convert'], desc: '字节单位换算，value 为数值，unit 为 B/KB/MB/GB/TB' },
   'loan-calc':    { autoRun: true,  inputs: ['amount','rate','months'], actions: ['calc'], desc: '贷款计算，amount 本金，rate 年利率(%)，months 期数' },
-  'calculator':   { autoRun: true,  inputs: ['expr'], actions: ['calc'], desc: '科学计算器，支持 sin/cos/tan/log/ln/sqrt/pow/π/e 等科学函数和括号' },
+  'calculator':   { autoRun: true,  inputs: ['expr'], actions: ['calc'], desc: '科学计算器，支持 sin/cos/tan/log/ln/sqrt、^ 幂、% 百分比、π/e 等科学函数和括号' },
   // ── 补全缺失的工具能力描述 ────────────────────────────────────
   'wordcount':    { autoRun: true,  inputs: ['text'], actions: ['count'], desc: '统计字符数、单词数、行数、段落数' },
   'lorem':        { autoRun: true,  inputs: ['count','lang'], actions: ['generate'], desc: '生成占位文本，count 段落数，lang 为 zh/en' },
@@ -97,7 +97,7 @@ const TOOL_CAPS = {
   'chmod-calc':   { autoRun: true,  inputs: ['text'], actions: ['calc'], desc: 'Linux chmod 权限计算，输入数字如 755 或 644 自动解析' },
   'placeholder-img':{ autoRun: true, inputs: ['width','height','bg','color','text'], actions: ['generate'], desc: '生成占位图，width/height 为尺寸' },
   'string-inspect':{ autoRun: true, inputs: ['text'], actions: ['inspect'], desc: '检查字符串每个字符的 Unicode 码点、字节数、不可见字符高亮' },
-  'json-schema':  { autoRun: true,  inputs: ['text'], actions: ['generate','validate'], desc: '从 JSON 示例推断 Schema（Draft-07），或校验 JSON 是否符合 Schema' },
+  'json-schema':  { autoRun: true,  inputs: ['text','schema'], actions: ['generate','validate'], desc: '从 JSON 示例推断 Schema（Draft-07），或校验 JSON 是否符合 Schema' },
   'favicon-gen':  { autoRun: true,  inputs: ['text','bg','color'], actions: ['generate'], desc: '从文字/Emoji 生成多尺寸 Favicon' },
   'llm-token':    { autoRun: true,  inputs: ['text'], actions: ['count'], desc: '估算文本 LLM Token 数和 API 价格' },
   'hmac-gen':     { autoRun: true,  inputs: ['text','key','algo'], actions: ['generate'], desc: 'HMAC 消息认证码生成，algo: SHA-256/SHA-384/SHA-512/SHA-1' },
@@ -129,16 +129,16 @@ const TOOL_RUNNERS = {
   },
   'json': {
     mainInput: '#jsonInput',
-    triggerMap: { format: 'formatJSON', compress: 'compressJSON', sort: 'jsonSort' },
+    triggerMap: { format: 'formatJSON', compress: 'compressJSON', sort: 'jsonSort', escape:'jsonEscape', unescape:'jsonUnescape', expand:'jsonExpandNested' },
     trigger: 'formatJSON',
-    outputSelector: '#jsonResultPanel',
+    outputSelector: '#jsonOutput',
     waitMs: 200,
   },
   'json-format': {
     mainInput: '#jsonInput',
-    triggerMap: { format: 'formatJSON', compress: 'compressJSON', sort: 'jsonSort' },
+    triggerMap: { format: 'formatJSON', compress: 'compressJSON', sort: 'jsonSort', escape:'jsonEscape', unescape:'jsonUnescape', expand:'jsonExpandNested' },
     trigger: 'formatJSON',
-    outputSelector: '#jsonResultPanel',
+    outputSelector: '#jsonOutput',
     waitMs: 200,
   },
   'case-convert': {
@@ -170,10 +170,12 @@ const TOOL_RUNNERS = {
   },
   'timestamp': {
     mainInput: '#tsInput',
+    extraInputs: {unit:'#tsUnit',timeZone:'#tsZone',disambiguation:'#tsDst'},
     triggerMap: { toDate: 'tsToDate', toTs: 'dateToTs', format: 'doTimeFormat' },
     outputSelector: '#tsDateResult',
     waitMs: 200,
     actionOverrides: {
+      toTs: { mainInput:'#dateInput',trigger:'dateToTs',outputSelector:'#tsFromDateResult',waitMs:0 },
       format: {
         mainInput: '#tfInput',
         trigger: 'doTimeFormat',
@@ -181,13 +183,6 @@ const TOOL_RUNNERS = {
         waitMs: 300,
       }
     }
-  },
-  'unit-convert': {
-    mainInput: '#ucFromVal',
-    extraInputs: { from: '#ucFromUnit', to: '#ucToUnit' },
-    trigger: 'ucConvert',
-    outputSelector: '#ucAllResults',
-    waitMs: 300,
   },
   'cron': {
     mainInput: '#cronInput',
@@ -239,7 +234,7 @@ const TOOL_RUNNERS = {
       check: {
         mainInput: '#ccFgHex',
         extraInputs: { bg: '#ccBgHex' },
-        trigger: '_ccUpdate',
+        trigger: () => _ccSyncFromHex('fg'),
         outputSelector: '#ccRatio',
         waitMs: 300,
       }
@@ -266,25 +261,34 @@ const TOOL_RUNNERS = {
   },
   'url-parser': {
     mainInput: '#urlInput',
+    beforeRun: ({inputs,action}) => {
+      if(action==='build'&&inputs.entries!==undefined) {
+        const entries=typeof inputs.entries==='string'?JSON.parse(inputs.entries):inputs.entries;
+        if(!Array.isArray(entries)||entries.length>5000||entries.some(x=>!x||typeof x.key!=='string'||typeof x.value!=='string'))throw new Error('entries 必须为 {key,value} 数组');
+        const state=document.getElementById('toolBody')._urlState;state.entries=entries.map(x=>({key:x.key,value:x.value,keep:true}));state.page=0;state.renderRows();
+      }
+    },
     preTriggerMap: {
       parse:  () => window.urlSwitchTab && window.urlSwitchTab('parse'),
-      encode: () => window.urlSwitchTab && window.urlSwitchTab('encode'),
-      decode: () => window.urlSwitchTab && window.urlSwitchTab('encode'),
+      encode: () => { window.urlSwitchTab('encode'); window.setUEMode('encode'); },
+      decode: () => { window.urlSwitchTab('encode'); window.setUEMode('decode'); },
       build:  () => window.urlSwitchTab && window.urlSwitchTab('build'),
     },
-    triggerMap: { parse: 'parseUrl', encode: 'doUrlEncode', decode: 'doUrlEncode' },
+    extraInputs: {base:'#urlBase'},
+    triggerMap: { parse: 'parseUrl', encode: 'doUrlEncode', decode: 'doUrlEncode', build:'urlBuildGenerate' },
     trigger: 'parseUrl',
     outputSelector: '#urlFields',
     waitMs: 200,
     actionOverrides: {
+      build: {mainInput:'#urlBuildBase',trigger:'urlBuildGenerate',outputSelector:'#urlBuildOutput',extraInputs:{}},
       encode: {
-        mainInput: '#ueInput',
+        mainInput: '#ueInput', extraInputs:{mode:'#ueScope'},
         trigger: 'doUrlEncode',
         outputSelector: '#ueOutput',
         waitMs: 200,
       },
       decode: {
-        mainInput: '#ueInput',
+        mainInput: '#ueInput', extraInputs:{mode:'#ueScope'},
         trigger: 'doUrlEncode',
         outputSelector: '#ueOutput',
         waitMs: 200,
@@ -415,12 +419,19 @@ const TOOL_RUNNERS = {
   },
   'text-escape': {
     mainInput: '#esc-input',
-    trigger: () => document.getElementById('esc-btn') && document.getElementById('esc-btn').click(),
+    beforeRun: ({ inputs, action }) => {
+      const mode = document.getElementById('escMode');
+      const type = action === 'expand' ? 'json' : inputs.type;
+      if (mode && ['json','html','url','regex'].includes(type)) { mode.value = type; mode.dispatchEvent(new Event('change')); }
+    },
+    trigger: () => window.textEscapeRun('escape'),
+    triggerMap: { escape:()=>window.textEscapeRun('escape'), unescape:()=>window.textEscapeRun('unescape'), expand:()=>window.textEscapeRun('expand') },
     outputSelector: '#esc-output',
     waitMs: 200,
   },
   'timezone': {
     mainInput: '#tzInput',
+    extraInputs:{from:'#tzFrom',disambiguation:'#tzDst'},
     trigger: 'tzConvert',
     outputSelector: '#tzResult',
     waitMs: 200,
@@ -625,11 +636,11 @@ const TOOL_RUNNERS = {
     outputSelector: '#siStats',
     waitMs: 300,
   },
+  'calculator': {mainInput:'#calcExpr',trigger:()=>document.getElementById('toolBody')._calculatorRun(),outputSelector:'#calcVal'},
   'json-schema': {
-    mainInput: '#jsInput',
-    trigger: '_jsGenerate',
-    outputSelector: '#jsOutput',
-    waitMs: 300,
+    mainInput:'#jsInput',extraInputs:{schema:'#jsOutput'},trigger:'_jsGenerate',
+    triggerMap:{generate:'_jsGenerate',validate:'_jsValidate'},outputSelector:'#jsOutput',
+    actionOverrides:{validate:{outputSelector:'#jsResult'}},waitMs:100,
   },
   'favicon-gen': {
     mainInput: '#favText',
@@ -655,6 +666,25 @@ const TOOL_RUNNERS = {
 // ── 特殊工具专用执行器 ───────────────────────────────────────────
 // 这些工具不走通用 mainInput/trigger 流程，需要直接操作全局变量
 const SPECIAL_RUNNERS = {
+  'unit-convert': async ({inputs,action}) => {
+    try {
+      const units=await window.ToolCompute.load('units');
+      const category=units.category(inputs.category||'length'),value=Number(inputs.value);
+      const until=Date.now()+2000;while(!document.getElementById('ucFromUnit')&&Date.now()<until)await new Promise(r=>setTimeout(r,30));
+      if(!document.getElementById('ucFromUnit'))throw new Error('工具页尚未就绪');
+      if(action==='format'||category==='numfmt') {ucSetCat('numfmt');document.getElementById('ucNfInput').value=inputs.value??inputs.text??'';ucNfUpdate();return {success:true,data:{result:document.getElementById('ucAllResults').textContent}};}
+      const from=units.unit(category,inputs.from),to=units.unit(category,inputs.to);
+      const result=units.convert(category,value,from,to);ucSetCat(category);
+      if(category==='storage') {
+        const deadline=Date.now()+2000;while(!document.getElementById('bcVal')&&Date.now()<deadline)await new Promise(r=>setTimeout(r,30));
+        const select=document.getElementById('bcUnit');if(!select)throw new Error('工具页尚未就绪');
+        select.value=[...select.options].find(o=>o.textContent===from).value;document.getElementById('bcVal').value=String(value);bcCalc();
+      } else {
+        document.getElementById('ucFromUnit').value=from;document.getElementById('ucToUnit').value=to;document.getElementById('ucFromVal').value=String(value);ucConvert();
+      }
+      return {success:true,data:{result,unit:to},display:`${value} ${from} = ${result} ${to}`};
+    } catch(error){return {success:false,error:error.message,display:error.message};}
+  },
   'nginx-gen': async ({ inputs, action }) => {
     // inputs: { domain, scene, root, port, ssl, gzip, cache, accessLog, upstream, servers }
     // scene: static | spa | proxy | https | loadbalance
@@ -766,15 +796,9 @@ const SPECIAL_RUNNERS = {
     return { success: true, data: { css }, display: css || '阴影已生成' };
   },
   'palette-gen': async ({ inputs }) => {
-    const colorInput = inputs.color || inputs.text || '';
-    if (colorInput) {
-      const el = document.getElementById('pgBaseColor') || document.querySelector('[id*="pgBase"]');
-      if (el) { el.value = colorInput; el.dispatchEvent(new Event('input', { bubbles: true })); }
-    }
-    await new Promise(r => setTimeout(r, 500));
-    const out = document.getElementById('pgResult');
-    const text = out ? out.textContent.trim() : '';
-    return { success: true, data: { result: text }, display: text || '调色板已生成' };
+    const input=document.getElementById('pgHex');if(!input)return {success:false,error:'Palette page is not ready'};
+    input.value=inputs.color??inputs.text??input.value;return genPalette();
+
   },
 };
 
@@ -964,6 +988,8 @@ const NavActions = [
         };
       }
 
+      while(document.getElementById('toolBody')?.dataset.tool!==toolId&&Date.now()<deadline)await new Promise(r=>setTimeout(r,30));
+      try{await document.getElementById('toolBody')?._renderReady;}catch(e){return {success:false,error:e.message};}
       let runner = TOOL_RUNNERS[toolId];
       // 优先走特殊执行器
       const special = SPECIAL_RUNNERS[toolId];
@@ -974,7 +1000,7 @@ const NavActions = [
 
       // ── beforeRun 钩子：在填值前执行（用于切换 tab 等前置操作）──
       if (runner.beforeRun) {
-        try { runner.beforeRun({ action, inputs }); } catch(e) { console.warn('beforeRun error:', e); }
+        try { await runner.beforeRun({ action, inputs }); } catch(e) { return {success:false,error:e.message,display:e.message}; }
         await new Promise(r => setTimeout(r, 100));
       }
 
@@ -994,8 +1020,8 @@ const NavActions = [
       }
 
       // 填入主输入
-      const mainVal = inputs.text || inputs.payload || inputs.value || inputs.token || inputs.url || inputs.expr || inputs.text1 || inputs.pattern || inputs.ip || inputs.domain || inputs.input || inputs.from || inputs.amount || '';
-      if (runner.mainInput && mainVal) {
+      const mainVal = [inputs.text,inputs.payload,inputs.value,inputs.token,inputs.url,inputs.expr,inputs.text1,inputs.pattern,inputs.ip,inputs.domain,inputs.input,inputs.from,inputs.amount].find(value=>value!==undefined&&value!==null);
+      if (runner.mainInput && mainVal !== undefined) {
         const mainInput = document.querySelector(runner.mainInput);
         if (!mainInput) {
           return { success: false, data: { error: `找不到输入框 ${runner.mainInput}，页面渲染超时` }, display: '找不到输入框，页面渲染超时' };
@@ -1026,14 +1052,15 @@ const NavActions = [
 
       // 触发执行（工具函数可能是 async，例如按需加载共享计算模块，等待其完成再读结果）
       let triggered = false;
+      let triggerResult;
       if (action && runner.triggerMap) {
         const fn = runner.triggerMap[action];
-        if (typeof fn === 'function') { await fn(); triggered = true; }
-        else if (typeof fn === 'string' && window[fn]) { await window[fn](); triggered = true; }
+        if (typeof fn === 'function') { triggerResult = await fn(); triggered = true; }
+        else if (typeof fn === 'string' && window[fn]) { triggerResult = await window[fn](); triggered = true; }
       }
       if (!triggered && runner.trigger) {
-        if (typeof runner.trigger === 'function') { await runner.trigger(); triggered = true; }
-        else if (typeof runner.trigger === 'string' && window[runner.trigger]) { await window[runner.trigger](); triggered = true; }
+        if (typeof runner.trigger === 'function') { triggerResult = await runner.trigger(); triggered = true; }
+        else if (typeof runner.trigger === 'string' && window[runner.trigger]) { triggerResult = await window[runner.trigger](); triggered = true; }
       }
       if (!triggered) {
         // 实时计算工具通过 input 事件自动更新
@@ -1043,7 +1070,21 @@ const NavActions = [
         }
       }
 
+      // These pages return the actual shared computation; a failed calculation must not be labelled successful.
+      if (['date-diff','timestamp','timezone','ip-calc'].includes(toolId) || toolId==='color') {
+        if(!triggerResult?.success)return {success:false,error:triggerResult?.error||'No result; check the page input'};
+        return {success:true,data:{toolId,...triggerResult.data},display:'已执行 '+toolId};
+      }
+      if (['calculator','json-schema','json-csv','url-parser','jwt'].includes(toolId) && !(toolId==='jwt'&&action==='generate')) {
+        if (triggerResult === undefined) return {success:false,error:'工具未产生结果，请检查输入或页面错误',display:'工具未产生结果，请检查输入或页面错误'};
+        const data = typeof triggerResult === 'object' && triggerResult !== null ? triggerResult : {result:triggerResult};
+        return {success:true,data:{toolId,...data},display:'已执行 '+toolId};
+      }
+
       // 等待结果渲染
+      if (['regex','json','json-format','text-escape'].includes(toolId) && triggerResult?.success === false) {
+        return { success: false, data: { toolId, error: triggerResult.error }, display: triggerResult.error };
+      }
       await new Promise(r => setTimeout(r, runner.waitMs || 400));
 
       // 读取结果
@@ -1182,6 +1223,11 @@ const NavActions = [
       const curPage = window.currentPage || '';
       if (curPage !== toolId) {
         return { success: false, data: { error: `当前页面是 ${curPage}` }, display: `当前不在 ${toolId} 工具页` };
+      }
+      const body=document.getElementById('toolBody');
+      if(body?.dataset.tool===toolId && typeof body._toolOutput==='function') {
+        const text=String(body._toolOutput()??'');
+        return {success:true,data:{toolId,result:text.slice(0,2000),truncated:text.length>2000,totalCharacters:text.length},display:text?text.slice(0,200):'（暂无输出）'};
       }
       const runner = (typeof TOOL_RUNNERS !== 'undefined') ? TOOL_RUNNERS[toolId] : null;
       if (!runner || !runner.outputSelector) {

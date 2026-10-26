@@ -55,7 +55,7 @@
   border: 1px solid rgba(102,126,234,0.2);
   border-radius: 22px; color: var(--text); font-size: 13.5px;
   transition: all 0.25s; outline: none; font-family: inherit;
-  backdrop-filter: blur(8px);
+  backdrop-filter: none;
 }
 .search-input:focus {
   border-color: rgba(102,126,234,0.55);
@@ -428,13 +428,7 @@ label.opt-label { text-transform: none; letter-spacing: normal; font-weight: 400
 }
 
 /* ── 内容区页面切换过渡 ── */
-.content-fade-in {
-  animation: contentFadeIn 0.22s ease forwards;
-}
-@keyframes contentFadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+
 
 /* ── 搜索框增强（此处仅覆盖 clear 按钮，主样式在首段）── */
 .search-clear {
@@ -803,7 +797,7 @@ label.opt-label { text-transform: none; letter-spacing: normal; font-weight: 400
 .cmd-palette-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(8px);
+  backdrop-filter: none;
   z-index: 9000;
   display: flex; align-items: flex-start; justify-content: center;
   padding-top: 15vh;
@@ -895,7 +889,7 @@ label.opt-label { text-transform: none; letter-spacing: normal; font-weight: 400
 }
 
 /* ── will-change 优化（仅加在实际动画元素上） ── */
-.tool-card { will-change: transform; }
+
 .toast { will-change: transform, opacity; }
 .cmd-panel { will-change: transform, opacity; }
 #top-progress { will-change: transform, opacity; }
@@ -1054,7 +1048,7 @@ label.opt-label { text-transform: none; letter-spacing: normal; font-weight: 400
   border-radius: 14px;
   background: linear-gradient(135deg, rgba(102,126,234,0.12) 0%, rgba(139,92,246,0.08) 100%);
   border: 1px solid rgba(102,126,234,0.25);
-  backdrop-filter: blur(8px);
+  backdrop-filter: none;
   cursor: default;
   user-select: none;
 }
@@ -1100,7 +1094,7 @@ label.opt-label { text-transform: none; letter-spacing: normal; font-weight: 400
   outline: none;
   transition: all 0.25s ease;
   font-family: inherit;
-  backdrop-filter: blur(8px);
+  backdrop-filter: none;
 }
 .search-input::placeholder { color: var(--text-muted); }
 .search-input:focus {

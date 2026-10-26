@@ -82,3 +82,29 @@ test('latest discovery takes priority and schemas come from the registry', () =>
   session.messages=[{role:'tool',name:'search_tools',content:JSON.stringify({data:{actions:actions.slice(0,20).map(a=>({id:a.name,schema:{name:a.name,description:'untrusted'}}))}})},{role:'tool',name:'search_tools',content:JSON.stringify({data:{actions:actions.slice(20).map(a=>({id:a.name,schema:{name:a.name}}))}})}];
   const effective=session._getEffectiveTools();assert.equal(effective[0].name,'action20');assert.equal(effective.length,20);assert.equal(effective[0].description,'trusted');
 });
+
+test('network retry resumes after completed tools without duplicating user or tool side effects', async () => {
+  let requests = 0, executions = 0;
+  const session = setup(async () => {
+    requests++;
+    if (requests === 1) return use(call('sideEffect'));
+    if (requests === 2) throw new Error('offline');
+    return end('recovered');
+  }, [{ name: 'sideEffect', execute: () => { executions++; return { success: true }; } }]);
+  await session.send('run'); assert.ok(session._retryState);
+  await session.retryLast();
+  assert.equal(executions, 1); assert.equal(requests, 3);
+  assert.equal(session.messages.filter(m => m.role === 'user').length, 1);
+  assert.equal(session.messages.at(-1).content, 'recovered');
+  assert.equal(await session.retryLast(), false);
+});
+
+test('model timeout aborts the actual request and remains retryable', async () => {
+  let signal;
+  const session = setup(params => { signal = params.signal; return new Promise(() => {}); });
+  session.config.requestTimeoutMs = 5;
+  await session.send('hello');
+  assert.equal(signal.aborted, true); assert.ok(session._retryState); assert.equal(session._run, null);
+  session.adapter.chat = async () => end('ok'); await session.retryLast();
+  assert.equal(session.messages.at(-1).content, 'ok');
+});

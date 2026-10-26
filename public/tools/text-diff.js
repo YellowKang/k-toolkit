@@ -6,6 +6,9 @@ const _diffDict = {
     count: (lines, chars) => `${lines} 行 / ${chars} 字`,
     stat: (added, removed) => `+${added} 增加  −${removed} 删除  ${added + removed === 0 ? '✓ 无差异' : ''}`,
     run_first: '请先执行对比', copied: '已复制差异结果',
+    previous: '上一页', next: '下一页', first_change: '首处差异', download: '下载差异',
+    page: (n,total) => `第 ${n} / ${total} 页 · 每页最多 200 段，复制与下载包含全部差异`,
+    complex: '内容差异过大，请改用逐行对比或缩小范围后再试。',
   },
   en: {
     title: 'Compare texts', realtime: 'Live diff', mode_line: 'By line', mode_word: 'By word', mode_char: 'By character',
@@ -14,6 +17,9 @@ const _diffDict = {
     count: (lines, chars) => `${lines} line${lines === 1 ? '' : 's'} / ${chars} char${chars === 1 ? '' : 's'}`,
     stat: (added, removed) => `+${added} added  −${removed} removed  ${added + removed === 0 ? '✓ No differences' : ''}`,
     run_first: 'Run a comparison first', copied: 'Diff copied',
+    previous: 'Previous', next: 'Next', first_change: 'First change', download: 'Download diff',
+    page: (n,total) => `Page ${n} of ${total} · Up to 200 segments per page. Copy and download include the full diff.`,
+    complex: 'The comparison is too complex. Try line mode or compare a smaller section.',
   },
 };
 
@@ -27,7 +33,7 @@ function renderTextDiff(el) {
           <label style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:4px">
             <input type="checkbox" id="diffRealtime" onchange="diffRealtimeToggle()"> ${T('realtime')}
           </label>
-          <select id="diffMode" class="tool-input" style="width:auto;font-size:12px">
+          <select id="diffMode" class="tool-input" style="width:auto;font-size:12px" onchange="runDiff()">
             <option value="line">${T('mode_line')}</option>
             <option value="word">${T('mode_word')}</option>
             <option value="char">${T('mode_char')}</option>
@@ -36,8 +42,9 @@ function renderTextDiff(el) {
             <option value="split">${T('view_split')}</option>
             <option value="unified">${T('view_unified')}</option>
           </select>
-          <button class="btn btn-primary" onclick="runDiff()">${T('compare')}</button>
+          <button class="btn btn-primary" data-tool-submit onclick="runDiff()">${T('compare')}</button>
           <button class="btn btn-secondary" onclick="diffCopyResult()">${T('copy_result')}</button>
+          <button class="btn btn-secondary" onclick="diffDownload()">${T('download')}</button>
           <button class="btn btn-secondary" onclick="diffClear()">${T('clear')}</button>
         </div>
       </div>
@@ -57,6 +64,7 @@ function renderTextDiff(el) {
           <textarea class="tool-textarea" id="diffB" rows="12" placeholder="${T('modified_ph')}" oninput="diffOnInput()"></textarea>
         </div>
       </div>
+      <p class="workspace-notice" id="diffError" role="status" hidden></p>
     </div>
     <div class="tool-card-panel" id="diffResultPanel" style="display:none">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
@@ -64,11 +72,18 @@ function renderTextDiff(el) {
         <span id="diffStat" style="font-size:12px;color:var(--text-muted)"></span>
       </div>
       <div id="diffOutput" style="font-family:monospace;font-size:13px;line-height:1.8;overflow-x:auto"></div>
+      <div class="tool-actions" id="diffPagination">
+        <button class="btn btn-secondary" id="diffPrevious" onclick="diffShowPage(-1)">${T('previous')}</button>
+        <button class="btn btn-secondary" id="diffNext" onclick="diffShowPage(1)">${T('next')}</button>
+        <button class="btn btn-secondary" onclick="diffShowPage(0,true)">${T('first_change')}</button>
+        <span class="workspace-notice" id="diffPageStatus" role="status"></span>
+      </div>
     </div>`;
 
-  window._diffRT = false;
+  window._activeCleanup = () => clearTimeout(_diffTimer);
 }
 
+let _diffTimer;
 function diffOnInput() {
   const T = makeToolI18n(_diffDict);
   const a = document.getElementById('diffA');
@@ -77,40 +92,47 @@ function diffOnInput() {
   const cb = document.getElementById('diffCountB');
   if (a && ca) ca.textContent = T('count', a.value.split('\n').length, a.value.length);
   if (b && cb) cb.textContent = T('count', b.value.split('\n').length, b.value.length);
-  if (window._diffRT) runDiff();
+  clearTimeout(_diffTimer);
+  document.getElementById('diffResultPanel').style.display='none';
+  document.getElementById('diffOutput')._result=null;
+  if (document.getElementById('diffRealtime').checked) _diffTimer=setTimeout(runDiff,200);
 }
 
 function diffRealtimeToggle() {
-  window._diffRT = document.getElementById('diffRealtime').checked;
-  if (window._diffRT) runDiff();
+  clearTimeout(_diffTimer);
+  if (document.getElementById('diffRealtime').checked) runDiff();
 }
 
 function diffChangeView() {
   const a = (document.getElementById('diffA') || {}).value;
   const b = (document.getElementById('diffB') || {}).value;
-  if (a || b) runDiff();
+  if (document.getElementById('diffOutput')._result) diffShowPage();
+  else if (a || b) runDiff();
 }
 
-function runDiff() {
+let _diffRevision = 0;
+async function runDiff() {
+  const revision=++_diffRevision, host=document.getElementById('diffA');
+  clearTimeout(_diffTimer);
+  if(!document.getElementById('diffMode')) return;
   const a = (document.getElementById('diffA') || {}).value || '';
   const b = (document.getElementById('diffB') || {}).value || '';
   if (!a && !b) return;
   const mode = document.getElementById('diffMode').value;
-  const view = document.getElementById('diffView').value;
 
-  let tokensA, tokensB;
-  if (mode === 'line') {
-    tokensA = a.split('\n');
-    tokensB = b.split('\n');
-  } else if (mode === 'word') {
-    tokensA = a.split(/(\s+)/);
-    tokensB = b.split(/(\s+)/);
-  } else {
-    tokensA = [...a];
-    tokensB = [...b];
+  const error=document.getElementById('diffError'); error.hidden=true;
+  let diff;
+  try {
+    const compute = await ToolCompute.load('text-diff');
+    if (!host?.isConnected || revision!==_diffRevision || host.value!==a || document.getElementById('diffB').value!==b) return {success:false,cancelled:true};
+    diff = _computeDiff(compute.tokenize(a,mode), compute.tokenize(b,mode));
   }
-
-  const diff = _computeDiff(tokensA, tokensB);
+  catch(e) {
+    if (!host?.isConnected || revision!==_diffRevision) return {success:false,cancelled:true};
+    error.textContent=makeToolI18n(_diffDict)('complex');error.hidden=false;
+    document.getElementById('diffResultPanel').style.display='none';
+    document.getElementById('diffOutput')._result=null;return {success:false,error:error.textContent};
+  }
   let added = 0, removed = 0;
   diff.forEach(([t]) => { if (t === 1) added++; else if (t === -1) removed++; });
 
@@ -118,15 +140,38 @@ function runDiff() {
   if (statEl) statEl.textContent = makeToolI18n(_diffDict)('stat', added, removed);
 
   const out = document.getElementById('diffOutput');
-  if (view === 'split' && mode === 'line') {
-    out.innerHTML = _renderSplitView(tokensA, tokensB, diff);
-  } else {
-    out.innerHTML = _renderUnifiedView(diff, mode);
+  const segments=[];
+  for(const [type,value] of diff) {
+    const last=segments[segments.length-1];
+    if(mode!=='line' && last?.[0]===type) last[1]+=value;
+    else segments.push([type,value]);
   }
+  out._result={diff:segments,mode,page:0};
   document.getElementById('diffResultPanel').style.display = '';
+  diffShowPage();
+  return {success:true,data:{added,removed,diff}};
 }
 
-function _renderSplitView(tokensA, tokensB, diff) {
+function diffShowPage(delta=0,firstChange=false) {
+  const out=document.getElementById('diffOutput'), state=out?._result;
+  if(!state) return;
+  const {diff,mode}=state, pages=Math.max(1,Math.ceil(diff.length/200));
+  state.page=firstChange ? Math.floor(Math.max(0,diff.findIndex(item=>item[0]!==0))/200) : Math.min(pages-1,Math.max(0,state.page+delta));
+  const start=state.page*200, visible=diff.slice(start,start+200);
+  let left=1,right=1;
+  for(let i=0;i<start;i++) {if(diff[i][0]!==1)left++;if(diff[i][0]!==-1)right++;}
+  const view=document.getElementById('diffView').value;
+  if (view === 'split' && mode === 'line') {
+    out.innerHTML = _renderSplitView([], [], visible, left, right);
+  } else {
+    out.innerHTML = _renderUnifiedView(visible, mode, left);
+  }
+  document.getElementById('diffPrevious').disabled=state.page===0;
+  document.getElementById('diffNext').disabled=state.page===pages-1;
+  document.getElementById('diffPageStatus').textContent=makeToolI18n(_diffDict)('page',state.page+1,pages);
+}
+
+function _renderSplitView(tokensA, tokensB, diff, startLeft=1, startRight=1) {
   const T = makeToolI18n(_diffDict);
   // 构建左右行对应
   const left = [], right = [];
@@ -137,10 +182,10 @@ function _renderSplitView(tokensA, tokensB, diff) {
   });
 
   const bgMap = { '-1': 'rgba(239,68,68,0.15)', '1': 'rgba(16,185,129,0.15)', '2': 'rgba(0,0,0,0.1)', '0': '' };
-  const colorMap = { '-1': '#ef4444', '1': '#10b981', '2': 'var(--text-muted)', '0': 'var(--text)' };
+  const colorMap = { '-1': 'var(--danger)', '1': 'var(--success)', '2': 'var(--text-muted)', '0': 'var(--text)' };
 
   let leftHtml = '', rightHtml = '';
-  let ln = 1, rn = 1;
+  let ln = startLeft, rn = startRight;
   for (let i = 0; i < left.length; i++) {
     const [lt, lv] = left[i];
     const [rt, rv] = right[i];
@@ -161,14 +206,14 @@ function _renderSplitView(tokensA, tokensB, diff) {
     + rightHtml + `</div></div>`;
 }
 
-function _renderUnifiedView(diff, mode) {
+function _renderUnifiedView(diff, mode, startLine=1) {
   const isLine = mode === 'line';
   let html = '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-  let lineNum = 1;
+  let lineNum = startLine;
   if (isLine) {
     diff.forEach(([t, v]) => {
       const bg = t === -1 ? 'rgba(239,68,68,0.12)' : t === 1 ? 'rgba(16,185,129,0.12)' : '';
-      const color = t === -1 ? '#ef4444' : t === 1 ? '#10b981' : 'var(--text)';
+      const color = t === -1 ? 'var(--danger)' : t === 1 ? 'var(--success)' : 'var(--text)';
       const prefix = t === -1 ? '− ' : t === 1 ? '+ ' : '  ';
       const num = t !== 1 ? lineNum++ : '';
       html += `<div style="display:flex;min-height:1.8em;background:${bg}">`
@@ -180,8 +225,8 @@ function _renderUnifiedView(diff, mode) {
     html += '<div style="padding:12px 16px;white-space:pre-wrap;word-break:break-all">';
     diff.forEach(([t, v]) => {
       if (t === 0)  html += `<span style="color:var(--text)">${_escD(v)}</span>`;
-      else if (t === -1) html += `<span style="background:rgba(239,68,68,0.25);color:#ef4444;border-radius:3px;padding:0 2px;text-decoration:line-through">${_escD(v)}</span>`;
-      else           html += `<span style="background:rgba(16,185,129,0.25);color:#10b981;border-radius:3px;padding:0 2px">${_escD(v)}</span>`;
+      else if (t === -1) html += `<span style="background:rgba(239,68,68,0.25);color:var(--danger);border-radius:3px;padding:0 2px;text-decoration:line-through">${_escD(v)}</span>`;
+      else           html += `<span style="background:rgba(16,185,129,0.25);color:var(--success);border-radius:3px;padding:0 2px">${_escD(v)}</span>`;
     });
     html += '</div>';
   }
@@ -191,47 +236,35 @@ function _renderUnifiedView(diff, mode) {
 function diffCopyResult() {
   const T = makeToolI18n(_diffDict);
   const out = document.getElementById('diffOutput');
-  if (!out || !out.textContent.trim()) { showToast(T('run_first'), 'info'); return; }
-  navigator.clipboard.writeText(out.innerText).then(() => showToast(T('copied')));
+  if (!out?._result) { showToast(T('run_first'), 'info'); return; }
+  copyText(_diffToText(out._result));
 }
 
+function _diffToText({diff,mode}) {
+  return mode==='line' ? diff.map(([type,value])=>(type===1?'+ ':type===-1?'- ':'  ')+value).join('\n')
+    : diff.map(([type,value])=>type===0?value:type===1?'{+'+value+'+}':'[-'+value+'-]').join('');
+}
+
+function diffDownload() {
+  const result=document.getElementById('diffOutput')?._result;
+  if(!result) {showToast(makeToolI18n(_diffDict)('run_first'),'info');return;}
+  const url=URL.createObjectURL(new Blob([_diffToText(result)],{type:'text/plain;charset=utf-8'}));
+  const a=document.createElement('a');a.href=url;a.download='difference.txt';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 function _escD(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function _computeDiff(a, b) {
-  const m = a.length, n = b.length;
-  // 超大文本降级为逐行简单 diff
-  if (m * n > 2000000) {
-    const result = [];
-    const max = Math.max(m, n);
-    for (let i = 0; i < max; i++) {
-      if (i < m && i < n) {
-        if (a[i] === b[i]) result.push([0, a[i]]);
-        else { result.push([-1, a[i]]); result.push([1, b[i]]); }
-      } else if (i < m) result.push([-1, a[i]]);
-      else result.push([1, b[i]]);
-    }
-    return result;
-  }
-  const dp = Array.from({length: m+1}, (_, i) =>
-    Array.from({length: n+1}, (_, j) => i === 0 ? j : j === 0 ? i : 0));
-  for (let i = 1; i <= m; i++)
-    for (let j = 1; j <= n; j++)
-      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
-  const result = []; let i = m, j = n;
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && a[i-1] === b[j-1]) { result.unshift([0, a[i-1]]); i--; j--; }
-    else if (j > 0 && (i === 0 || dp[i][j-1] <= dp[i-1][j])) { result.unshift([1, b[j-1]]); j--; }
-    else { result.unshift([-1, a[i-1]]); i--; }
-  }
-  return result;
-}
+function _computeDiff(...args) { return window.KCompute['text-diff'].diff(...args); }
 
 function diffClear() {
+  clearTimeout(_diffTimer);
   document.getElementById('diffA').value = '';
   document.getElementById('diffB').value = '';
   document.getElementById('diffResultPanel').style.display = 'none';
+  document.getElementById('diffOutput')._result=null;
+  document.getElementById('diffError').hidden=true;
   const ca = document.getElementById('diffCountA');
   const cb = document.getElementById('diffCountB');
   if (ca) ca.textContent = '';

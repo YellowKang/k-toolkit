@@ -10,34 +10,55 @@ const AG = {
     try { localStorage.setItem('ag_' + key, JSON.stringify(val)); } catch {}
   },
 
-  // Load full config
-  load() {
+  // Only the legacy selected provider inherits the old global fields.
+  profile(adapter) {
+    const profiles = AG.get('profiles', {});
+    const saved = profiles && typeof profiles === 'object' && Object.hasOwn(profiles, adapter) ? profiles[adapter] : null;
+    const legacy = adapter === AG.get('adapter', 'claude');
+    const read = (key, old, fallback) => saved?.[key] ?? (legacy ? AG.get(old, fallback) : fallback);
     return {
-      adapter:     AG.get('adapter', 'claude'),
-      apiKey:      AG.get('key_claude', ''),
-      baseUrl:     AG.get('base_url', ''),
-      model:       AG.get('model', ''),
-      temperature: AG.get('temperature', 0.7),
-      max_tokens:  AG.get('max_tokens', 2000),
-      skin:        AG.get('skin', 'theme'),
-      position:    AG.get('position', 'right'),
-      size:        AG.get('size', 'normal'),
-      show_cards:  AG.get('show_cards', true),
+      adapter, apiKey: AG.getKey(adapter),
+      baseUrl: String(read('baseUrl', 'base_url', '')),
+      model: String(read('model', 'model', '')),
+      temperature: Number(read('temperature', 'temperature', 0.7)),
+      max_tokens: Number(read('max_tokens', 'max_tokens', 2000)),
     };
   },
-
-  // Save full config object
+  load() {
+    const selected = AG.get('adapter', 'claude');
+    const adapter = ['claude', 'openai-chat', 'openai-response', 'gemini', 'custom'].includes(selected) ? selected : 'claude';
+    return {
+      ...AG.profile(adapter),
+      skin: AG.get('skin', 'theme'), position: AG.get('position', 'right'),
+      size: AG.get('size', 'normal'), show_cards: AG.get('show_cards', true),
+    };
+  },
+  validate(cfg) {
+    if (!window.AgentAdapters.listAdapters().some(a => a.id === cfg.adapter)) throw new Error('Unknown adapter');
+    window.AgentTransport.endpoint(cfg.adapter, cfg.baseUrl);
+    if (cfg.adapter === 'custom' && !cfg.model.trim()) throw new Error(window.getCurrentLang?.() === 'en' ? 'Enter a model name.' : '请输入模型名称。');
+    if (!Number.isFinite(cfg.temperature) || cfg.temperature < 0 || cfg.temperature > 1) throw new Error('Temperature: 0–1');
+    if (!Number.isInteger(cfg.max_tokens) || cfg.max_tokens < 1 || cfg.max_tokens > 128000) throw new Error('Max tokens: 1–128000');
+  },
   save(cfg) {
-    AG.set('adapter',     cfg.adapter);
-    AG.set('key_' + cfg.adapter, cfg.apiKey);
-    AG.set('base_url',    cfg.baseUrl);
-    AG.set('model',       cfg.model);
-    AG.set('temperature', cfg.temperature);
-    AG.set('max_tokens',  cfg.max_tokens);
-    AG.set('skin',        cfg.skin);
-    AG.set('position',    cfg.position);
-    AG.set('size',        cfg.size);
-    AG.set('show_cards',  cfg.show_cards);
+    AG.validate(cfg);
+    const profiles = { ...AG.get('profiles', {}) };
+    // Preserve the previous legacy profile before switching providers.
+    const previous = AG.load().adapter;
+    for (const id of [previous, cfg.adapter]) {
+      const profile = id === cfg.adapter ? cfg : AG.profile(id);
+      profiles[id] = { baseUrl: profile.baseUrl, model: profile.model, temperature: profile.temperature, max_tokens: profile.max_tokens };
+    }
+    const values = { profiles, adapter: cfg.adapter, ['key_' + cfg.adapter]: cfg.apiKey,
+      base_url: cfg.baseUrl, model: cfg.model, temperature: cfg.temperature, max_tokens: cfg.max_tokens,
+      skin: cfg.skin, position: cfg.position, size: cfg.size, show_cards: cfg.show_cards };
+    const before = new Map(Object.keys(values).map(key => [key, localStorage.getItem('ag_' + key)]));
+    try { for (const [key, value] of Object.entries(values)) localStorage.setItem('ag_' + key, JSON.stringify(value)); }
+    catch (error) {
+      for (const [key, value] of before) { try { if (value === null) localStorage.removeItem('ag_' + key); else localStorage.setItem('ag_' + key, value); } catch {} }
+      throw new Error(window.getCurrentLang?.() === 'en' ? 'Could not save settings. Browser storage is unavailable or full.' : '设置保存失败：浏览器存储不可用或已满。');
+    }
+    window.dispatchEvent(new CustomEvent('agent-config-change'));
   },
 
   // Get API key for specific adapter
@@ -170,31 +191,14 @@ const SKINS = {
 
 // Apply skin — always resolve from current global theme
 function applySkin() {
-  const panel = document.getElementById('agentPanel');
-  if (!panel) return;
-  panel.setAttribute('data-skin', 'theme');
-
+  const targets = [document.getElementById('agentPanel'), document.querySelector('#agConfigModal .ag-config-box'), document.getElementById('agMiniBox')].filter(Boolean);
   const rootStyle = getComputedStyle(document.documentElement);
-  const themeMap = SKINS.theme;
-  for (const [agVar, globalVar] of Object.entries(themeMap)) {
-    if (globalVar.startsWith('--')) {
-      const val = rootStyle.getPropertyValue(globalVar).trim();
-      panel.style.setProperty(agVar, val || '');
-    } else {
-      panel.style.setProperty(agVar, globalVar);
+  for (const target of targets) {
+    target.setAttribute('data-skin', 'theme');
+    for (const [variable, value] of Object.entries(SKINS.theme)) {
+      target.style.setProperty(variable, value.startsWith('--') ? rootStyle.getPropertyValue(value).trim() : value);
     }
   }
-
-  // 同步更新已打开的 config modal 和 mini dialog
-  ['agConfigModal', 'agMiniBox'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const target = id === 'agConfigModal' ? el.querySelector('.ag-config-box') || el : el;
-    for (let i = 0; i < panel.style.length; i++) {
-      const prop = panel.style[i];
-      if (prop.startsWith('--ag-')) target.style.setProperty(prop, panel.style.getPropertyValue(prop));
-    }
-  });
 }
 
 window.AgentConfig = { AG, SKINS, applySkin };

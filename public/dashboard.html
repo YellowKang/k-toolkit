@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="dashboard-base.css">
     <link rel="stylesheet" href="dashboard-components.css">
     <link rel="stylesheet" href="dashboard-theme.css">
+    <link rel="stylesheet" href="dashboard-ux.css">
 </head>
 <body>
     <!-- 顶部加载进度条 -->
@@ -24,7 +25,7 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <span class="logo-icon">🔧</span>
+                    <span class="logo-icon" aria-hidden="true">K</span>
                     <span class="logo-text">K Toolkit</span>
                 </div>
                 <button class="sidebar-collapse-btn" id="collapseBtn" onclick="toggleCollapse()" title="折叠侧边栏">‹</button>
@@ -49,11 +50,14 @@
                     <button class="search-clear" id="searchClear" onclick="clearSearch()" style="display:none">✕</button>
                     <div class="search-kbd-hint" id="searchKbdHint"><kbd class="search-kbd">/</kbd></div>
                 </div>
-                <div class="topbar-actions">
+                <div class="topbar-settings">
+                  <button type="button" class="theme-btn topbar-more" id="topbarMore" aria-expanded="false" aria-controls="topbarActions">⋯</button>
+                  <div class="topbar-actions" id="topbarActions">
                     <button type="button" class="update-trigger" id="dataBackupButton" aria-label="数据备份与迁移" title="数据备份与迁移">⇅</button>
                     <button type="button" class="update-trigger" id="appUpdateButton" aria-label="检查更新" title="检查更新">↻<span class="update-dot" hidden></span></button>
-                    <button class="theme-btn" id="langBtn" onclick="setLang(getCurrentLang()==='zh'?'en':'zh')" style="display:inline-flex;align-items:center;font-size:12px;font-weight:600;min-width:36px;justify-content:center">EN</button>
-                    <button class="theme-btn" id="themeBtn" onclick="openThemePicker()" title="切换主题" style="display:inline-flex;align-items:center;justify-content:center;padding:6px"></button>
+                    <button class="theme-btn" id="langBtn" onclick="setLang(getCurrentLang()==='zh'?'en':'zh')" >EN</button>
+                    <button class="theme-btn" id="themeBtn" onclick="openThemePicker()" title="切换主题" ></button>
+                </div>
                 </div>
             </header>
 
@@ -88,6 +92,9 @@
     <script src="tool-compute.js"></script>
     <script src="tool-catalog.js"></script>
     <script src="image-session.js"></script>
+    <script src="file-session.js"></script>
+    <script src="tool-workspace.js"></script>
+    <script src="request-session.js"></script>
     <script src="dashboard.js"></script>
     <script src="agent/agent-loader.js"></script>
     <script src="app-updates.js"></script>

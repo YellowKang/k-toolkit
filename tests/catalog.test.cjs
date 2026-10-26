@@ -18,7 +18,7 @@ test('all stable capabilities exist, have unique IDs and valid category/file met
     assert.ok(['local', 'network', 'model', 'optional-network'].includes(tool.execution));
   }
   assert.equal(Object.keys(catalog.categories).length, 10);
-  assert.equal(catalog.entries.length, 87);
+  assert.equal(catalog.entries.length, 74);
 });
 test('workbenches have one primary entry and preserve every child capability', () => {
   const catalog = load(); const members = new Set();

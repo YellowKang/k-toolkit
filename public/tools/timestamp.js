@@ -125,6 +125,12 @@ function renderTimestamp(el) {
   const dt = new Date();
   dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset());
   document.getElementById('dateInput').value = dt.toISOString().slice(0,16);
+  el._toolOutput=()=>el._timestampOutput||'';
+  const settings=document.createElement('div');settings.className='tool-card-panel';
+  const say=(zh,en)=>getCurrentLang()==='en'?en:zh;
+  settings.innerHTML=`<div class="panel-label">${say('转换设置','Conversion settings')}</div><div style="display:flex;gap:12px;flex-wrap:wrap"><label>${say('时间戳单位','Timestamp unit')}<select id="tsUnit" class="tool-input"><option value="auto">${say('自动识别（历史时间请指定单位）','Auto (specify units for historical timestamps)')}</option>${['s','ms','us','ns'].map(x=>`<option>${x}</option>`).join('')}</select></label><label>${say('无偏移日期的时区','Time zone for dates without an offset')}<input id="tsZone" class="tool-input" value="local" placeholder="Asia/Shanghai"></label><label>${say('夏令时重复时间','DST overlap')}<select id="tsDst" class="tool-input"><option value="reject">${say('要求明确选择','Require an explicit choice')}</option><option value="earlier">${say('较早时刻','Earlier instant')}</option><option value="later">${say('较晚时刻','Later instant')}</option></select></label></div><p>${say('精度到毫秒；无效日期和夏令时不存在的时间会报错。','Millisecond precision; invalid dates and nonexistent DST times are rejected.')}</p>`;
+  el.children[0].after(settings);
+  el.addEventListener('input',event=>{if(event.target.id==='tfInput')return;el._timestampRevision=(el._timestampRevision||0)+1;el._timestampOutput='';for(const id of ['tsDateResult','tsFromDateResult','tfCards'])document.getElementById(id).textContent='';});
   startTsClock();
 
   document.getElementById('tsInput').addEventListener('keydown', e => {
@@ -189,114 +195,25 @@ function _padTwo(n) {
   return String(n).padStart(2, '0');
 }
 
-function tsToDate() {
-  const tl = window._tsTl;
-  const val = document.getElementById('tsInput').value.trim();
-  if (!val) return;
-  const unit = tsDetectUnit(val);
-  const d = unit ? new Date(tsToMillis(val, unit)) : new Date(NaN);
-  if (isNaN(d.getTime())) {
-    document.getElementById('tsDateResult').innerHTML = `<span style="color:#ef4444;font-size:13px">${tl('invalid_ts')}</span>`;
-    return;
-  }
-  const locale = _tsLocale();
-  const Y = d.getFullYear(), M = _padTwo(d.getMonth()+1), D = _padTwo(d.getDate());
-  const h = _padTwo(d.getHours()), m = _padTwo(d.getMinutes()), s = _padTwo(d.getSeconds());
-  const fmt = [
-    { label: tl('unit_detected'),  time: tl('units')[unit] },
-    { label: tl('utc_time'),       time: d.toUTCString() },
-    { label: tl('local_time'),     time: d.toLocaleString(locale) },
-    { label: tl('iso_8601'),       time: d.toISOString() },
-    { label: tl('relative_time'),  time: relativeTime(d) },
-    { label: tl('full_date'),      time: d.toLocaleDateString(locale,{year:'numeric',month:'long',day:'numeric',weekday:'long'}) },
-    { label: tl('local_datetime'), time: `${Y}-${M}-${D} ${h}:${m}:${s}` },
-    { label: tl('date'),           time: `${Y}-${M}-${D}` },
-    { label: tl('time'),           time: `${h}:${m}:${s}` },
-    { label: tl('readable'),       time: d.toLocaleString(locale,{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}) },
-  ];
-  document.getElementById('tsDateResult').innerHTML = fmt.map(z =>
-    `<div class="result-row" style="margin-bottom:6px;display:flex;align-items:center;gap:10px">
-      <span style="color:var(--text-muted);width:100px;flex-shrink:0;font-size:12px">${z.label}</span>
-      <span style="font-weight:600;flex:1;font-size:13px">${z.time}</span>
-      <button class="copy-inline" data-copy="${escHtml(z.time)}" onclick="copyText(this.dataset.copy,this)">${tl('copy')}</button>
-    </div>`).join('');
+// Shared timestamp operations
+function tsDetectUnit(text){return KCompute.date.detectUnit(text);}
+function tsToMillis(text,unit){return KCompute.date.millis(text,unit||'auto');}
+async function _timestampRun(kind){
+  const root=document.getElementById('toolBody'),id=kind==='toDate'?'tsInput':kind==='toTs'?'dateInput':'tfInput',out=document.getElementById(kind==='toDate'?'tsDateResult':kind==='toTs'?'tsFromDateResult':'tfCards');
+  const value=document.getElementById(id).value.trim(),revision=(root._timestampRevision||0)+1;root._timestampRevision=revision;root._timestampOutput='';out.textContent='';
+  if(kind==='format')document.getElementById('tfResult').style.display=value?'':'none';if(!value)return;
+  const options={unit:document.getElementById('tsUnit').value,timeZone:document.getElementById('tsZone').value.trim()||'local',disambiguation:document.getElementById('tsDst').value};
+  try{
+    const compute=await ToolCompute.load('date');if(!out.isConnected||root._timestampRevision!==revision)return;
+    const direction=kind==='format'?(compute.detectUnit(value)?'toDate':'toTs'):kind;
+    const data=compute.timestamp(value,{...options,direction}),date=new Date(data.milliseconds);root._timestampOutput=JSON.stringify(data,null,2);
+    const rows=[['ISO 8601',data.iso],[window._tsTl('ts_sec'),data.seconds],[window._tsTl('ts_ms'),data.milliseconds],[window._tsTl('unit_detected'),data.unit],[window._tsTl('local_time'),date.toLocaleString(_tsLocale())],[window._tsTl('utc_time'),date.toUTCString()]];
+    if(direction==='toTs'&&['us','ns'].includes(data.unit))rows.unshift([data.unit,data.result]);
+    for(const[label,value]of rows){const row=document.createElement('div');row.className='result-row';row.style.cssText='display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px';const name=document.createElement('span');name.textContent=label;name.style.minWidth='100px';const text=document.createElement('code');text.textContent=String(value);text.style.cssText='flex:1;min-width:120px;overflow-wrap:anywhere';const button=document.createElement('button');button.className='copy-inline';button.textContent=window._tsTl('copy');button.onclick=()=>copyText(String(value),button);row.append(name,text,button);out.append(row);}
+    return {success:true,data};
+  }catch(e){if(out.isConnected&&root._timestampRevision===revision)out.textContent=e.message;return {success:false,error:e.message};}
 }
-
-/** Unit of a numeric timestamp by integer digit count: ≤11 s, 12–14 ms, 15–17 µs, ≥18 ns; null if not numeric. */
-function tsDetectUnit(text) {
-  const m = /^-?(\d+)(?:\.\d+)?$/.exec(String(text ?? '').trim());
-  if (!m) return null;
-  const digits = m[1].replace(/^0+(?=\d)/, '').length;
-  return digits >= 18 ? 'ns' : digits >= 15 ? 'us' : digits >= 12 ? 'ms' : 's';
-}
-
-function tsToMillis(text, unit = tsDetectUnit(text)) {
-  const n = Number(String(text).trim());
-  return unit === 's' ? n * 1000 : unit === 'ms' ? n : unit === 'us' ? n / 1000 : n / 1e6;
-}
-
-function dateToTs() {
-  const tl = window._tsTl;
-  const val = document.getElementById('dateInput').value;
-  if (!val) return;
-  const d = new Date(val);
-  const sec = Math.floor(d.getTime()/1000);
-  const ms  = d.getTime();
-  document.getElementById('tsFromDateResult').innerHTML = [
-    { label: tl('ts_sec'), val: sec },
-    { label: tl('ts_ms'),  val: ms },
-  ].map(r => `<div class="result-row" style="margin-bottom:6px;display:flex;align-items:center;gap:10px">
-    <span style="color:var(--text-muted);width:80px;flex-shrink:0;font-size:12px">${r.label}</span>
-    <span style="font-weight:700;color:var(--neon);flex:1">${r.val}</span>
-    <button class="copy-inline" onclick="copyText('${r.val}',this)">${tl('copy')}</button>
-  </div>`).join('');
-}
-
-function relativeTime(d) {
-  const tl = window._tsTl;
-  const diff = Date.now() - d.getTime();
-  const abs  = Math.abs(diff), future = diff < 0;
-  if (abs < 60000)    return tl('just_now');
-  if (abs < 3600000)  return Math.floor(abs/60000) + (future ? tl('min_later') : tl('min_ago'));
-  if (abs < 86400000) return Math.floor(abs/3600000) + (future ? tl('hr_later') : tl('hr_ago'));
-  return Math.floor(abs/86400000) + (future ? tl('day_later') : tl('day_ago'));
-}
-
-function doTimeFormat() {
-  const tl = window._tsTl;
-  const locale = _tsLocale();
-  const raw = document.getElementById('tfInput').value.trim();
-  if (!raw) return;
-  let d;
-  if (/^\d{10}$/.test(raw)) d = new Date(+raw * 1000);
-  else if (/^\d{13}$/.test(raw)) d = new Date(+raw);
-  else d = new Date(raw);
-  if (isNaN(d.getTime())) {
-    document.getElementById('tfCards').innerHTML = '<span style="color:#ef4444">' + tl('cannot_parse') + '</span>';
-    document.getElementById('tfResult').style.display = '';
-    return;
-  }
-  const Y = d.getFullYear(), M = _padTwo(d.getMonth()+1), D = _padTwo(d.getDate());
-  const h = _padTwo(d.getHours()), m = _padTwo(d.getMinutes()), s = _padTwo(d.getSeconds());
-  const rows = [
-    [tl('ts_sec_label'), Math.floor(d.getTime()/1000)],
-    [tl('ts_ms_label'), d.getTime()],
-    [tl('iso_8601'), d.toISOString()],
-    [tl('local_datetime'), `${Y}-${M}-${D} ${h}:${m}:${s}`],
-    [tl('date'), `${Y}-${M}-${D}`],
-    [tl('time'), `${h}:${m}:${s}`],
-    [tl('utc_string'), d.toUTCString()],
-    [tl('readable'), d.toLocaleString(locale,{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'})],
-  ];
-  document.getElementById('tfCards').innerHTML = rows.map(([k,v]) =>
-    `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--glass-border)">
-      <span style="font-size:12px;color:var(--text-muted);min-width:130px">${k}</span>
-      <span style="font-size:13px;color:var(--text);font-family:monospace">${v}</span>
-      <button onclick="copyText('${String(v).replace(/'/g,"\\'")}',this)" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:12px;padding:2px 6px">${tl('copy')}</button>
-    </div>`
-  ).join('');
-  document.getElementById('tfResult').style.display = '';
-}
-
-// Backward compat alias: time-format tool now merged into timestamp
-window.renderTimeFormat = function(el) { renderTimestamp(el); };
+function tsToDate(){return _timestampRun('toDate');}
+function dateToTs(){return _timestampRun('toTs');}
+function doTimeFormat(){return _timestampRun('format');}
+function renderTimeFormat(el){return renderTimestamp(el);}
