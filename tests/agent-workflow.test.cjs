@@ -5,7 +5,8 @@ const vm = require('node:vm');
 const path = require('node:path');
 const { webcrypto, createHash, createHmac } = require('node:crypto');
 function setup() {
- const context={window:{},crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,URL,AbortController,btoa,atob,setTimeout,clearTimeout,console};
+ const values = new Map();
+ const context={localStorage:{getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v)},window:{},crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,URL,AbortController,btoa,atob,setTimeout,clearTimeout,console};
  vm.createContext(context);
  for(const file of ['tool-compute.js','compute/url.js','agent/actions/text.js','agent/actions/dev.js','agent/actions/composite.js','agent/actions/data.js','agent/agent-workflow.js','agent/actions/index.js','agent/agent-core.js','agent/agent-cmd-parser.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../public',file),'utf8'),context,{filename:file});
  context.window.AgentActions.registerActions();
@@ -125,4 +126,32 @@ test('model discovers schemas and executes a referenced workflow without page na
   rounds++;if(rounds===1)return{stop_reason:'tool_use',message:{role:'assistant',tool_calls:[{id:'search',function:{name:'search_tools',arguments:'{}'}}]}};
   if(rounds===2){assert.ok(request.tools.some(t=>t.name==='run_workflow'));return{stop_reason:'tool_use',message:{role:'assistant',tool_calls:[{id:'chain',function:{name:'run_workflow',arguments:JSON.stringify(workflow)}}]}};}assert.equal(JSON.parse(request.messages.at(-1).content).data.result.result,'some_status');return{stop_reason:'end',message:{role:'assistant',content:'done'}};
  }},config:{apiKey:'fixture'}});await session.send('extract and convert');assert.equal(rounds,3);
+});
+
+test('custom workflows persist as input-free plans and manual/Agent results match', async () => {
+ const { window, action } = setup(); const workflow = window.AgentWorkflow;
+ const plan = workflow.save({ name: 'My hash', steps: [
+  { id: 'format', action: 'json_format', params: { input: { $input: true }, minify: true } },
+  { id: 'hash', action: 'hash_generate', params: { text: { $ref: 'format.data.result' }, algo: 'SHA-256' } },
+ ], returnSteps: ['format'] });
+ const input = '{ "x": 1 }'; const manual = await workflow.run({ steps: workflow.inject(plan.steps, input), returnSteps: plan.returnSteps });
+ const agent = await action('run_workflow_template').execute({ template: plan.id, input });
+ assert.equal(agent.success, true); assert.equal(agent.data.result.hash, manual.data.result.hash);
+ assert.equal(agent.data.result.hash, createHash('sha256').update('{"x":1}').digest('hex'));
+ assert.equal(agent.data.outputs.format.result, '{"x":1}');
+ assert.ok(action('list_workflows').execute().data.templates.some(item => item.id === plan.id));
+ assert.ok(workflow.definition(plan.id).steps[0].params.input.$input);
+ workflow.remove(plan.id); assert.equal((await workflow.runTemplate(plan.id, input)).success, false);
+});
+test('saving invalid workflows neither executes actions nor stores secrets or unresolved plans', () => {
+ const { window, action } = setup(); let executions = 0; action('json_format').execute = () => executions++;
+ const first = { id: 'first', action: 'json_format', params: { input: { $input: true } } };
+ for (const steps of [
+  [{ ...first, params: { input: { $input: false } } }],
+  [first, { id: 'next', action: 'json_format', params: { input: { $ref: 'first.data.missing' } } }],
+  [first, { id: 'next', action: 'json_extract', params: { input: { $ref: 'first.data.result' }, pointer: 123 } }],
+  [{ id: 'hmac', action: 'hmac_generate', params: { text: { $input: true }, key: 'must-not-store' } }],
+  [{ id: 'navigate', action: 'navigate_to', params: {} }],
+ ]) assert.throws(() => window.AgentWorkflow.save({ name: 'Invalid', steps }));
+ assert.equal(executions, 0); assert.equal(window.AgentWorkflow.custom().length, 0);
 });

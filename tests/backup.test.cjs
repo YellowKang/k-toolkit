@@ -72,3 +72,24 @@ test('merge combines lists and counters, keeps local preferences and never mixes
   assert.equal(applied.written, 2);
   assert.equal(target.getItem('dtb_theme'), '"dark"');
 });
+
+test('merging indexed conversations preserves active history and archives imported active chat', () => {
+  const index = (id, title) => JSON.stringify({ version: 1, activeId: id, items: [{ id, title }] });
+  const target = storage({ dtb_chat_sessions: index('chat-local', 'Local'), dtb_chat_history: '[{"role":"user","content":"local"}]', dtb_chat_system: 'local system' });
+  const incoming = { dtb_chat_sessions: index('chat-remote', 'Remote'), dtb_chat_history: '[{"role":"user","content":"remote"}]', dtb_chat_system: 'remote system', dtb_chat_draft: '"remote draft"' };
+  const { writes } = backup.plan(target, incoming); backup.apply(target, writes);
+  assert.equal(JSON.parse(target.getItem('dtb_chat_history'))[0].content, 'local');
+  assert.equal(JSON.parse(target.getItem('dtb_chat_sessions')).activeId, 'chat-local');
+  assert.equal(JSON.parse(target.getItem('dtb_chat_sessions')).items.length, 2);
+  const archive = JSON.parse(target.getItem('dtb_chat_session_chat-remote')); assert.equal(archive.messages[0].content, 'remote'); assert.equal(archive.systemPrompt, 'remote system');
+  const { backup: file, secret } = backup.collect(storage({ ...target.dump(), 'ag_key_connection-local': '"private"' }), ['chat', 'apikeys']);
+  assert.ok(file.data['dtb_chat_session_chat-remote']); assert.equal(secret['ag_key_connection-local'], '"private"');
+  assert.equal(backup.parse(JSON.stringify(file)).rejected.length, 0);
+});
+
+test('conversation restore rolls back the group if a write fails', () => {
+  const target = storage({ dtb_chat_history: '["old"]', dtb_chat_sessions: '{"old":true}' }); const before = target.dump();
+  const write = target.setItem; let count = 0; target.setItem = (...args) => { if (++count === 2) throw new Error('quota'); return write(...args); };
+  const result = backup.apply(target, [{ key: 'dtb_chat_history', value: '["new"]', group: 'chat' }, { key: 'dtb_chat_sessions', value: '{"new":true}', group: 'chat' }]);
+  assert.equal(result.failed.length, 2); assert.deepEqual(target.dump(), before);
+});

@@ -394,6 +394,7 @@ const AG_CSS = `
 .ag-skin-btn.active { border-color: var(--ag-accent,#6366f1); background: color-mix(in srgb,var(--ag-accent,#6366f1) 15%,transparent); }
 .ag-skin-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--ag-border,rgba(255,255,255,0.2)); flex-shrink: 0; }
 .ag-range { width: 100%; accent-color: var(--ag-accent,#6366f1); margin-top: 2px; }
+.ag-connection-actions { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0; }
 .ag-config-footer {
   display: flex; gap: 8px; padding: 16px 24px;
   border-top: 1px solid var(--ag-border,rgba(255,255,255,0.06));

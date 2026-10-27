@@ -251,7 +251,7 @@ class AgentSession {
         max_tokens:  this.config.max_tokens || 2000,
         temperature: this.config.temperature ?? 0.7,
         baseUrl:     this.config.baseUrl || '',
-        apiKey:      this.config.apiKey || window.AgentConfig.AG.getKey(this.adapter.id),
+        apiKey:      this.config.apiKey ?? '',
         signal:      run.controller.signal,
       };
       if (this.adapter.id === 'openai-response' && this._responseId) {

@@ -9,7 +9,7 @@ function openConfig({ modelsOnly = false } = {}) {
   const adapters = window.AgentAdapters.listAdapters();
   const t = window.AgentI18n?.t || (k => k);
   const say = (zh, en) => window.getCurrentLang?.() === 'en' ? en : zh;
-  const previousFocus = document.activeElement;
+  let connectionId = AG.connectionId(cfg);
   let selected = cfg.adapter, testing = null, discovering = null, catalog;
   const modal = document.createElement('div'); modal.id = 'agConfigModal';
   const box = document.createElement('div'); box.className = 'ag-config-box';
@@ -18,8 +18,11 @@ function openConfig({ modelsOnly = false } = {}) {
   box.innerHTML = `
     <div class="ag-config-header"><h3 id="cfgTitle">${modelsOnly ? t('models_switch') : say('AI 连接设置', 'AI connection settings')}</h3><button class="ag-config-close" id="cfgCloseBtn" aria-label="${t('close')}">✕</button></div>
     <div class="ag-config-section">
-      <p class="ag-hint">${modelsOnly ? t('models_switch_hint') : say('Agent、快捷助手和 AI 对话共用；各服务商分别保存。', 'Shared by Agent, quick assistant and AI chat. Each provider has its own settings.')}</p>
+      <p class="ag-hint">${modelsOnly ? t('models_switch_hint') : say('Agent、快捷助手和 AI 对话共用；每个连接独立保存模型与参数。', 'Shared by Agent, quick assistant and AI chat. Named connections keep separate settings.')}</p>
+      <div class="ag-config-row"><label class="ag-config-label" for="cfgSavedConnection">${say('使用的连接', 'Connection')}</label><select id="cfgSavedConnection"></select></div>
       <details id="cfgConnection" class="ag-config-connection" ${modelsOnly ? '' : 'open'}><summary><span>${t('models_connection')}</span><span id="cfgConnectionSummary"></span></summary>
+      <div class="ag-connection-actions"><button class="ag-btn" id="cfgNewConnection">${say('新建连接', 'New connection')}</button><button class="ag-btn" id="cfgCopyConnection">${say('复制连接', 'Duplicate')}</button><button class="ag-btn" id="cfgDeleteConnection">${say('删除', 'Delete')}</button></div>
+      <div class="ag-config-row" id="cfgNameRow"><label class="ag-config-label" for="cfgConnectionName">${say('连接名称', 'Connection name')}</label><input id="cfgConnectionName" maxlength="60" autocomplete="off"></div>
       <div class="ag-config-row"><div class="ag-config-label">${t('models_protocol')}</div><div class="ag-adapter-btns" id="cfgAdapterBtns"></div><p class="ag-hint">${t('models_protocol_hint')}</p></div>
       <div class="ag-config-row"><label class="ag-config-label" for="cfgApiKey">API Key</label><div class="ag-key-wrap"><input type="password" id="cfgApiKey" autocomplete="off" spellcheck="false"><button class="ag-eye-btn" id="cfgEye" aria-label="${say('显示密钥', 'Show API key')}" aria-pressed="false">◉</button></div><div class="ag-hint">${say('保存在当前浏览器。自定义的无认证本地服务可留空。', 'Saved in this browser. Optional for a custom local server without authentication.')}</div></div>
       <div class="ag-config-row"><label class="ag-config-label" for="cfgBaseUrl">Base URL</label><input type="url" id="cfgBaseUrl" placeholder="${say('留空使用官方地址', 'Leave blank for the official endpoint')}" spellcheck="false"><div class="ag-hint">${say('支持域名、/v1 或完整接口路径', 'Accepts an origin, /v1 or a full endpoint')}</div><code id="cfgEndpoint" class="ag-endpoint"></code><p id="cfgLocalNetworkHint" class="ag-hint"></p></div>
@@ -47,7 +50,7 @@ function openConfig({ modelsOnly = false } = {}) {
   const field = id => box.querySelector('#' + id);
   const status = (message, error = false) => { field('cfgStatus').textContent = message; field('cfgStatus').classList.toggle('error', error); };
   const modelStatus = (message, error = false) => { field('cfgModelsStatus').textContent = message; field('cfgModelsStatus').classList.toggle('error', error); };
-  const read = () => ({ ...cfg, adapter: selected, apiKey: field('cfgApiKey').value.trim(), baseUrl: field('cfgBaseUrl').value.trim(), model: field('cfgModel').value.trim(), temperature: Number(field('cfgTemp').value), max_tokens: Number(field('cfgMaxTokens').value), position: field('cfgPosition').value, size: field('cfgSize').value });
+  const read = () => ({ ...cfg, connectionId, connectionName: field('cfgConnectionName').value.trim(), adapter: selected, apiKey: field('cfgApiKey').value.trim(), baseUrl: field('cfgBaseUrl').value.trim(), model: field('cfgModel').value.trim(), temperature: Number(field('cfgTemp').value), max_tokens: Number(field('cfgMaxTokens').value), position: field('cfgPosition').value, size: field('cfgSize').value });
   const picker = window.AgentModelPicker.mount(field('cfgModelLibrary'), { getConfig: read, onSelect(model) { field('cfgModel').value = model; stopTest(); status(''); } });
   const version = document.querySelector('meta[name="toolkit-version"]')?.content || 'dev';
   field('cfgVersion').textContent = t('models_version') + ' · ' + (version === 'dev' ? t('models_dev') : version);
@@ -74,8 +77,20 @@ function openConfig({ modelsOnly = false } = {}) {
     field('cfgLocalNetworkHint').textContent = window.AgentTransport.localNetworkHint(read());
     field('cfgLocalNetworkHint').hidden = !field('cfgLocalNetworkHint').textContent;
   }
+  function connectionOptions() {
+    const select = field('cfgSavedConnection'); select.replaceChildren();
+    const entries = new Map(AG.connections().map(c => [c.id, c]));
+    for (const [id, draft] of drafts) if (id.startsWith('connection-')) entries.set(id, { id, name: draft.config.connectionName || say('未命名连接', 'Untitled connection') });
+    for (const entry of entries.values()) { const option = document.createElement('option'); option.value = entry.id; option.textContent = entry.name + (entry.legacy ? say(' · 默认', ' · default') : ''); select.appendChild(option); }
+    select.value = connectionId;
+  }
   function populate() {
-    const draft = drafts.get(selected), p = draft?.config || AG.profile(selected);
+    const draft = drafts.get(connectionId), p = draft?.config || AG.connection(connectionId);
+    selected = p.adapter;
+    connectionOptions();
+    field('cfgConnectionName').value = p.connectionName || '';
+    field('cfgNameRow').hidden = connectionId.startsWith('legacy-');
+    field('cfgDeleteConnection').disabled = connectionId.startsWith('legacy-');
     const adapter = adapters.find(a => a.id === selected);
     field('cfgApiKey').value = p.apiKey; field('cfgApiKey').type = 'password'; field('cfgEye').setAttribute('aria-pressed', 'false');
     field('cfgEye').setAttribute('aria-label', say('显示密钥', 'Show API key'));
@@ -88,9 +103,28 @@ function openConfig({ modelsOnly = false } = {}) {
   }
   for (const adapter of adapters) {
     const button = document.createElement('button'); button.className = 'ag-opt-btn'; button.dataset.adapter = adapter.id; button.textContent = adapter.name;
-    button.onclick = () => { if (selected === adapter.id) return; stopTest(); stopDiscovery(); drafts.set(selected, { config: read(), catalog }); selected = adapter.id; populate(); };
+    button.onclick = () => { if (selected === adapter.id) return; stopTest(); stopDiscovery(); drafts.set(connectionId, { config: read(), catalog });
+      if (connectionId.startsWith('legacy-')) connectionId = 'legacy-' + adapter.id;
+      else drafts.set(connectionId, { config: { ...read(), adapter: adapter.id, model: adapter.defaultModel }, catalog: { models: [], recent: [] } });
+      selected = adapter.id; populate(); };
     field('cfgAdapterBtns').appendChild(button);
   }
+  field('cfgSavedConnection').onchange = event => {
+    stopTest(); stopDiscovery(); drafts.set(connectionId, { config: read(), catalog }); connectionId = event.target.value; populate();
+  };
+  function addConnection(copy) {
+    stopTest(); stopDiscovery(); const current = read(); drafts.set(connectionId, { config: current, catalog });
+    if (new Set([...AG.connections().filter(c => !c.legacy).map(c => c.id), ...[...drafts.keys()].filter(id => id.startsWith('connection-'))]).size >= 20) { status(say('最多保存 20 个命名连接。', 'Up to 20 named connections.'), true); return; }
+    connectionId = 'connection-' + crypto.randomUUID();
+    drafts.set(connectionId, { config: { ...current, connectionId, connectionName: copy ? (current.connectionName + say(' 副本', ' copy')).slice(0, 60) : say('新连接', 'New connection'), ...(copy ? {} : { apiKey: '', baseUrl: '', model: adapters.find(a => a.id === selected).defaultModel }) }, catalog: copy ? catalog : { models: [], recent: [] } });
+    populate(); field('cfgConnection').open = true; field('cfgConnectionName').focus(); field('cfgConnectionName').select();
+  }
+  field('cfgNewConnection').onclick = () => addConnection(false);
+  field('cfgCopyConnection').onclick = () => addConnection(true);
+  field('cfgDeleteConnection').onclick = () => {
+    if (!confirm(say('删除这个连接及其本地密钥？', 'Delete this connection and its local API key?'))) return;
+    try { AG.removeConnection(connectionId); drafts.delete(connectionId); connectionId = AG.connectionId(AG.load()); populate(); } catch (e) { status(e.message, true); }
+  };
   field('cfgPosition').value = cfg.position; field('cfgSize').value = cfg.size; populate();
   box.addEventListener('input', event => {
     if (event.target.id === 'cfgModelSearch') return;
@@ -115,17 +149,9 @@ function openConfig({ modelsOnly = false } = {}) {
     finally { clearTimeout(run.timer); if (discovering === run) stopDiscovery(false); }
   };
   field('cfgEye').onclick = () => { const show = field('cfgApiKey').type === 'password'; field('cfgApiKey').type = show ? 'text' : 'password'; field('cfgEye').setAttribute('aria-pressed', String(show)); field('cfgEye').setAttribute('aria-label', show ? say('隐藏密钥', 'Hide API key') : say('显示密钥', 'Show API key')); };
-  function close() { stopTest(); stopDiscovery(); modal.remove(); if (previousFocus?.isConnected) previousFocus.focus(); }
+  function close() { stopTest(); stopDiscovery(); modal.remove(); releaseFocus(); }
+  const releaseFocus = window.AgentDialog.trap(modal, box, close);
   field('cfgCloseBtn').onclick = close; field('cfgCancelBtn').onclick = close;
-  modal.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && !event.isComposing) { event.preventDefault(); event.stopPropagation(); close(); }
-    if (event.key === 'Tab') {
-      const focusable = [...box.querySelectorAll('button,input,select,summary')].filter(el => !el.disabled && el.getClientRects().length);
-      const first = focusable[0], last = focusable.at(-1);
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    }
-  });
   field('cfgTestBtn').onclick = async () => {
     if (testing) { stopTest(); status(say('测试已取消。', 'Test cancelled.')); return; }
     stopDiscovery();
@@ -137,9 +163,10 @@ function openConfig({ modelsOnly = false } = {}) {
     field('cfgTestBtn').textContent = say('取消测试', 'Cancel test'); status(say('正在连接…', 'Connecting…'));
     const started = performance.now();
     try {
-      const result = await window.AgentTransport.wait(window.AgentAdapters.getAdapter(selected).chat({ ...config, messages: [{ role: 'user', content: 'Reply with OK.' }], tools: [], max_tokens: Math.min(config.max_tokens, 64), signal: run.controller.signal }), run.controller.signal);
+      const result = await window.AgentTransport.wait(window.AgentAdapters.getAdapter(selected).chat({ ...config, messages: [{ role: 'user', content: 'Reply with OK.' }], tools: [], max_tokens: Math.min(config.max_tokens, 1024), signal: run.controller.signal }), run.controller.signal);
       if (testing !== run) return;
-      if (!result?.message || typeof result.message.content !== 'string' || !result.message.content.trim()) throw new Error('Invalid response');
+      if (result?.stop_reason === 'max_tokens') { status(say('已收到服务响应，但达到输出 Token 上限。可提高最大输出后重试；本次未验证完整对话。', 'Server responded but reached the output token limit. Increase the output limit and retry; a complete reply was not verified.'), true); return; }
+      if (!result?.message || typeof result.message.content !== 'string' || !result.message.content.trim()) { status(say('已收到服务响应，但回复为空。请检查模型、协议或服务端响应格式。', 'Server responded with an empty reply. Check the model, protocol or response format.'), true); return; }
       status(say('连接成功', 'Connected') + ' · ' + ((performance.now() - started) / 1000).toFixed(1) + ' s · ' + say('已验证基础对话', 'Basic chat verified'));
     } catch (e) { if (testing === run) status(window.AgentTransport.message(e, config), true); }
     finally { clearTimeout(run.timer); if (testing === run) stopTest(); }
@@ -156,7 +183,7 @@ window._agSyncModelButton = () => {
   const cfg = window.AgentConfig.AG.load(), adapter = window.AgentAdapters.getAdapter(cfg.adapter);
   button.firstElementChild.textContent = cfg.model || adapter.defaultModel || '—';
   button.lastElementChild.textContent = window.AgentI18n.t('models_switch') + ' ▾';
-  button.title = adapter.name + ' · ' + (cfg.model || adapter.defaultModel || '—');
+  button.title = (cfg.connectionName || adapter.name) + ' · ' + (cfg.model || adapter.defaultModel || '—');
 };
 window.addEventListener('toolkit-language-change', window._agSyncModelButton);
 window.addEventListener('agent-config-change', () => {

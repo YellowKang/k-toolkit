@@ -24,11 +24,43 @@ const AG = {
       max_tokens: Number(read('max_tokens', 'max_tokens', 2000)),
     };
   },
+  connectionId(cfg) { return /^connection-[a-zA-Z0-9-]{1,80}$/.test(cfg?.connectionId || '') ? cfg.connectionId : 'legacy-' + cfg.adapter; },
+  connections() {
+    const named = AG.get('connections', []);
+    return [
+      ...window.AgentAdapters.listAdapters().map(a => ({ id: 'legacy-' + a.id, name: a.name || a.id, adapter: a.id, legacy: true })),
+      ...(Array.isArray(named) ? named : []).filter(c => /^connection-[a-zA-Z0-9-]{1,80}$/.test(c?.id) && window.AgentAdapters.listAdapters().some(a => a.id === c.adapter)).slice(0, 20),
+    ];
+  },
+  connection(id) {
+    const entry = AG.connections().find(c => c.id === id);
+    if (!entry) return null;
+    return entry.legacy ? { ...AG.profile(entry.adapter), connectionId: entry.id, connectionName: entry.name } : {
+      adapter: entry.adapter, baseUrl: entry.baseUrl || '', model: entry.model || '', temperature: entry.temperature ?? 0.7, max_tokens: entry.max_tokens ?? 2000,
+      connectionId: entry.id, connectionName: entry.name, apiKey: AG.get('key_' + entry.id, ''),
+    };
+  },
+  write(values) {
+    const before = new Map(Object.keys(values).map(key => [key, localStorage.getItem('ag_' + key)]));
+    try { for (const [key, value] of Object.entries(values)) { if (value === null) localStorage.removeItem('ag_' + key); else localStorage.setItem('ag_' + key, JSON.stringify(value)); } }
+    catch {
+      for (const [key, value] of before) { try { if (value === null) localStorage.removeItem('ag_' + key); else localStorage.setItem('ag_' + key, value); } catch {} }
+      throw new Error(window.getCurrentLang?.() === 'en' ? 'Could not save settings. Browser storage is unavailable or full.' : '设置保存失败：浏览器存储不可用或已满。');
+    }
+    window.dispatchEvent(new CustomEvent('agent-config-change'));
+  },
+  removeConnection(id) {
+    if (!/^connection-[a-zA-Z0-9-]{1,80}$/.test(id)) throw new Error('Cannot remove a default connection');
+    const catalogs = { ...AG.get('model_catalogs', {}) }; delete catalogs[id];
+    const values = { connections: AG.connections().filter(c => !c.legacy && c.id !== id), model_catalogs: catalogs, ['key_' + id]: null };
+    if (AG.get('active_connection') === id) values.active_connection = 'legacy-' + AG.get('adapter', 'claude');
+    AG.write(values);
+  },
   load() {
     const selected = AG.get('adapter', 'claude');
     const adapter = ['claude', 'openai-chat', 'openai-response', 'gemini', 'custom'].includes(selected) ? selected : 'claude';
     return {
-      ...AG.profile(adapter),
+      ...(AG.connection(AG.get('active_connection')) || AG.connection('legacy-' + adapter)),
       skin: AG.get('skin', 'theme'), position: AG.get('position', 'right'),
       size: AG.get('size', 'normal'), show_cards: AG.get('show_cards', true),
     };
@@ -41,9 +73,9 @@ const AG = {
     const empty = { models: [], recent: [], fetchedAt: 0 };
     try {
       const endpoint = window.AgentTransport.modelsEndpoint(cfg.adapter, cfg.baseUrl);
-      const saved = AG.profile(cfg.adapter), catalogs = AG.get('model_catalogs', {});
-      const catalog = catalogs && Object.hasOwn(catalogs, cfg.adapter) ? catalogs[cfg.adapter] : null;
-      if (cfg.apiKey !== saved.apiKey || endpoint !== window.AgentTransport.modelsEndpoint(saved.adapter, saved.baseUrl) || catalog?.endpoint !== endpoint) return { ...empty, endpoint };
+      const id = AG.connectionId(cfg), saved = AG.connection(id), catalogs = AG.get('model_catalogs', {});
+      const catalog = catalogs && Object.hasOwn(catalogs, id.startsWith('legacy-') ? cfg.adapter : id) ? catalogs[id.startsWith('legacy-') ? cfg.adapter : id] : null;
+      if (!saved || cfg.adapter !== saved.adapter || cfg.apiKey !== saved.apiKey || endpoint !== window.AgentTransport.modelsEndpoint(saved.adapter, saved.baseUrl) || catalog?.endpoint !== endpoint) return { ...empty, endpoint };
       return { endpoint, models: AG.modelIds(catalog.models), recent: AG.modelIds(catalog.recent, 12), fetchedAt: Number(catalog.fetchedAt) || 0 };
     } catch { return empty; }
   },
@@ -59,24 +91,29 @@ const AG = {
     const endpoint = window.AgentTransport.modelsEndpoint(cfg.adapter, cfg.baseUrl);
     const current = catalog?.endpoint === endpoint ? catalog : AG.modelCatalog(cfg);
     const catalogs = { ...AG.get('model_catalogs', {}) };
-    catalogs[cfg.adapter] = { endpoint, models: AG.modelIds(current.models), recent: AG.modelIds([cfg.model, ...AG.modelIds(current.recent, 12)], 12), fetchedAt: Number(current.fetchedAt) || 0 };
+    const id = AG.connectionId(cfg), named = id.startsWith('connection-');
+    catalogs[named ? id : cfg.adapter] = { endpoint, models: AG.modelIds(current.models), recent: AG.modelIds([cfg.model, ...AG.modelIds(current.recent, 12)], 12), fetchedAt: Number(current.fetchedAt) || 0 };
+    if (named) {
+      const name = String(cfg.connectionName || '').trim();
+      if (!name || name.length > 60) throw new Error(window.getCurrentLang?.() === 'en' ? 'Connection name: 1–60 characters.' : '连接名称需要 1–60 个字符。');
+      const connections = AG.connections().filter(c => !c.legacy && c.id !== id);
+      if (connections.length >= 20) throw new Error(window.getCurrentLang?.() === 'en' ? 'Up to 20 named connections.' : '最多保存 20 个命名连接。');
+      connections.push({ id, name, adapter: cfg.adapter, baseUrl: cfg.baseUrl, model: cfg.model, temperature: cfg.temperature, max_tokens: cfg.max_tokens });
+      AG.write({ connections, active_connection: id, model_catalogs: catalogs, ['key_' + id]: cfg.apiKey,
+        skin: cfg.skin, position: cfg.position, size: cfg.size, show_cards: cfg.show_cards });
+      return;
+    }
     const profiles = { ...AG.get('profiles', {}) };
     // Preserve the previous legacy profile before switching providers.
-    const previous = AG.load().adapter;
+    const previous = AG.get('adapter', 'claude');
     for (const id of [previous, cfg.adapter]) {
       const profile = id === cfg.adapter ? cfg : AG.profile(id);
       profiles[id] = { baseUrl: profile.baseUrl, model: profile.model, temperature: profile.temperature, max_tokens: profile.max_tokens };
     }
-    const values = { profiles, model_catalogs: catalogs, adapter: cfg.adapter, ['key_' + cfg.adapter]: cfg.apiKey,
+    const values = { profiles, active_connection: id, model_catalogs: catalogs, adapter: cfg.adapter, ['key_' + cfg.adapter]: cfg.apiKey,
       base_url: cfg.baseUrl, model: cfg.model, temperature: cfg.temperature, max_tokens: cfg.max_tokens,
       skin: cfg.skin, position: cfg.position, size: cfg.size, show_cards: cfg.show_cards };
-    const before = new Map(Object.keys(values).map(key => [key, localStorage.getItem('ag_' + key)]));
-    try { for (const [key, value] of Object.entries(values)) localStorage.setItem('ag_' + key, JSON.stringify(value)); }
-    catch (error) {
-      for (const [key, value] of before) { try { if (value === null) localStorage.removeItem('ag_' + key); else localStorage.setItem('ag_' + key, value); } catch {} }
-      throw new Error(window.getCurrentLang?.() === 'en' ? 'Could not save settings. Browser storage is unavailable or full.' : '设置保存失败：浏览器存储不可用或已满。');
-    }
-    window.dispatchEvent(new CustomEvent('agent-config-change'));
+    AG.write(values);
   },
 
   // Get API key for specific adapter

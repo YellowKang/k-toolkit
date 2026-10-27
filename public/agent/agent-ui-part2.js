@@ -140,9 +140,10 @@ function finishCard(tc, result) {
     try { await _session.executeLocal(name, params); } finally { setBusy(false); }
   } });
   if (tc.name === 'list_workflows' || tc.function?.name === 'list_workflows') {
+    const manage = document.createElement('button'); manage.type = 'button'; manage.className = 'ag-btn'; manage.textContent = window.getCurrentLang?.() === 'en' ? 'Edit my workflows' : '编排我的流程'; manage.onclick = () => { document.getElementById('agentPanel').style.display = 'none'; navigateTo('workflow-studio'); }; actions.append(manage);
     for (const template of result.data?.templates || []) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'ag-btn';
-      button.textContent = _agT('workflow_use') + ': ' + template.id;
+      button.textContent = _agT('workflow_use') + ': ' + (template.name || template.id); button.title = template.id;
       button.addEventListener('click', () => { const input = document.getElementById('agInput'); input.value = '/workflow ' + template.id + ' '; input.focus(); });
       body.querySelector('.ag-card-actions').appendChild(button);
     }
@@ -169,7 +170,7 @@ function doSend() {
     const { AG } = window.AgentConfig;
     const cfg = AG.load();
     const adapter = window.AgentAdapters.getAdapter(cfg.adapter);
-    _session = new window.AgentSession({ adapter, config: { ...cfg, apiKey: AG.getKey(cfg.adapter) } });
+    _session = new window.AgentSession({ adapter, config: cfg });
     window.initAgentRouter(_session);
     wireSession(_session);
   }
@@ -212,7 +213,7 @@ function doSend() {
   if (!cfg.apiKey && cfg.adapter !== 'custom') {
     input.value = text; openConfig(); return;
   }
-  if (_session.config.adapter !== cfg.adapter || _session.config.model !== cfg.model || _session.config.baseUrl !== cfg.baseUrl) _session._responseId = null;
+  if (_session.config.connectionId !== cfg.connectionId || _session.config.apiKey !== cfg.apiKey || _session.config.adapter !== cfg.adapter || _session.config.model !== cfg.model || _session.config.baseUrl !== cfg.baseUrl) _session._responseId = null;
   _session.adapter = window.AgentAdapters.getAdapter(cfg.adapter); _session.config = cfg;
   appendBubble('user', text);
   setBusy(true);

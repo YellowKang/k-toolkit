@@ -41,31 +41,35 @@ window.AgentWorkflow = (() => {
     if (parts.length < 2 || parts[1] !== 'data' || parts.some(part => !part || !safeKey(part))) throw new Error('Invalid result reference: ' + ref);
     return parts;
   }
+  function validate({ steps, returnSteps }) {
+    if (!Array.isArray(steps) || !steps.length || steps.length > 12) throw new Error('A workflow requires 1–12 steps');
+    checkSize(steps);
+    const known = new Set();
+    const actions = new Map();
+    // Validate the entire plan before the first execution; no silent truncation.
+    for (const step of steps) {
+      if (!step || !/^[a-zA-Z][\w-]{0,39}$/.test(step.id) || !safeKey(step.id) || known.has(step.id)) throw new Error('Invalid or duplicate step ID');
+      if (Object.keys(step).some(key => !['id', 'action', 'params'].includes(key))) throw new Error('Unknown step field');
+      const action = window._AGENT_ALL_ACTIONS?.get(step.action);
+      if (!own(outputs, step.action) || !action) throw new Error('Action cannot be used in a local workflow: ' + step.action);
+      if (!step.params || Array.isArray(step.params) || typeof step.params !== 'object') throw new Error('Step params must be an object');
+      let hasRefs = false;
+      mapParams(step.params, ref => {
+        hasRefs = true;
+        if (!known.has(referenceParts(ref)[0])) throw new Error('Reference must point to an earlier step: ' + ref);
+      });
+      if (!hasRefs) validateAgentInput(step.params, action.parameters);
+      known.add(step.id); actions.set(step.id, action);
+    }
+    if (returnSteps !== undefined && (!Array.isArray(returnSteps) || returnSteps.length > 12 || new Set(returnSteps).size !== returnSteps.length || returnSteps.some(id => !known.has(id)))) throw new Error('returnSteps must contain unique existing step IDs (up to 12)');
+    return actions;
+  }
   async function run({ steps, returnSteps }, { signal, onProgress } = {}) {
     const log = [];
     let activeStep = null;
     try {
       checkCancelled(signal);
-      if (!Array.isArray(steps) || !steps.length || steps.length > 12) throw new Error('A workflow requires 1–12 steps');
-      checkSize(steps);
-      const known = new Set();
-      const actions = new Map();
-      // Validate the entire plan before the first execution; no silent truncation.
-      for (const step of steps) {
-        if (!step || !/^[a-zA-Z][\w-]{0,39}$/.test(step.id) || !safeKey(step.id) || known.has(step.id)) throw new Error('Invalid or duplicate step ID');
-        if (Object.keys(step).some(key => !['id', 'action', 'params'].includes(key))) throw new Error('Unknown step field');
-        const action = window._AGENT_ALL_ACTIONS?.get(step.action);
-        if (!own(outputs, step.action) || !action) throw new Error('Action cannot be used in a local workflow: ' + step.action);
-        if (!step.params || Array.isArray(step.params) || typeof step.params !== 'object') throw new Error('Step params must be an object');
-        let hasRefs = false;
-        mapParams(step.params, ref => {
-          hasRefs = true;
-          if (!known.has(referenceParts(ref)[0])) throw new Error('Reference must point to an earlier step: ' + ref);
-        });
-        if (!hasRefs) validateAgentInput(step.params, action.parameters);
-        known.add(step.id); actions.set(step.id, action);
-      }
-      if (returnSteps !== undefined && (!Array.isArray(returnSteps) || returnSteps.length > 12 || new Set(returnSteps).size !== returnSteps.length || returnSteps.some(id => !known.has(id)))) throw new Error('returnSteps must contain unique existing step IDs (up to 12)');
+      const actions = validate({ steps, returnSteps });
       const results = new Map();
       for (const step of steps) {
         checkCancelled(signal);
@@ -133,7 +137,61 @@ window.AgentWorkflow = (() => {
       { id: 'hash', action: 'hash_generate', params: { text: ref('json'), algo: 'SHA-256' } },
     ] },
   ];
-  return { run, outputs, templates, list: () => templates.map(({ id, name }) => ({ id, name })) };
+  const customKey = 'ag_custom_workflows';
+  function custom() {
+    try { const saved = JSON.parse(localStorage.getItem(customKey) || '[]'); return Array.isArray(saved) ? saved.filter(item => item && /^user-[a-zA-Z0-9-]{1,80}$/.test(item.id) && typeof item.name === 'string' && Array.isArray(item.steps)).slice(0, 20) : []; } catch { return []; }
+  }
+  function inject(value, input, depth = 0) {
+    if (depth > 20) throw new Error('Parameters are nested too deeply');
+    if (value === null || typeof value !== 'object') return value;
+    if (own(value, '$input')) { if (value.$input !== true || Object.keys(value).length !== 1) throw new Error('Input placeholder must be {"$input":true}'); return input; }
+    if (Array.isArray(value)) return value.map(v => inject(v, input, depth + 1));
+    const result = {}; for (const [key, v] of Object.entries(value)) { if (!safeKey(key)) throw new Error('Unsafe parameter key'); result[key] = inject(v, input, depth + 1); } return result;
+  }
+  function validateCustom(plan) {
+    checkSize(plan.steps);
+    const steps = inject(plan.steps, 'sample');
+    validate({ steps, returnSteps: plan.returnSteps });
+    for (const step of steps) {
+      if (step.action === 'hmac_generate') throw new Error('HMAC keys cannot be saved in a reusable workflow');
+      const schema = window._AGENT_ALL_ACTIONS.get(step.action).parameters;
+      for (const required of schema.required || []) if (!own(step.params, required)) throw new Error(step.id + ': missing ' + required);
+      for (const [key, value] of Object.entries(step.params)) {
+        if (!own(schema.properties, key)) throw new Error(step.id + ': unknown parameter ' + key);
+        let refs = false;
+        mapParams(value, ref => {
+          refs = true; const [id, ...path] = referenceParts(ref); const source = steps.find(item => item.id === id);
+          if (!outputs[source.action].includes(path.join('.'))) throw new Error('Unknown output field: ' + ref);
+        });
+        if (!refs) validateAgentInput(value, schema.properties[key], step.id + '.' + key);
+      }
+    }
+    return plan;
+  }
+  function save(plan) {
+    validateCustom(plan);
+    const name = String(plan.name || '').trim(); if (!name || name.length > 60) throw new Error('Workflow name: 1–60 characters');
+    const id = plan.id || 'user-' + crypto.randomUUID(); if (!/^user-[a-zA-Z0-9-]{1,80}$/.test(id)) throw new Error('Invalid workflow ID');
+    const entries = custom().filter(item => item.id !== id); if (entries.length >= 20) throw new Error('Up to 20 custom workflows');
+    const item = { id, name, steps: plan.steps, ...(plan.returnSteps ? { returnSteps: plan.returnSteps } : {}), updatedAt: Date.now() };
+    entries.push(item); const text = JSON.stringify(entries); if (text.length > 524288) throw new Error('Saved workflows exceed 512 KiB');
+    localStorage.setItem(customKey, text); return JSON.parse(JSON.stringify(item));
+  }
+  function remove(id) { localStorage.setItem(customKey, JSON.stringify(custom().filter(item => item.id !== id))); }
+  function list() { return [...templates.map(({ id, name }) => ({ id, name, builtin: true })), ...custom().map(({ id, name }) => ({ id, name, builtin: false }))]; }
+  function definition(id) {
+    const builtin = templates.find(item => item.id === id); if (builtin) return { id, name: builtin.name, steps: builtin.build({ $input: true }) };
+    return custom().find(item => item.id === id);
+  }
+  async function runTemplate(id, input, context) {
+    try {
+      if (typeof input !== 'string' || input.length > LIMIT) throw new Error('Workflow input must be text, up to 65536 characters');
+      const plan = definition(id); if (!plan) throw new Error('Unknown workflow template');
+      if (id.startsWith('user-')) validateCustom(plan);
+      return run({ steps: inject(plan.steps, input), returnSteps: plan.returnSteps }, context);
+    } catch (e) { return { success: false, error: e.message }; }
+  }
+  return { run, validate, outputs, templates, list, custom, save, remove, definition, inject, validateCustom, runTemplate };
 })();
 
 window.WorkflowActions = [
@@ -145,19 +203,15 @@ window.WorkflowActions = [
     execute: (params, context) => window.AgentWorkflow.run(params, context),
   },
   {
-    name: 'list_workflows', description: '列出无需模型即可执行的本地工作流模板和允许串联的动作及输出字段。',
+    name: 'list_workflows', description: '列出内置及用户保存的本地工作流、可串联动作和输出字段。列表中的 id 可直接交给 run_workflow_template；运行不依赖页面。',
     meta: { tier: 'standard', tags: ['workflow', 'templates', '模板', '串联', '流程'], category: 'composite' },
     parameters: { type: 'object', properties: {}, additionalProperties: false },
     execute: () => ({ success: true, data: { templates: window.AgentWorkflow.list(), actions: window.AgentWorkflow.outputs }, display: window.AgentWorkflow.list().map(t => t.id + ': ' + t.name).join('\n') }),
   },
   {
-    name: 'run_workflow_template', description: '执行内置本地模板：decode-json、clean-base64、json-sha256、csv-json-schema 或 yaml-json。通过引用传递结果，失败即停止。',
+    name: 'run_workflow_template', description: '执行 list_workflows 返回的内置或用户自定义本地流程。template 使用其准确 ID，input 为本次输入；通过引用传递结果，失败即停止。',
     meta: { tier: 'standard', tags: ['workflow', 'template', 'base64', 'json', 'hash', '模板', '串联'], category: 'composite' },
-    parameters: { type: 'object', properties: { template: { type: 'string', enum: ['decode-json', 'clean-base64', 'json-sha256', 'csv-json-schema', 'yaml-json'] }, input: { type: 'string', maxLength: 65536 } }, required: ['template', 'input'], additionalProperties: false },
-    execute: ({ template, input }, context) => {
-      const selected = window.AgentWorkflow.templates.find(item => item.id === template);
-      if (!selected) return { success: false, error: 'Unknown workflow template' };
-      return window.AgentWorkflow.run({ steps: selected.build(input) }, context);
-    },
+    parameters: { type: 'object', properties: { template: { type: 'string', minLength: 1, maxLength: 90 }, input: { type: 'string', maxLength: 65536 } }, required: ['template', 'input'], additionalProperties: false },
+    execute: ({ template, input }, context) => window.AgentWorkflow.runTemplate(template, input, context),
   },
 ];

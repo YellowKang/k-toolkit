@@ -31,7 +31,7 @@ const express = require('express');
     await page.goto(`http://127.0.0.1:${server.address().port}/k-toolkit/dashboard.html`, { waitUntil: 'domcontentloaded' });
     await page.locator('.nav-cat').first().waitFor();
     assert.equal(await page.locator('.nav-cat').count(), 10);
-    assert.equal(await page.locator('.nav-tool-item').count(), 73);
+    assert.equal(await page.locator('.nav-tool-item').count(), 74);
     const categories = await page.evaluate(() => Object.keys(ToolCatalog.categories));
     for (const category of categories) {
       await page.evaluate(category => setCatFilter(category), category);

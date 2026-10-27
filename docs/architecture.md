@@ -105,3 +105,13 @@ GitHub Pages 继续承载静态前端；只有需要隐藏密钥、统一鉴权�
 缓存前缀包含 scope 路径，不清理同域其他项目。version.json 不经过 Worker 缓存，检查使用 no-store 与查询参数；Worker 注册使用 updateViaCache:none。GitHub/CDN 仍可能有传播延迟，更新失败保留现有运行版本。GitHub 工作流使用 configure-pages/upload-pages-artifact/deploy-pages，仓库 Source 需设为 GitHub Actions。
 
 ImageSession 只保留最近一组 File 引用，最多 20 个、共 100 MiB，提供清除和结果暂存；显式“转为 Base64”会带入选定结果。元数据接口仅返回名称/类型/大小，不把文件内容发送给模型。压缩/转换会话同样限制 20 个输入、共 100 MiB，单张 4000 万像素，输出合计 100 MiB，顺序复用 Canvas。离页取消未完成计算并移除订阅，保留已完成的结果 URL；替换图片、重新处理或清空时释放 URL，刷新后整个会话消失。
+
+### 命名连接、会话库与可复用流程
+
+`AgentConfig` 保留旧协议 profile 和 `ag_key_<adapter>` 作为默认连接。新增 `ag_connections` 元数据、`ag_key_connection_<id>` 密钥和 `ag_active_connection` 指针；命名连接的模型目录使用连接 ID 索引，并继续校验协议、地址和凭证。Agent、快捷助手、AI 对话都读取 `AG.load()` 的完整连接快照，不回退到其他连接的密钥。配置取消不写入，保存失败回滚。
+
+`ChatConversations` 维护 `dtb_chat_sessions` 索引，活动会话沿用 `dtb_chat_history` 和 `dtb_chat_system`，非活动记录保存在 `dtb_chat_session_<id>`。切换以一次同步存储事务交换活动数据和归档，失败恢复原值；生成时禁止切换，跨标签页的活动会话冲突会提示刷新。会话上限 50，草稿、系统提示词和待发图片随会话归档，模型连接和上下文预算/固定备注仍为全局设置。长历史继续分批渲染；普通自动保存最多 500 条/约 1.5M 字符，超限明确提示导出。
+
+备份识别新会话键；合并时保留本机活动会话，将导入的活动会话归档到自己的 ID，避免拼接不同会话。会话分组写入失败整体回滚。命名连接密钥沿用 `ag_key_` 敏感分组，只进入加密密钥部分。
+
+`AgentDialog.trap` 统一处理焦点约束、Tab 循环、遮罩点击和 Escape，并在关闭时移除监听器、恢复触发按钮焦点。连接测试单次最多请求 1,024 个输出 Token，区分正常文本、截断和空回复，不自动重试。

@@ -11,14 +11,14 @@ function load() {
 }
 test('all stable capabilities exist, have unique IDs and valid category/file metadata', () => {
   const catalog = load();
-  assert.equal(catalog.tools.length, 93); assert.equal(new Set(catalog.tools.map(tool => tool.id)).size, 93);
+  assert.equal(catalog.tools.length, 94); assert.equal(new Set(catalog.tools.map(tool => tool.id)).size, 94);
   for (const tool of catalog.tools) {
     assert.ok(tool.id === 'ai-chat' || catalog.categories[tool.category], tool.id);
     assert.ok(fs.existsSync(path.join(root, 'public/tools', tool.file)), tool.file);
     assert.ok(['local', 'network', 'model', 'optional-network'].includes(tool.execution));
   }
   assert.equal(Object.keys(catalog.categories).length, 10);
-  assert.equal(catalog.entries.length, 74);
+  assert.equal(catalog.entries.length, 75);
 });
 test('workbenches have one primary entry and preserve every child capability', () => {
   const catalog = load(); const members = new Set();

@@ -11,7 +11,7 @@ const CmdParser = (() => {
   // 斜杠命令定义（desc 使用 key，getSuggestions/getHelpText 调用时动态翻译）
   const SLASH_CMDS = {
     workflows: { descKey: 'cmd_workflows', usage: '/workflows', parse: () => ({ action: 'list_workflows', params: {} }) },
-    workflow: { descKey: 'cmd_workflow', usage: '/workflow <decode-json|clean-base64|json-sha256> <input>',
+    workflow: { descKey: 'cmd_workflow', usage: '/workflow <id from /workflows> <input>',
       parse: (args, raw) => {
         const match = raw.match(/^(\S+)(?:[ \t]|\r?\n)?([\s\S]*)$/);
         return { action:'run_workflow_template', params:{template:match?.[1] || '', input:match?.[2] || ''} };

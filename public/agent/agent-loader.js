@@ -9,6 +9,8 @@ const AG_SCRIPT_GROUPS = [
     'agent/agent-transport.js',
     'agent/agent-context.js',
     'agent/agent-result-store.js',
+    'agent/agent-dialog.js',
+    'agent/agent-conversations.js',
   ],
   // Group 1: 无依赖的独立模块（适配器 + actions + 工具模块）
   [
@@ -248,7 +250,7 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
     if (!text) return;
     const cfg = window.AgentConfig.AG.load();
     if (!cfg.apiKey && cfg.adapter !== 'custom') { window._agOpenConfig(); return; }
-    if (_miniSession.config.adapter !== cfg.adapter || _miniSession.config.model !== cfg.model || _miniSession.config.baseUrl !== cfg.baseUrl) _miniSession._responseId = null;
+    if (_miniSession.config.connectionId !== cfg.connectionId || _miniSession.config.apiKey !== cfg.apiKey || _miniSession.config.adapter !== cfg.adapter || _miniSession.config.model !== cfg.model || _miniSession.config.baseUrl !== cfg.baseUrl) _miniSession._responseId = null;
     _miniSession.adapter = window.AgentAdapters.getAdapter(cfg.adapter); _miniSession.config = cfg;
     _miniDraft = '';
     input.value = '';
@@ -403,7 +405,7 @@ const _modLabel = _isMac ? '⌘' : 'Ctrl';
     }
 
     // Refresh session config each time (in case API key/model changed)
-    if (_miniSession.config.adapter !== cfg.adapter || _miniSession.config.model !== cfg.model || _miniSession.config.baseUrl !== cfg.baseUrl) _miniSession._responseId = null;
+    if (_miniSession.config.connectionId !== cfg.connectionId || _miniSession.config.apiKey !== cfg.apiKey || _miniSession.config.adapter !== cfg.adapter || _miniSession.config.model !== cfg.model || _miniSession.config.baseUrl !== cfg.baseUrl) _miniSession._responseId = null;
     _miniSession.adapter = adapter;
     _miniSession.config = cfg;
 

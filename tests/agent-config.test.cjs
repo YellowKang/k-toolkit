@@ -141,3 +141,31 @@ test('OpenAI-compatible Gemini stream requests its resolved endpoint once', asyn
   const output = []; for await (const item of context.window.GeminiAdapter.chatStream({ messages: [], signal: new AbortController().signal })) output.push(item);
   assert.equal(requested, 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'); assert.equal(output[0].text, 'OK');
 });
+
+test('named connections isolate credentials, models and parameters on the same protocol', () => {
+  const { AG, values } = setup({ adapter: 'openai-chat', model: 'legacy', 'key_openai-chat': 'legacy-key' });
+  const legacy = AG.load();
+  const a = { ...legacy, connectionId: 'connection-a', connectionName: 'Local', baseUrl: 'https://gateway.example', apiKey: 'key-a', model: 'a', temperature: 0.2 };
+  AG.save(a, { endpoint: 'https://gateway.example/v1/models', models: ['a'], fetchedAt: 1 });
+  AG.save({ ...a, connectionId: 'connection-b', connectionName: 'Company', apiKey: 'key-b', model: 'b', temperature: 0.9 });
+  assert.equal(AG.load().model, 'b'); assert.equal(AG.profile('openai-chat').apiKey, 'legacy-key');
+  assert.equal(AG.profile('openai-chat').model, 'legacy');
+  assert.equal(AG.modelCatalog(AG.load()).models.length, 0);
+  AG.save({ ...AG.load(), ...AG.connection('connection-a') });
+  assert.equal(AG.load().apiKey, 'key-a'); assert.equal(AG.load().temperature, 0.2);
+  assert.deepEqual([...AG.modelCatalog(AG.load()).models], ['a']);
+  assert.doesNotMatch(values.get('ag_connections'), /key-a|key-b|apiKey/);
+  AG.removeConnection('connection-a'); assert.equal(AG.load().model, 'legacy');
+  assert.equal(values.has('ag_key_connection-a'), false); assert.equal(AG.connection('connection-b').apiKey, 'key-b');
+});
+
+test('named connection save and deletion roll back as a unit', () => {
+  const { AG, context, values } = setup();
+  AG.save({ ...AG.load(), connectionId: 'connection-a', connectionName: 'A', model: 'model-a', apiKey: 'key-a' });
+  const before = [...values]; const write = context.localStorage.setItem; let count = 0;
+  context.localStorage.setItem = (...args) => { if (++count === 2) throw new Error('quota'); return write(...args); };
+  assert.throws(() => AG.save({ ...AG.load(), model: 'unsaved' }), /Could not save/);
+  assert.deepEqual([...values], before);
+  count = 0; assert.throws(() => AG.removeConnection('connection-a'), /Could not save/);
+  assert.deepEqual([...values], before); assert.equal(AG.load().apiKey, 'key-a');
+});

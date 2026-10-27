@@ -3,6 +3,7 @@
 // ── 工具能力描述表 ───────────────────────────────────────────────
 // autoRun: true = AI 可直接填数据执行；false = 需要用户手动操作（文件上传类）
 const TOOL_CAPS = {
+  'workflow-studio': { autoRun: false, desc: '可视化编辑与保存本地流程；手动和 Agent 共用执行器', note: '页面用于编排流程。运行已保存的流程请直接调用 list_workflows / run_workflow_template，无需操作页面。' },
   'uuid':         { autoRun: true,  inputs: ['count','format'],              actions: ['generate'],                    desc: '生成 UUID v4，可指定数量和格式(standard/no-dash/upper/braces)' },
   'json':         { autoRun: true,  inputs: ['text'], actions: ['format','compress','sort','escape','unescape','expand'], desc: '格式化/压缩/排序 JSON，转义、去转义一层、递归展开嵌套 JSON 字符串' },
   'base64':       { autoRun: true,  inputs: ['text'],                         actions: ['encode','decode'],              desc: 'Base64 编解码，支持 URL 安全模式和文件 Base64 编解码' },

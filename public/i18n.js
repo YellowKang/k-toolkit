@@ -287,6 +287,7 @@ const TOOLS_EN = {
   'llm-token':        { name:'LLM Token Counter',  desc:'Estimate text token count and API call cost for GPT/Claude models',          category:'Dev Tools' },
   'hmac-gen':         { name:'HMAC Generator',     desc:'Generate HMAC-SHA256/384/512/SHA1 message authentication codes',             category:'Crypto' },
   // AI
+  'workflow-studio': { name: 'My Workflows', desc: 'Compose and save reusable local workflows for manual and Agent runs', category: 'Developer Tools' },
   'ai-chat':          { name:'AI Chat',            desc:'Chat with AI models — multi-turn, images, Markdown',                       category:'Productivity' },
 };
 

@@ -8,10 +8,10 @@
   });
   const own = (value, key) => value !== null && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key);
   function unwrap(data) { return own(data, 'result') ? data.result : own(data, 'hash') ? data.hash : data; }
-  function values(result) {
+  function values(result, stepLabels = {}) {
     const outputs = [];
     if (own(result, 'data') && (!result.data?.steps || own(result.data, 'result'))) outputs.push({ label: T('final'), value: unwrap(result.data?.steps ? result.data.result : result.data) });
-    for (const [id, data] of Object.entries(result.data?.outputs || {})) outputs.push({ label: T('step') + ': ' + id, value: unwrap(data) });
+    for (const [id, data] of Object.entries(result.data?.outputs || {})) outputs.push({ label: T('step') + ': ' + (stepLabels[id] || id), value: unwrap(data) });
     return outputs.filter(item => item.value !== undefined);
   }
   const textOf = value => typeof value === 'string' ? value : JSON.stringify(value, null, 2);
@@ -28,13 +28,13 @@
     for (const [value, text] of options) { const option = document.createElement('option'); option.value = value; option.textContent = text; select.append(option); }
     return select;
   }
-  function mount(host, { tc = {}, result, onRun, onNavigate } = {}) {
+  function mount(host, { tc = {}, result, onRun, onNavigate, stepLabels } = {}) {
     const root = document.createElement('section'); root.className = 'ag-result'; host.append(root);
     const status = document.createElement('p'); status.className = 'ag-result-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
     const report = error => { status.textContent = error?.message || T('failed'); };
     const action = tc.name || tc.function?.name || 'result';
     const fileResult = Array.isArray(result.data?.files);
-    const outputs = fileResult || ['search_tools', 'get_current_context', 'list_workflows'].includes(action) ? [] : values(result);
+    const outputs = fileResult || ['search_tools', 'get_current_context', 'list_workflows'].includes(action) ? [] : values(result, stepLabels);
     if (outputs.length) {
       const select = chooser(T('output'), outputs.map((item, index) => [String(index), item.label]));
       select.dataset.resultSelect = ''; root.append(select);

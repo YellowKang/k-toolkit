@@ -7,14 +7,14 @@
     { id: 'prefs', keys: ['dtb_lang', 'dtb_theme', 'dtb_sidebar_collapsed', 'dtb_collapsed_cats', 'ag_fab_pos', 'dtb_otp_settings'] },
     { id: 'history', keys: ['dtb_favorites', 'dtb_recent', 'dtb_usage', 'dtb_search_history'] },
     { id: 'tools', keys: ['dtb_note', 'dtb_todo', 'dtb_countdowns', 'dtb_saved_regex', 'dtb_mc_history', 'dtb_typing_scores', 'dtb_http_history'] },
-    { id: 'chat', keys: ['dtb_chat_history', 'dtb_chat_system', 'dtb_chat_config', 'dtb_chat_history_meta', 'dtb_context_preferences'] },
+    { id: 'chat', keys: ['dtb_chat_history', 'dtb_chat_system', 'dtb_chat_config', 'dtb_chat_history_meta', 'dtb_context_preferences', 'dtb_chat_sessions', 'dtb_chat_draft', 'dtb_chat_draft_images'], prefix: 'dtb_chat_session_' },
     { id: 'agent', prefix: 'ag_', exclude: key => key.startsWith('ag_key_') || key === 'ag_fab_pos' },
     { id: 'apikeys', prefix: 'ag_key_', sensitive: true },
     { id: 'otp', keys: ['dtb_otp_vault'] },
   ];
   const DEFAULT_GROUPS = ['prefs', 'history', 'tools', 'chat', 'agent', 'otp'];
   const LIMITS = { dtb_recent: 8, dtb_search_history: 5 };
-  const TEXT_KEYS = new Set(['dtb_note']);
+  const TEXT_KEYS = new Set(['dtb_note', 'dtb_chat_system']);
   const MAX_CHARS = 5 * 1024 * 1024;
 
   class BackupError extends Error {
@@ -113,9 +113,15 @@
     if (current === incoming) return { value: current };
     // Two boards are encrypted with different passwords; their entries cannot be combined here.
     if (key === 'dtb_otp_vault') return { skip: 'otp-exists' };
+    if (key === 'dtb_chat_system') return { value: current };
     if (TEXT_KEYS.has(key)) return { value: current.includes(incoming) ? current : `${current}\n\n---\n${incoming}` };
     let a, b;
     try { a = JSON.parse(current); b = JSON.parse(incoming); } catch { return { value: current }; }
+    if (['ag_connections', 'ag_custom_workflows'].includes(key) && Array.isArray(a) && Array.isArray(b)) {
+      const ids = new Set(a.map(item => item.id)); const combined = [...a, ...b.filter(item => !ids.has(item.id))];
+      if (combined.length > 20) throw new BackupError('limit', 'Too many saved connections or workflows (maximum 20)');
+      return { value: JSON.stringify(combined) };
+    }
     if (Array.isArray(a) && Array.isArray(b)) {
       const seen = new Set(a.map(x => JSON.stringify(x))), merged = [...a];
       for (const item of b) { const id = JSON.stringify(item); if (!seen.has(id)) { seen.add(id); merged.push(item); } }
@@ -133,11 +139,38 @@
   /** Writes needed to import `incoming` into `storage` for the chosen groups. */
   function plan(storage, incoming, { mode = 'merge', groups = null } = {}) {
     const writes = [], skipped = [];
+    incoming = { ...incoming };
+    if (mode === 'merge' && (!groups || groups.includes('chat'))) {
+      const read = (raw, fallback) => { try { return JSON.parse(raw) ?? fallback; } catch { return fallback; } };
+      const local = read(storage.getItem('dtb_chat_sessions'), null), imported = read(incoming.dtb_chat_sessions, null);
+      if (local || imported) {
+        const valid = index => index?.version === 1 && Array.isArray(index.items) && index.items.length <= 50 && index.items.some(item => item.id === index.activeId) && index.items.every(item => /^chat-[a-zA-Z0-9-]{1,80}$/.test(item.id));
+        if ((local && !valid(local)) || (imported && !valid(imported))) throw new BackupError('sessions', 'Invalid conversation index');
+        const legacy = (get) => ({ messages: read(get('dtb_chat_history'), []), meta: read(get('dtb_chat_history_meta'), {}), systemPrompt: get('dtb_chat_system') || '', draft: read(get('dtb_chat_draft'), ''), images: read(get('dtb_chat_draft_images'), []) });
+        // Preserve a legacy local chat as its own session before importing indexed chats.
+        const make = () => ({ id: 'chat-import-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10), title: 'Imported chat', createdAt: Date.now(), updatedAt: Date.now(), pinned: false });
+        const localItem = !local && storage.getItem('dtb_chat_history') ? make() : null;
+        const base = local || (localItem ? { version: 1, activeId: localItem.id, items: [localItem] } : null);
+        if (base) {
+          const extra = imported || (incoming.dtb_chat_history ? (() => { const item = make(); return { version: 1, activeId: item.id, items: [item] }; })() : null);
+          if (extra) {
+            const existing = new Set(base.items.map(item => item.id));
+            if (!existing.has(extra.activeId)) incoming['dtb_chat_session_' + extra.activeId] = JSON.stringify(legacy(key => incoming[key]));
+            base.items.push(...extra.items.filter(item => !existing.has(item.id)));
+            if (base.items.length > 50) throw new BackupError('limit', 'Too many conversations (maximum 50)');
+            // Active snapshots must never be concatenated across different conversations.
+            for (const key of ['dtb_chat_history', 'dtb_chat_history_meta', 'dtb_chat_system', 'dtb_chat_draft', 'dtb_chat_draft_images']) delete incoming[key];
+            delete incoming['dtb_chat_session_' + base.activeId];
+          }
+          incoming.dtb_chat_sessions = JSON.stringify(base);
+        }
+      }
+    }
     for (const [key, value] of Object.entries(incoming)) {
       const group = groupOf(key);
       if (!group || (groups && !groups.includes(group))) continue;
       const current = storage.getItem(key);
-      if (mode === 'overwrite' || current === null || current === '' || current === '[]' || current === '{}') {
+      if (mode === 'overwrite' || key === 'dtb_chat_sessions' || current === null || current === '' || current === '[]' || current === '{}') {
         if (current !== value) writes.push({ key, value, group });
         continue;
       }
@@ -149,10 +182,17 @@
   }
 
   function apply(storage, writes) {
-    const failed = [];
-    for (const { key, value } of writes) {
-      try { storage.setItem(key, value); } catch (e) { failed.push({ key, reason: e?.name === 'QuotaExceededError' ? 'quota' : 'storage' }); }
+    const failed = [], chat = writes.filter(item => item.group === 'chat'), other = writes.filter(item => item.group !== 'chat');
+    if (chat.length) {
+      const before = new Map(chat.map(({ key }) => [key, storage.getItem(key)]));
+      try { for (const { key, value } of chat) storage.setItem(key, value); }
+      catch (e) {
+        for (const { key } of chat) { try { storage.removeItem(key); } catch {} }
+        for (const [key, value] of before) if (value !== null) { try { storage.setItem(key, value); } catch {} }
+        failed.push(...chat.map(({ key }) => ({ key, reason: e?.name === 'QuotaExceededError' ? 'quota' : 'storage' })));
+      }
     }
+    for (const { key, value } of other) { try { storage.setItem(key, value); } catch (e) { failed.push({ key, reason: e?.name === 'QuotaExceededError' ? 'quota' : 'storage' }); } }
     return { written: writes.length - failed.length, failed };
   }
 

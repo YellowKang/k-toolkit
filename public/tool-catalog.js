@@ -3,6 +3,7 @@
   const tools = [
   // AI 工具（置顶）
   { id: 'ai-chat',         render: 'renderAiChat',         icon: '💬', color: '#6366f1', name: 'AI 对话',           desc: '直接与 AI 模型对话，支持多轮、发图、Markdown 渲染',        category: 'AI 助手', file: 'ai-chat.js',         isNew: true, tags: ['ai','chat','gpt','claude','gemini','对话','聊天'] },
+  { id: 'workflow-studio', render: 'renderWorkflowStudio', icon: '🔗', color: '#7c3aed', name: '我的流程', desc: '可视化组合工具、保存常用流程，手动与 Agent 共用', category: '开发工具', file: 'workflow-studio.js', isNew: true, tags: ['workflow','pipeline','流程','串联','自定义','自动化'] },
   // 文本处理
   { id: 'uuid', render: 'renderUUID',          icon: '🎲', color: '#f59e0b', name: 'UUID 生成器',    desc: '批量生成 UUID v4，一键复制，支持自定义数量', category: '开发工具', file: 'uuid.js', tags: ['uuid','guid','id','唯一标识','随机id','generate'] },
   { id: 'json', render: 'renderJSON',          icon: '📋', color: '#3b82f6', name: 'JSON 格式化',   desc: '格式化、去转义、展开嵌套 JSON，快速复制字段值与路径', category: '数据格式', file: 'json-format.js', tags: ['json','format','prettify','minify','validate','校验','美化','压缩','嵌套','nested','去转义','unescape','复制'] },

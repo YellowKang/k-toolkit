@@ -57,15 +57,15 @@ const _CHAT_LS_KEY = 'dtb_chat_history';
 const _CHAT_SYS_KEY = 'dtb_chat_system';
 const _CHAT_CFG_KEY = 'dtb_chat_config';
 
-function _chatLoadHistory() {
+function _chatLoadHistory(source) {
   try {
-    const messages = JSON.parse(localStorage.getItem(_CHAT_LS_KEY));
+    const messages = source || JSON.parse(localStorage.getItem(_CHAT_LS_KEY));
     const saved=Array.isArray(messages)?messages:messages?.messages;
     if (!Array.isArray(saved)) return [];
-    let omitted=messages?.omitted;try{omitted=omitted||JSON.parse(localStorage.getItem('dtb_chat_history_meta')||'{}')?.omitted;}catch{}
+    let omitted=messages?.omitted;try{omitted=source ? 0 : omitted||JSON.parse(localStorage.getItem('dtb_chat_history_meta')||'{}')?.omitted;}catch{}
     if(omitted)queueMicrotask(()=>window.showToast?.(_chatSay('仅恢复上次保存的最近历史；旧内容请查看导出文件。','Only the recent saved history was restored; see your export for older content.')));
 
-    return saved.filter(m => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string').slice(-500).map(m => ({ ...m,
+    return saved.filter(m => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string').map(m => ({ ...m,
       _images: Array.isArray(m._images) ? m._images.filter(img => img && /^image\/(png|jpeg|webp|gif)$/.test(img.mime) && typeof img.base64 === 'string' && /^[A-Za-z0-9+/=]+$/.test(img.base64)).slice(0, 4) : null,
     }));
   } catch { return []; }
@@ -76,12 +76,14 @@ function _chatSaveHistory() {
     for(let i=_chatMessages.length-1;i>=0;i--){const m=_chatMessages[i],value={role:m.role,content:m.content,_images:m._images||null,ts:m.ts,status:m.status},size=JSON.stringify(value).length;if(save.length>=500||characters+size>1500000)break;save.unshift(value);characters+=size;}
     while(save.length&&save[0].role!=='user')save.shift();
     const omitted=_chatMessages.length-save.length;
-    localStorage.setItem(_CHAT_LS_KEY,JSON.stringify(save));
-    localStorage.setItem('dtb_chat_history_meta',JSON.stringify({omitted}));
+    if (window.ChatConversations) {
+      const index = window.ChatConversations.save({ ..._chatSnapshot(), messages: save, meta: { omitted } }, _chatSessionId);
+      _chatSessionId = index.activeId; _chatSessionTitle();
+    } else { localStorage.setItem(_CHAT_LS_KEY,JSON.stringify(save)); localStorage.setItem('dtb_chat_history_meta',JSON.stringify({omitted})); }
     const status=document.getElementById('_chatStorageStatus');if(status)status.textContent=omitted?_chatSay(`刷新后仅恢复最近 ${save.length} 条；请导出以保留完整对话。`,`Only the latest ${save.length} messages will survive refresh; export to keep the full conversation.`):'';
     return true;
-  } catch {
-    window.showToast?.(_chatSay('对话暂存失败，浏览器空间不足；请导出后再清理。', 'Chat could not be saved. Export it before freeing browser storage.'), 'error');
+  } catch (error) {
+    window.showToast?.(error.message || _chatSay('对话暂存失败，浏览器空间不足；请导出后再清理。', 'Chat could not be saved. Export it before freeing browser storage.'), 'error');
     return false;
   }
 }
@@ -94,6 +96,81 @@ function _chatSaveConfig() {
       ..._chatLoadConfig(), maxCtx: _chatMaxCtx
     }));
   } catch {}
+}
+
+// ── Conversation library ──
+let _chatSessionId = null, _chatDraftTimer = null, _chatDialogClose = null;
+function _chatSafeImages(images) { return Array.isArray(images) ? images.filter(img => img && /^image\/(png|jpeg|webp|gif)$/.test(img.mime) && typeof img.base64 === 'string' && img.base64.length <= 2800000 && /^[A-Za-z0-9+/=]+$/.test(img.base64)).slice(0, 4) : []; }
+function _chatSnapshot() { return { messages: _chatMessages, systemPrompt: _chatSystemPrompt, draft: document.getElementById('_chatInput')?.value ?? _chatDraft, images: _chatImages, meta: {} }; }
+function _chatSessionTitle() {
+  try {
+    const store = window.ChatConversations; if (!store) return;
+    const index = store.assertActive(_chatSessionId); _chatSessionId = index.activeId;
+    const button = document.getElementById('_chatSessionsBtn');
+    if (button) { const title = index.items.find(item => item.id === index.activeId).title; button.textContent = _chatSay('会话 · ', 'Chats · ') + title + ' ▾'; button.title = title; }
+  } catch (e) { window.showToast?.(e.message, 'error'); }
+}
+function _chatSaveDraft() {
+  clearTimeout(_chatDraftTimer);
+  try {
+    window.ChatConversations?.assertActive(_chatSessionId);
+    localStorage.setItem('dtb_chat_draft', JSON.stringify(_chatDraft));
+  } catch (e) { window.showToast?.(e.message || _chatSay('草稿保存失败。', 'Could not save draft.'), 'error'); }
+}
+function _chatRestoreSession(value) {
+  _chatSessionId = value.index.activeId; _chatMessages = _chatLoadHistory(value.record.messages); _chatSystemPrompt = value.record.systemPrompt || '';
+  _chatDraft = typeof value.record.draft === 'string' ? value.record.draft : ''; _chatImages = _chatSafeImages(value.record.images); _chatImageEpoch++; _chatUndo = null; _chatHistoryLimit = 40;
+  document.getElementById('_chatUndoBar')?.remove();
+  const input = document.getElementById('_chatInput'); if (input) { input.value = _chatDraft; input.dispatchEvent(new Event('input')); }
+  _chatRenderHistory(_chatGetMsgContainer()); _chatUpdateImgPreview(); _chatSessionTitle(); _chatUpdateButtons(); _chatRefreshRetry(); _chatScrollBottom(true); _chatBuildMessages();
+}
+async function _chatOpenSessions() {
+  try { await window._agEnsureLoaded(); } catch { window.showToast?.(_chatTl('no_adapter'), 'error'); return; }
+  if (document.getElementById('_chatSessions')) return;
+  const store = window.ChatConversations;
+  let index;
+  try { index = store.assertActive(_chatSessionId); _chatSessionId = index.activeId; } catch (e) { window.showToast?.(e.message, 'error'); return; }
+  const overlay = document.createElement('div'); overlay.id = '_chatSessions'; overlay.className = '_chat-overlay';
+  const box = document.createElement('div'); box.className = '_chat-dialog _chat-session-dialog'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-labelledby', '_chatSessionsTitle');
+  box.innerHTML = `<div class="_chat-session-heading"><h3 id="_chatSessionsTitle">${_chatSay('我的会话', 'My conversations')}</h3><button id="_chatSessionsClose" class="_chat-btn-secondary">${_chatSay('关闭', 'Close')}</button></div><p class="_chat-session-hint">${_chatSay('会话、草稿和系统提示词独立保存到本机；连接、上下文预算与固定备注共用。生成结束或停止后可切换。', 'Chats, drafts and system prompts are saved separately in this browser. Connections, context budgets and pinned notes are shared. Stop generation before switching.')}</p><div class="_chat-session-heading"><input id="_chatSessionSearch" type="search" placeholder="${_chatSay('搜索标题或消息', 'Search titles or messages')}" aria-label="${_chatSay('搜索会话', 'Search conversations')}"><button id="_chatSessionNew" class="_chat-btn-primary">${_chatSay('新对话', 'New chat')}</button></div><p id="_chatSessionStatus" role="status" aria-live="polite"></p><div id="_chatSessionList"></div>`;
+  overlay.append(box); document.getElementById('_chatPageRoot').append(overlay);
+  const status = message => { box.querySelector('#_chatSessionStatus').textContent = message; };
+  let searchTimer;
+  const close = () => { clearTimeout(searchTimer); overlay.remove(); release(); if (_chatDialogClose === close) _chatDialogClose = null; };
+  _chatDialogClose = close;
+  const release = window.AgentDialog.trap(overlay, box, close);
+  box.querySelector('#_chatSessionsClose').onclick = close;
+  const guard = fn => { try { fn(); } catch (e) { status(e.message); } };
+  const available = () => { if (_chatBusy || _chatPreparing) throw new Error(_chatSay('请先停止当前回复再切换或删除会话。', 'Stop the current reply before switching or deleting a conversation.')); clearTimeout(_chatDraftTimer); };
+  const switchTo = (id, create = false) => guard(() => { available(); const value = store.switchTo(id, _chatSnapshot(), _chatSessionId, create); _chatRestoreSession(value); close(); document.getElementById('_chatInput')?.focus(); });
+  box.querySelector('#_chatSessionNew').onclick = () => switchTo(null, true);
+  function render() {
+    index = store.ensure(); const query = box.querySelector('#_chatSessionSearch').value.trim().toLocaleLowerCase();
+    const list = box.querySelector('#_chatSessionList'); list.replaceChildren();
+    const items = [...index.items].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+    for (const item of items) {
+      let record; const get = () => record ||= item.id === _chatSessionId ? _chatSnapshot() : store.record(item.id, index);
+      if (query && !item.title.toLocaleLowerCase().includes(query) && !get().messages.some(m => String(m.content || '').toLocaleLowerCase().includes(query))) continue;
+      const row = document.createElement('div'); row.className = '_chat-session-row'; row.dataset.sessionId = item.id;
+      const select = document.createElement('button'); select.className = '_chat-session-select'; select.dataset.sessionOpen = item.id;
+      select.textContent = (item.pinned ? '★ ' : '') + item.title + (item.id === index.activeId ? _chatSay(' · 当前', ' · active') : ''); select.onclick = () => switchTo(item.id); row.append(select);
+      const actions = document.createElement('div'); actions.className = '_chat-session-actions'; row.append(actions);
+      const action = (label, name, fn) => { const button = document.createElement('button'); button.className = '_chat-btn-secondary'; button.textContent = label; button.dataset.sessionAction = name; button.onclick = () => guard(fn); actions.append(button); };
+      action(_chatSay('改名', 'Rename'), 'rename', () => {
+        select.hidden = true; const input = document.createElement('input'); input.value = item.title; input.maxLength = 60; input.setAttribute('aria-label', _chatSay('会话名称', 'Conversation title')); row.prepend(input);
+        const save = document.createElement('button'); save.className = '_chat-btn-primary'; save.textContent = _chatSay('保存', 'Save'); row.prepend(save);
+        save.onclick = () => guard(() => { store.edit(item.id, { title: input.value }); render(); _chatSessionTitle(); box.querySelector('#_chatSessionSearch').focus(); });
+        input.onkeydown = event => { if (event.key === 'Enter' && !event.isComposing) save.click(); }; input.focus(); input.select();
+      });
+      action(item.pinned ? _chatSay('取消置顶', 'Unpin') : _chatSay('置顶', 'Pin'), 'pin', () => { store.edit(item.id, { pinned: !item.pinned }); render(); });
+      action(_chatSay('导出', 'Export'), 'export', () => _chatExportMd(get().messages, item.title));
+      action(_chatSay('删除', 'Delete'), 'delete', () => { available(); if (!confirm(_chatSay('删除此会话？建议先导出保存。', 'Delete this conversation? Export it first if needed.'))) return; const value = store.remove(item.id, _chatSessionId); if (value.record) _chatRestoreSession(value); render(); });
+      list.append(row);
+    }
+    if (!list.children.length) { const empty = document.createElement('p'); empty.textContent = _chatSay('没有匹配的会话。', 'No matching conversations.'); list.append(empty); }
+  }
+  box.querySelector('#_chatSessionSearch').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => guard(render), 150); };
+  guard(render); box.querySelector('#_chatSessionSearch').focus();
 }
 
 // ── Escape HTML ──
@@ -315,6 +392,7 @@ function _chatFinishRun(run, status, error) {
 async function _chatDoSend(text, images, replace = null) {
   if (_chatBusy) return;
   const cfg = window.AgentConfig.AG.load();
+  try { window.ChatConversations?.assertActive(_chatSessionId); } catch (e) { _chatShowError(e.message); return; }
   if (!cfg.apiKey && cfg.adapter !== 'custom') { _chatShowNoKey(); return; }
   const adapter = window.AgentAdapters.getAdapter(cfg.adapter);
   const container = _chatGetMsgContainer(); if (!container) return;
@@ -379,6 +457,7 @@ async function _chatSend() {
   if (!input?.isConnected || _chatBusy) return;
   _chatSyncConfig();
   const cfg = window.AgentConfig.AG.load();
+  try { window.ChatConversations?.assertActive(_chatSessionId); } catch (e) { _chatShowError(e.message); return; }
   if (!cfg.apiKey && cfg.adapter !== 'custom') { _chatShowNoKey(); return; }
   _chatUndo = null; document.getElementById('_chatUndoBar')?.remove();
 
@@ -398,7 +477,7 @@ async function _chatSend() {
   // Render user bubble
   const msgList = _chatGetMsgContainer();
   _chatRenderMsg(userMsg, msgList);_chatLimitRows(msgList);
-  input.value = '';
+  input.value = ''; _chatSaveDraft();
   input.style.height = 'auto';
   _chatScrollBottom(true);
 
@@ -535,16 +614,17 @@ function _chatClear() {
 }
 
 // ── Export Markdown ──
-function _chatExportMd() {
+function _chatExportMd(messages = _chatMessages, title = 'AI Chat') {
+  if (!Array.isArray(messages)) messages = _chatMessages;
   let md = `# AI Chat Export\n\n`;
-  for (const m of _chatMessages) {
+  for (const m of messages) {
     const label = m.role === 'user' ? '**User**' : '**AI**';
     md += `${label}:\n${m.content || ''}\n\n---\n\n`;
   }
   const blob = new Blob([md], { type: 'text/markdown' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `ai-chat-${new Date().toISOString().slice(0, 10)}.md`;
+  a.download = `${title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 60)}-${new Date().toISOString().slice(0, 10)}.md`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -563,7 +643,7 @@ function _chatSyncConfig() {
   _chatAdapterId = cfg.adapter; _chatModel = cfg.model; _chatTemp = cfg.temperature;
   const adapter = window.AgentAdapters.getAdapter(cfg.adapter);
   const setup = document.getElementById('_chatSetup'); if (setup) setup.hidden = !!cfg.apiKey || (cfg.adapter === 'custom' && !!cfg.baseUrl && !!cfg.model);
-  const badge = document.getElementById('_chatAdapterBadge'); if (badge) badge.textContent = adapter.name;
+  const badge = document.getElementById('_chatAdapterBadge'); if (badge) badge.textContent = cfg.connectionName || adapter.name;
   const model = document.getElementById('_chatModelBadge'); if (model) model.textContent = cfg.model || adapter.defaultModel || '—';
   const range = document.querySelector('._chat-temp-wrap input'); if (range) range.value = cfg.temperature;
   const value = document.querySelector('._chat-temp-val'); if (value) value.textContent = cfg.temperature;
@@ -571,7 +651,9 @@ function _chatSyncConfig() {
 window.addEventListener('agent-config-change', _chatSyncConfig);
 
 // ── System prompt dialog ──
-function _chatEditSystemPrompt() {
+async function _chatEditSystemPrompt() {
+  try { await window._agEnsureLoaded(); } catch { window.showToast?.(_chatTl('no_adapter'), 'error'); return; }
+  if (document.getElementById('_chatSysInput')) return;
   const overlay = document.createElement('div');
   overlay.className = '_chat-overlay';
   const dialog = document.createElement('div');
@@ -587,15 +669,15 @@ function _chatEditSystemPrompt() {
   overlay.appendChild(dialog);
   const _chatRoot2 = document.getElementById('_chatPageRoot') || document.body;
   _chatRoot2.appendChild(overlay);
-  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
-  dialog.querySelector('#_chatSysCancel').onclick = () => overlay.remove();
+  dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true'); dialog.setAttribute('aria-label', _chatTl('sys_prompt_title'));
+  const close = () => { overlay.remove(); release?.(); if (_chatDialogClose === close) _chatDialogClose = null; }; _chatDialogClose = close; const release = window.AgentDialog?.trap(overlay, dialog, close);
+  dialog.querySelector('#_chatSysInput').focus();
+  dialog.querySelector('#_chatSysCancel').onclick = close;
   dialog.querySelector('#_chatSysReset').onclick = () => {
     dialog.querySelector('#_chatSysInput').value = _chatTl('system_default');
   };
   dialog.querySelector('#_chatSysSave').onclick = () => {
-    _chatSystemPrompt = dialog.querySelector('#_chatSysInput').value.trim();
-    try { localStorage.setItem(_CHAT_SYS_KEY, _chatSystemPrompt); } catch {}
-    overlay.remove();
+    try { window.ChatConversations?.assertActive(_chatSessionId); const value = dialog.querySelector('#_chatSysInput').value.trim(); localStorage.setItem(_CHAT_SYS_KEY, value); _chatSystemPrompt = value; close(); } catch (e) { window.showToast?.(e.message, 'error'); }
   };
 }
 
@@ -738,11 +820,11 @@ function renderAiChat(container) {
   _chatTemp = AG?.load().temperature ?? _lsGet('temperature', 0.7);
   _chatMaxCtx = [0, 5, 10, 20].includes(savedCfg.maxCtx) ? savedCfg.maxCtx : 20;
   try { _chatSystemPrompt = localStorage.getItem(_CHAT_SYS_KEY) || ''; } catch {}
-  if (!_chatInitialized) { _chatMessages = _chatLoadHistory(); _chatInitialized = true; }
+  if (!_chatInitialized) { _chatMessages = _chatLoadHistory(); try { _chatDraft = JSON.parse(localStorage.getItem('dtb_chat_draft')) || ''; _chatImages = _chatSafeImages(JSON.parse(localStorage.getItem('dtb_chat_draft_images'))); if (typeof _chatDraft !== 'string') _chatDraft = ''; } catch {} _chatInitialized = true; }
   _chatSticky = true;
   if (!window.AgentAdapters && window._agEnsureLoaded) window._agEnsureLoaded().then(() => {
     if (container.isConnected) {
-      _chatSyncConfig();_chatMountContext();
+      _chatSyncConfig();_chatMountContext();_chatSessionTitle();
       if (!_chatBusy) { const inner = _chatGetMsgContainer(); if (inner && _chatMessages.length) { _chatRenderHistory(inner); } }
     }
   }).catch(() => {});
@@ -767,6 +849,16 @@ function renderAiChat(container) {
       #_chatPageRoot{position:fixed;inset:0;z-index:400}
     }
     ._chat-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 24px;padding-top:max(8px,env(safe-area-inset-top,8px));border-bottom:1px solid var(--border,rgba(255,255,255,.08));background:var(--sidebar-bg,rgba(12,12,20,.95));flex-shrink:0;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+    #_chatAdapterBadge{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #_chatSessionsBtn{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    ._chat-session-dialog{width:min(700px,calc(100vw - 32px))!important;max-height:85dvh;overflow:auto;box-sizing:border-box}
+    ._chat-session-heading{display:flex;align-items:center;gap:10px;justify-content:space-between}
+    ._chat-session-heading input{min-width:0;flex:1}
+    ._chat-session-dialog input{padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)}
+    ._chat-session-hint{font-size:12px;color:var(--text-muted);line-height:1.6}
+    ._chat-session-row{padding:12px 0;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px}
+    ._chat-session-select{display:block;width:100%;text-align:left;overflow-wrap:anywhere;border:0;background:transparent;color:var(--text);padding:4px;font:inherit;cursor:pointer}
+    ._chat-session-actions{display:flex;gap:8px;flex-wrap:wrap}
     ._chat-toolbar label{font-size:10px;color:var(--text-muted,rgba(241,245,249,.5));white-space:nowrap;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
     ._chat-toolbar-sep{width:1px;height:18px;background:var(--border,rgba(255,255,255,.08));margin:0 2px;flex-shrink:0}
     ._chat-toolbar select,._chat-toolbar input[type="text"]{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font-size:12px;outline:none;transition:border-color .15s}
@@ -956,9 +1048,9 @@ function renderAiChat(container) {
     @media(max-width:600px){
       ._chat-toolbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:7px;padding:8px 10px;overflow:visible}
       ._chat-toolbar button{white-space:nowrap;min-height:30px}
-      #_chatHome{grid-area:1/1} #_chatClearBtn{grid-area:1/2;justify-self:start}
+      #_chatHome{grid-area:1/1} #_chatSessionsBtn{grid-area:1/2;max-width:100%;min-width:0} #_chatClearBtn{grid-area:3/1;justify-self:start}
       ._chat-settings-btn{grid-area:1/3}
-      #_chatAdapterBadge{grid-area:2/1}
+      #_chatAdapterBadge{grid-area:2/1;max-width:120px}
       #_chatModelBadge{grid-area:2/2;max-width:100%;min-width:0}
       #_chatCtxWrap{grid-area:2/3;display:flex}
       ._chat-toolbar-sep,._chat-toolbar-spacer{display:none}
@@ -1020,6 +1112,7 @@ function renderAiChat(container) {
   const toolbar = document.createElement('div');
   toolbar.className = '_chat-toolbar';
   const home = document.createElement('button'); home.id = '_chatHome'; home.className = '_chat-adapter-btn'; home.textContent = _chatSay('← 工具箱', '← Toolbox'); home.onclick = () => navigateTo('home'); toolbar.appendChild(home);
+  const sessions = document.createElement('button'); sessions.id = '_chatSessionsBtn'; sessions.className = '_chat-adapter-btn'; sessions.textContent = _chatSay('会话 ▾', 'Chats ▾'); sessions.onclick = _chatOpenSessions; toolbar.append(sessions);
   const clear = document.createElement('button'); clear.id = '_chatClearBtn'; clear.className = '_chat-adapter-btn'; clear.textContent = _chatSay('清空对话', 'Clear chat'); clear.onclick = _chatClear; toolbar.appendChild(clear);
 
   // Current adapter badge
@@ -1163,7 +1256,7 @@ function renderAiChat(container) {
     }
   });
   textarea.addEventListener('input', () => {
-    _chatDraft = textarea.value;
+    _chatDraft = textarea.value; clearTimeout(_chatDraftTimer); _chatDraftTimer = setTimeout(_chatSaveDraft, 300);
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   });
@@ -1208,9 +1301,9 @@ function renderAiChat(container) {
   if (_chatMessages.length > 0) {
     requestAnimationFrame(() => _chatScrollBottom(true));
   }
-  _chatUpdateImgPreview(); _chatSyncConfig();
+  _chatUpdateImgPreview(); _chatSyncConfig(); _chatSessionTitle();
   window._activeCleanup = () => {
-    _chatDraft = textarea.value; _chatStop(); _chatImageEpoch++; cancelAnimationFrame(_chatScrollFrame);
+    _chatDialogClose?.(); _chatDraft = textarea.value; _chatSaveDraft(); _chatStop(); _chatImageEpoch++; cancelAnimationFrame(_chatScrollFrame);
   };
   // Focus input
   requestAnimationFrame(() => { if (textarea.isConnected) { textarea.dispatchEvent(new Event('input')); textarea.focus(); } });
