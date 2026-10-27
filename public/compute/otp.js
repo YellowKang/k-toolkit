@@ -325,6 +325,25 @@
     return { added, duplicates };
   }
 
+  /** Derive display groups without changing, merging or exposing secrets to search. */
+  function groupAccounts(entries, { query = '', issuer = '', locale = 'zh-CN' } = {}) {
+    const fold = value => String(value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+    const names = new Map([['google', 'Google'], ['openai', 'OpenAI'], ['github', 'GitHub'], ['microsoft', 'Microsoft'], ['meta', 'Meta'], ['amazon', 'Amazon'], ['binance', 'Binance']]);
+    const words = fold(query).split(' ').filter(Boolean), groups = new Map();
+    for (const entry of entries) {
+      const name = fold(entry.issuer), key = name ? 'issuer:' + name : 'unclassified';
+      if (!groups.has(key)) groups.set(key, { key, label: names.get(name) || String(entry.issuer || '').trim(), count: 0, entries: [] });
+      const group = groups.get(key); group.count++;
+      const text = fold([entry.issuer, entry.account, entry.note].join(' '));
+      if ((!issuer || issuer === key) && words.every(word => text.includes(word))) group.entries.push(entry);
+    }
+    const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true });
+    const sorted = [...groups.values()].sort((a, b) => Number(a.key === 'unclassified') - Number(b.key === 'unclassified') || collator.compare(a.label, b.label));
+    for (const group of sorted) group.entries.sort((a, b) => collator.compare(a.account, b.account) || collator.compare(a.issuer, b.issuer));
+    return { total: entries.length, matched: sorted.reduce((n, group) => n + group.entries.length, 0),
+      issuers: sorted.map(({ key, label, count }) => ({ key, label, count })), groups: sorted.filter(group => group.entries.length) };
+  }
+
   (window.KCompute ||= {}).otp = Object.freeze({ OtpError, base32Decode, base32Encode, randomSecret, normalize, hotp, generate, verify,
-    parseUri, buildUri, parseMigration, buildMigration, parseImport, merge, dedupeKey });
+    parseUri, buildUri, parseMigration, buildMigration, parseImport, merge, dedupeKey, groupAccounts });
 })();

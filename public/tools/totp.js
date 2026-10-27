@@ -16,6 +16,9 @@ const _tfDict = {
     empty: '还没有账号。点击“添加”，或“导入” Google Authenticator 迁移二维码、otpauth 链接、Aegis / 2FAS 导出文件。',
     no_match: '没有匹配的账号',
     count: n => `${n} 个账号`,
+    issuer_filter: '按发行方筛选', all_issuers: n => `全部发行方（${n} 个账号）`, unclassified: '未分类', clear_filters: '清除筛选',
+    matched_count: (n, total) => `显示 ${n} / ${total} 个账号`, group_hint: '按发行方自动分组；名称忽略大小写。未分类账号可在“编辑”中补充发行方。支持多个关键词搜索。',
+    code_changed: '输入或账号已变化，请重新复制', code_refresh_failed: '验证码刷新失败，请重试',
     copy_code: '点击复制验证码', copied: '验证码已复制', copy_failed: '复制失败，请手动选择',
     next_code: '下一个', edit: '编辑', qr: '二维码', delete: '删除', cancel: '取消', save: '保存', close: '关闭',
     delete_confirm: name => `确定删除“${name}”？删除后无法恢复，除非你有备份。`,
@@ -72,6 +75,9 @@ const _tfDict = {
     search: 'Search issuer, account or note', add: '＋ Add', import: '⇣ Import', export: '⇡ Export', settings: '⚙ Settings', lock: '🔒 Lock',
     empty: 'No accounts yet. Add one, or import a Google Authenticator transfer QR code, otpauth links, or an Aegis / 2FAS export.',
     no_match: 'No matching accounts',
+    issuer_filter: 'Filter by issuer', all_issuers: n => `All issuers (${n} accounts)`, unclassified: 'Unclassified', clear_filters: 'Clear filters',
+    matched_count: (n, total) => `Showing ${n} / ${total} accounts`, group_hint: 'Grouped by issuer, ignoring letter case. Edit unclassified accounts to add an issuer. Search supports multiple keywords.',
+    code_changed: 'Input or account changed. Copy again.', code_refresh_failed: 'Could not refresh the code. Try again.',
     count: n => `${n} account${n === 1 ? '' : 's'}`,
     copy_code: 'Click to copy the code', copied: 'Code copied', copy_failed: 'Copy failed; select the code manually',
     next_code: 'Next', edit: 'Edit', qr: 'QR', delete: 'Delete', cancel: 'Cancel', save: 'Save', close: 'Close',
@@ -125,6 +131,7 @@ const _TF_LOCK_CHOICES = [1, 5, 15, 30, 60];
 const _tf = {
   tab: 'vault', key: null, kdf: null, entries: null, codes: new Map(), timer: null, lastActive: 0, hiddenAt: 0, pendingLock: null,
   search: '', panel: null, importState: null, pendingSave: null, quick: null, generated: null, migration: null, busy: false,
+  issuerFilter: '', collapsed: new Set(), searchTimer: null, quickRevision: 0,
 };
 
 const _tfT = (key, ...args) => makeToolI18n(_tfDict)(key, ...args);
@@ -176,6 +183,8 @@ function _tfInjectStyles() {
     .tf-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .tf-toolbar input{flex:1;min-width:180px}
     .tf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:4px}
+    .tf-groups{display:flex;flex-direction:column;gap:16px}.tf-account-group{min-width:0}.tf-account-group>summary{cursor:pointer;padding:10px 2px;color:var(--text);font-size:15px;font-weight:600;overflow-wrap:anywhere}.tf-group-count{font-size:12px;font-weight:400;color:var(--text-muted);margin-left:10px}.tf-account-group>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    .tf-filter-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}.tf-filter-row select{min-width:0;max-width:100%;flex:1}.tf-filter-row button{flex-shrink:0}.tf-group-hint{font-size:12px;color:var(--text-muted);line-height:1.6;margin:10px 0 0}.tf-big:disabled{cursor:wait;opacity:.5}
     .tf-card{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--glass-border);border-radius:14px;background:rgba(255,255,255,0.04);transition:border-color .2s,box-shadow .2s;min-width:0}
     .tf-card.tf-copied{border-color:var(--accent);box-shadow:0 0 0 2px rgba(99,102,241,.25)}
     .tf-head{display:flex;gap:10px;align-items:center;min-width:0}
@@ -225,7 +234,9 @@ function renderTotp(el) {
   const visibility = () => {
     if (document.hidden) _tf.hiddenAt = Date.now();
     else if (_tf.hiddenAt && _tf.entries && Date.now() - _tf.hiddenAt > _tfSettings().autoLock * 60000) tfLock();
+    if (!document.hidden) _tfTick();
   };
+  const foreground = () => { if (!document.hidden) _tfTick(); };
   const paste = e => {
     const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
     if (item) { e.preventDefault(); _tfHandleImage(item.getAsFile()); }
@@ -233,6 +244,7 @@ function renderTotp(el) {
   document.addEventListener('pointerdown', activity, true);
   document.addEventListener('keydown', activity, true);
   document.addEventListener('visibilitychange', visibility);
+  window.addEventListener('focus', foreground);
   document.addEventListener('paste', paste);
   // Files dropped anywhere on the tool are handled here instead of making the browser open them.
   el.addEventListener('dragover', e => e.preventDefault());
@@ -244,8 +256,9 @@ function renderTotp(el) {
     document.removeEventListener('pointerdown', activity, true);
     document.removeEventListener('keydown', activity, true);
     document.removeEventListener('visibilitychange', visibility);
+    window.removeEventListener('focus', foreground);
     document.removeEventListener('paste', paste);
-    _tf.quick = null; _tf.generated = null; _tf.migration = null;
+    _tf.quick = null; _tf.generated = null; _tf.migration = null; _tf.quickRevision++; clearTimeout(_tf.searchTimer);
     // A language switch re-renders right away; leaving the tool locks the board shortly after.
     _tf.pendingLock = setTimeout(() => { _tf.pendingLock = null; tfLock(true); }, 1500);
   };
@@ -254,6 +267,7 @@ function renderTotp(el) {
 }
 
 function tfSwitchTab(tab) {
+  clearTimeout(_tf.searchTimer); _tf.quickRevision++; _tf.quick = null;
   _tf.tab = tab;
   document.querySelectorAll('.tf-tabs [data-tab]').forEach(b => {
     const on = b.dataset.tab === tab;
@@ -322,10 +336,12 @@ function _tfRenderVault() {
         <button type="button" class="btn btn-secondary" onclick="tfOpenPanel('settings')">${T('settings')}</button>
         <button type="button" class="btn btn-secondary" onclick="tfLock()">${T('lock')}</button>
       </div>
+      <div class="tf-filter-row"><select class="tool-input" id="tfIssuerFilter" aria-label="${T('issuer_filter')}" onchange="_tf.issuerFilter=this.value;_tfRenderCards()"></select><button type="button" class="btn btn-secondary" id="tfClearFilters" onclick="tfClearFilters()">${T('clear_filters')}</button></div>
+      <p class="tf-group-hint">${T('group_hint')}</p>
       <div id="tfPanel"></div>
-      <div class="tf-msg" id="tfCount"></div>
+      <div class="tf-msg" id="tfCount" role="status" aria-live="polite"></div>
     </div>
-    <div id="tfGrid" class="tf-grid"></div>`;
+    <div id="tfGrid" class="tf-groups"></div>`;
   document.getElementById('tfSearch').value = _tf.search;
   _tfRenderPanel();
   _tfRenderCards();
@@ -382,6 +398,7 @@ async function tfUnlock() {
 function tfLock(silent = false) {
   const wasOpen = !!_tf.entries;
   Object.assign(_tf, { key: null, kdf: null, entries: null, panel: null, importState: null, migration: null, search: '' });
+  _tf.issuerFilter = ''; _tf.collapsed.clear(); clearTimeout(_tf.searchTimer);
   _tf.codes.clear();
   if (!wasOpen) return;
   if (!silent && typeof showToast === 'function') showToast(_tfT('locked_toast'), 'info');
@@ -419,27 +436,43 @@ async function _tfFlushPendingSave() {
 }
 
 function tfFilter(value) {
-  _tf.search = value;
-  _tfRenderCards();
+  _tf.search = value; clearTimeout(_tf.searchTimer);
+  _tf.searchTimer = setTimeout(_tfRenderCards, 150);
 }
 
-function _tfVisibleEntries() {
-  const q = _tf.search.trim().toLowerCase();
-  return q ? _tf.entries.filter(e => [e.issuer, e.account, e.note].some(v => v.toLowerCase().includes(q))) : _tf.entries;
+function tfClearFilters() {
+  clearTimeout(_tf.searchTimer); _tf.search = ''; _tf.issuerFilter = '';
+  const search = document.getElementById('tfSearch'); if (search) { search.value = ''; search.focus(); }
+  _tfRenderCards();
 }
 
 function _tfRenderCards() {
   const grid = document.getElementById('tfGrid');
   if (!grid || !_tf.entries) return;
-  const list = _tfVisibleEntries();
-  _tfMsg('tfCount', _tf.entries.length ? _tfT('count', _tf.entries.length) : '');
+  const otp = window.KCompute.otp;
+  const options = () => ({ query: _tf.search, issuer: _tf.issuerFilter, locale: window.getCurrentLang?.() === 'en' ? 'en' : 'zh-CN' });
+  let view = otp.groupAccounts(_tf.entries, options());
+  if (_tf.issuerFilter && !view.issuers.some(group => group.key === _tf.issuerFilter)) { _tf.issuerFilter = ''; view = otp.groupAccounts(_tf.entries, options()); }
+  const select = document.getElementById('tfIssuerFilter');
+  select.replaceChildren(_tfEl('option', { value: '' }, _tfT('all_issuers', view.total)));
+  for (const group of view.issuers) select.append(_tfEl('option', { value: group.key }, `${group.label || _tfT('unclassified')} (${group.count})`));
+  select.value = _tf.issuerFilter;
+  document.getElementById('tfClearFilters').disabled = !_tf.search && !_tf.issuerFilter;
+  _tfMsg('tfCount', _tfT('matched_count', view.matched, view.total));
   grid.replaceChildren();
-  if (!list.length) {
+  if (!view.matched) {
     grid.append(_tfEl('div', { class: 'tf-empty', style: 'grid-column:1/-1' }, _tf.entries.length ? _tfT('no_match') : _tfT('empty')));
     return;
   }
   const hide = _tfSettings().hideCodes;
-  for (const entry of list) grid.append(_tfCard(entry, hide));
+  for (const group of view.groups) {
+    const details = _tfEl('details', { class: 'tf-account-group', open: !_tf.collapsed.has(group.key), dataset: { issuer: group.key } });
+    const heading = _tfEl('summary', {}, group.label || _tfT('unclassified'), _tfEl('span', { class: 'tf-group-count' }, _tfT('count', group.entries.length)));
+    const cards = _tfEl('div', { class: 'tf-grid' }, ...group.entries.map(entry => _tfCard(entry, hide)));
+    details.append(heading, cards); grid.append(details);
+    let open = details.open;
+    details.addEventListener('toggle', () => { if (!details.isConnected || details.open === open) return; open = details.open; if (open) { _tf.collapsed.delete(group.key); _tfUpdateCodes(); } else _tf.collapsed.add(group.key); });
+  }
   _tfUpdateCodes();
 }
 
@@ -469,22 +502,26 @@ function _tfCard(entry, hide) {
 async function _tfUpdateCodes() {
   const grid = document.getElementById('tfGrid');
   if (!grid || !_tf.entries) return;
-  const [otp] = await _tfModules();
-  const now = Date.now();
+  const entries = _tf.entries, byId = new Map(entries.map(entry => [entry.id, entry]));
   for (const card of grid.querySelectorAll('.tf-card')) {
-    const entry = _tf.entries?.find(e => e.id === card.dataset.id);
+    if (card.closest('.tf-account-group')?.open === false) continue;
+    const entry = byId.get(card.dataset.id);
     if (!entry) continue;
-    const step = entry.type === 'hotp' ? entry.counter : Math.floor(now / 1000 / entry.period);
+    const step = _tfStep(entry), signature = _tfCodeSignature(entry);
     let cached = _tf.codes.get(entry.id);
-    if (!cached || cached.step !== step || cached.secret !== entry.secret) {
-      cached = { step, secret: entry.secret, code: (await otp.generate(entry, now)).code };
+    if (!cached || cached.step !== step || cached.signature !== signature) {
+      let result;
+      try { result = await _tfFreshCode(entry); } catch { if (grid.isConnected) _tfMsg('tfCount', _tfT('code_refresh_failed'), 'err'); continue; }
+      if (!grid.isConnected || _tf.entries !== entries || signature !== _tfCodeSignature(entry) || result.counter !== _tfStep(entry)) continue;
+      cached = { step: result.counter, signature, code: result.code };
       _tf.codes.set(entry.id, cached);
     }
+    if (!card.isConnected) continue;
     const codeEl = card.querySelector('.tf-code');
     if (codeEl && codeEl.dataset.code !== cached.code) { codeEl.dataset.code = cached.code; codeEl.textContent = _tfGroup(cached.code); }
     const ring = card.querySelector('.tf-ring');
     if (ring) {
-      const remaining = entry.period - (Math.floor(now / 1000) % entry.period);
+      const remaining = entry.period - (Math.floor(Date.now() / 1000) % entry.period);
       ring.querySelector('.tf-ring-fg').setAttribute('stroke-dashoffset', String(94.25 * (1 - remaining / entry.period)));
       ring.querySelector('text').textContent = String(remaining);
       ring.classList.toggle('tf-low', remaining <= 5);
@@ -492,15 +529,50 @@ async function _tfUpdateCodes() {
   }
 }
 
-async function _tfCopyCode(entry, card) {
-  const code = _tf.codes.get(entry.id)?.code;
-  if (!code) return;
+const _tfStep = entry => entry.type === 'hotp' ? entry.counter : Math.floor(Date.now() / 1000 / entry.period);
+const _tfCodeSignature = entry => [entry.type, entry.secret, entry.algorithm, entry.digits, entry.period, entry.counter].join('|');
+async function _tfFreshCode(entry) {
+  const [otp] = await _tfModules();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const signature = _tfCodeSignature(entry), result = await otp.generate({ ...entry }, Date.now());
+    if (signature === _tfCodeSignature(entry) && result.counter === _tfStep(entry)) {
+      if (entry.type === 'totp') result.remaining = entry.period - (Math.floor(Date.now() / 1000) % entry.period);
+      return result;
+    }
+  }
+  throw new Error(_tfT('code_refresh_failed'));
+}
+
+// Start the clipboard operation inside the click gesture; crypto may finish asynchronously.
+async function _tfCopyFresh(entry, isCurrent, display) {
+  const prepared = _tfFreshCode(entry).then(result => {
+    if (!isCurrent()) throw new Error(_tfT('code_changed'));
+    display(result); return result.code;
+  });
+  const content = prepared.then(code => new Blob([code], { type: 'text/plain' }));
+  content.catch(() => {});
   try {
-    await navigator.clipboard.writeText(code);
+    let item;
+    if (navigator.clipboard?.write && typeof ClipboardItem === 'function') {
+      try { item = new ClipboardItem({ 'text/plain': content }); } catch { /* Older browsers use writeText below. */ }
+    }
+    if (item) { await navigator.clipboard.write([item]); window.showToast?.(_tfT('copied'), 'success'); return true; }
+    return await copyText(await prepared);
+  } catch { if (isCurrent()) window.showToast?.(_tfT('copy_failed'), 'error'); return false; }
+}
+
+async function _tfCopyCode(entry, card) {
+  const current = () => card.isConnected && !!_tf.entries?.includes(entry);
+  if (!current()) return;
+  const copied = await _tfCopyFresh(entry, current, result => {
+    _tf.codes.set(entry.id, { step: result.counter, signature: _tfCodeSignature(entry), code: result.code });
+    const el = card.querySelector('.tf-code'); el.dataset.code = result.code; el.textContent = _tfGroup(result.code);
+    _tfUpdateCodes();
+  });
+  if (copied && current()) {
     card.classList.add('tf-copied');
     setTimeout(() => card.classList.remove('tf-copied'), 900);
-    if (typeof showToast === 'function') showToast(_tfT('copied'), 'success');
-  } catch { if (typeof showToast === 'function') showToast(_tfT('copy_failed'), 'error'); }
+  }
 }
 
 async function tfNextHotp(id) {
@@ -962,7 +1034,7 @@ function _tfRenderQuick() {
     <div class="tool-card-panel" id="tfQuickResult" style="display:none">
       <div class="panel-label">${T('current_code')}</div>
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-        <button type="button" class="tf-big" id="tfQuickCode" title="${T('copy_code')}" onclick="copyText(this.dataset.code||'',this)"></button>
+        <button type="button" class="tf-big" id="tfQuickCode" title="${T('copy_code')}" onclick="tfQuickCopy()" disabled></button>
         <span id="tfQuickRemain" style="font-size:12px;color:var(--text-muted)"></span>
       </div>
       <div class="tf-msg" id="tfQuickNeighbours"></div>
@@ -976,40 +1048,59 @@ function _tfRenderQuick() {
 }
 
 async function tfQuickUpdate() {
-  const [otp] = await _tfModules();
-  const raw = document.getElementById('tfQuickInput')?.value.trim() || '';
-  const result = document.getElementById('tfQuickResult');
-  if (!raw) { _tf.quick = null; result.style.display = 'none'; _tfMsg('tfQuickMsg', ''); return; }
+  const revision = ++_tf.quickRevision, input = document.getElementById('tfQuickInput'), result = document.getElementById('tfQuickResult');
+  if (!input || !result) return;
+  const raw = input.value.trim(), params = _tfReadParams('tfQuick');
+  _tf.quick = null; result.style.display = 'none';
+  const code = document.getElementById('tfQuickCode'); code.disabled = true; delete code.dataset.code; code.textContent = '';
+  _tfMsg('tfQuickVerifyResult', ''); _tfMsg('tfQuickMsg', '');
+  if (!raw) return;
+  const current = () => revision === _tf.quickRevision && input.isConnected && _tf.tab === 'quick';
   try {
-    _tf.quick = /^otpauth:/i.test(raw) ? otp.parseUri(raw) : otp.normalize({ ..._tfReadParams('tfQuick'), secret: raw });
+    const [otp] = await _tfModules(); if (!current()) return;
+    _tf.quick = /^otpauth:/i.test(raw) ? otp.parseUri(raw) : otp.normalize({ ...params, secret: raw });
     _tfMsg('tfQuickMsg', _tf.quick.issuer || _tf.quick.account ? _tfLabel(_tf.quick) : '');
     result.style.display = '';
     await _tfUpdateQuick();
-    tfQuickVerify();
-  } catch (e) { _tf.quick = null; result.style.display = 'none'; _tfMsg('tfQuickMsg', _tfError(e), 'err'); }
+    if (current()) tfQuickVerify();
+  } catch (e) { if (current()) { _tf.quick = null; result.style.display = 'none'; _tfMsg('tfQuickMsg', _tfError(e), 'err'); } }
 }
 
 async function _tfUpdateQuick() {
   const entry = _tf.quick, codeEl = document.getElementById('tfQuickCode');
   if (!entry || !codeEl) return;
+  const live = () => _tf.quick === entry && codeEl.isConnected && _tf.tab === 'quick';
+  let current;
+  try { current = await _tfFreshCode(entry); }
+  catch { if (live()) { codeEl.disabled = true; _tfMsg('tfQuickMsg', _tfT('code_refresh_failed'), 'err'); } return; }
+  if (!live() || current.counter !== _tfStep(entry)) return;
+  _tfDisplayQuick(entry, current);
   const [otp] = await _tfModules();
-  const now = Date.now();
-  const current = await otp.generate(entry, now);
-  codeEl.dataset.code = current.code;
-  codeEl.textContent = _tfGroup(current.code);
-  document.getElementById('tfQuickRemain').textContent = entry.type === 'totp' ? _tfT('remaining', current.remaining) : `#${entry.counter}`;
-  const at = delta => entry.type === 'totp' ? otp.generate(entry, now + delta * entry.period * 1000) : otp.generate({ ...entry, counter: Math.max(0, entry.counter + delta) });
+  const at = delta => entry.type === 'totp' ? otp.generate(entry, (current.counter + delta) * entry.period * 1000) : otp.generate({ ...entry, counter: Math.max(0, entry.counter + delta) });
   const [prev, next] = await Promise.all([at(-1), at(1)]);
+  if (!live() || current.counter !== _tfStep(entry)) return;
   document.getElementById('tfQuickNeighbours').textContent = `${_tfT('previous')} ${_tfGroup(prev.code)} · ${_tfT('following')} ${_tfGroup(next.code)}`;
+}
+
+function _tfDisplayQuick(entry, current) {
+  const code = document.getElementById('tfQuickCode'); code.dataset.code = current.code; code.textContent = _tfGroup(current.code); code.disabled = false;
+  document.getElementById('tfQuickRemain').textContent = entry.type === 'totp' ? _tfT('remaining', current.remaining) : `#${current.counter}`;
+}
+
+function tfQuickCopy() {
+  const entry = _tf.quick, code = document.getElementById('tfQuickCode'); if (!entry || !code) return;
+  return _tfCopyFresh(entry, () => _tf.quick === entry && code.isConnected && _tf.tab === 'quick', result => _tfDisplayQuick(entry, result));
 }
 
 async function tfQuickVerify() {
   const value = document.getElementById('tfQuickVerify')?.value.replace(/\s/g, '') || '';
-  if (!value || !_tf.quick) return _tfMsg('tfQuickVerifyResult', '');
+  const entry = _tf.quick;
+  if (!value || !entry) return _tfMsg('tfQuickVerifyResult', '');
   const [otp] = await _tfModules();
-  const delta = await otp.verify(value, _tf.quick);
+  const delta = await otp.verify(value, entry);
+  if (_tf.quick !== entry || value !== document.getElementById('tfQuickVerify')?.value.replace(/\s/g, '')) return;
   if (delta === null) _tfMsg('tfQuickVerifyResult', _tfT('verify_bad'), 'err');
-  else _tfMsg('tfQuickVerifyResult', _tf.quick.type === 'hotp' ? _tfT('verify_ok_hotp', delta) : _tfT('verify_ok', delta), 'ok');
+  else _tfMsg('tfQuickVerifyResult', entry.type === 'hotp' ? _tfT('verify_ok_hotp', delta) : _tfT('verify_ok', delta), 'ok');
 }
 
 function tfQuickSave() { if (_tf.quick) _tfSaveToVault(_tf.quick); }

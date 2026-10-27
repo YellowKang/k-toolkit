@@ -25,7 +25,7 @@
     "test:workflows": "node tests/workflow-browser.cjs",
     "test:xss": "node tests/xss-browser.cjs",
     "test:i18n": "node tests/i18n-browser.cjs",
-    "test:totp": "node tests/totp-browser.cjs",
+    "test:totp": "node tests/totp-browser.cjs && node tests/totp-state-browser.cjs",
     "test:backup": "node tests/backup-browser.cjs",
     "test:ux": "node tests/ux-browser.cjs",
     "test:performance": "node tests/performance-browser.cjs",

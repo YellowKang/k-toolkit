@@ -56,6 +56,24 @@ test('Base32 tolerates formatting and reports bad characters', () => {
   assert.equal(otp.randomSecret().length, 32);
 });
 
+test('account grouping folds issuer case, intersects search terms and never searches secrets', () => {
+  const entries = [
+    { id: '1', issuer: ' Google ', account: 'work@example.com', note: 'primary team', secret: 'PRIVATESECRET' },
+    { id: '2', issuer: 'google', account: 'personal@example.com', note: '', secret: 'PRIVATESECRET' },
+    { id: '3', issuer: 'OpenAI', account: 'work@example.com', note: 'primary team', secret: 'PRIVATESECRET' },
+    { id: '4', issuer: '', account: 'name@gmail.com', note: '', secret: 'PRIVATESECRET' },
+  ];
+  const before = JSON.stringify(entries), view = otp.groupAccounts(entries);
+  assert.equal(view.total, 4); assert.equal(view.matched, 4); assert.equal(view.groups.length, 3);
+  assert.equal(view.groups.find(g => g.key === 'issuer:google').entries.length, 2);
+  assert.equal(view.groups.at(-1).key, 'unclassified', 'email domain must not invent an issuer');
+  assert.equal(otp.groupAccounts(entries, { query: 'PRIMARY google' }).matched, 1);
+  assert.equal(otp.groupAccounts(entries, { issuer: 'issuer:openai', query: 'primary work' }).matched, 1);
+  assert.equal(otp.groupAccounts(entries, { issuer: 'issuer:google', query: 'OPENAI' }).matched, 0);
+  assert.equal(otp.groupAccounts(entries, { query: 'PRIVATESECRET' }).matched, 0);
+  assert.equal(JSON.stringify(entries), before, 'grouping must not change or merge imported accounts');
+});
+
 test('otpauth links parse and build in the Google key URI format', () => {
   const e = otp.parseUri('otpauth://totp/ACME%20Co:john.doe@email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&issuer=ACME%20Co&algorithm=SHA256&digits=8&period=60');
   assert.deepEqual([e.issuer, e.account, e.algorithm, e.digits, e.period, e.type], ['ACME Co', 'john.doe@email.com', 'SHA256', 8, 60, 'totp']);
