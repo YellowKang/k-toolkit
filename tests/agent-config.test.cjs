@@ -35,6 +35,22 @@ test('failed storage save rolls back settings without announcing a change', () =
   assert.deepEqual([...values], before); assert.equal(events, 0);
 });
 
+test('save-only updates named and default connections without activating or overwriting the active profile', () => {
+  const { AG } = setup({ adapter: 'claude', model: 'active-model', key_claude: 'active-key' });
+  const active = AG.load();
+  const named = { ...active, connectionId: 'connection-test', connectionName: 'Saved only', adapter: 'custom', baseUrl: 'https://fixture.invalid', apiKey: 'named-key', model: 'named-model' };
+  AG.save(named, undefined, { activate: false });
+  assert.equal(AG.load().model, 'active-model'); assert.equal(AG.load().apiKey, 'active-key');
+  assert.equal(AG.connection(named.connectionId).model, 'named-model');
+  AG.save({ ...active, ...AG.connection('legacy-openai-chat'), model: 'default-openai', apiKey: 'openai-key' }, undefined, { activate: false });
+  assert.equal(AG.load().adapter, 'claude'); assert.equal(AG.load().model, 'active-model');
+  assert.equal(AG.connection('legacy-openai-chat').model, 'default-openai');
+  AG.save(named);
+  AG.save({ ...AG.load(), ...AG.connection('legacy-claude'), model: 'edited-claude' }, undefined, { activate: false });
+  assert.equal(AG.load().connectionId, named.connectionId); assert.equal(AG.load().model, 'named-model');
+  assert.equal(AG.connection('legacy-claude').model, 'edited-claude');
+});
+
 test('fetched and manual models persist together without credentials in the catalog', () => {
   const { AG, values } = setup();
   const cfg = { ...AG.load(), adapter: 'openai-chat', apiKey: 'private-fixture-key', baseUrl: 'https://gateway.example/v1/', model: 'gateway/fast' };

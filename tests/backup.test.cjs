@@ -26,6 +26,8 @@ test('keys are grouped by allow-list and API keys stay out of the plain section'
   assert.equal(backup.groupOf('ag_key_openai'), 'apikeys');
   assert.equal(backup.groupOf('ag_model'), 'agent');
   assert.equal(backup.groupOf('unrelated_key'), null);
+  assert.equal(backup.groupOf('dtb_workflow_draft'), 'tools');
+  assert.equal(backup.groupOf('dtb_connection_drafts'), null, 'temporary connection credentials must never be exported');
   const inv = backup.inventory(seed());
   assert.deepEqual(plain(inv.history.map(x => [x.key, x.items])), [['dtb_favorites', 2], ['dtb_recent', 2], ['dtb_usage', 1]]);
   const { backup: file, secret } = backup.collect(seed(), [...backup.DEFAULT_GROUPS, 'apikeys'], { appVersion: 'abc', now: new Date('2026-10-23T00:00:00Z') });

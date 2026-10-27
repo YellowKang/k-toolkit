@@ -124,6 +124,19 @@ function _chatRestoreSession(value) {
   const input = document.getElementById('_chatInput'); if (input) { input.value = _chatDraft; input.dispatchEvent(new Event('input')); }
   _chatRenderHistory(_chatGetMsgContainer()); _chatUpdateImgPreview(); _chatSessionTitle(); _chatUpdateButtons(); _chatRefreshRetry(); _chatScrollBottom(true); _chatBuildMessages();
 }
+function _chatRequireIdle() {
+  if (_chatBusy || _chatPreparing) throw new Error(_chatSay('请先停止当前回复再切换或删除会话。', 'Stop the current reply before switching or deleting a conversation.'));
+  clearTimeout(_chatDraftTimer);
+}
+function _chatSwitchSession(id, create = false) {
+  _chatRequireIdle();
+  _chatRestoreSession(window.ChatConversations.switchTo(id, _chatSnapshot(), _chatSessionId, create));
+  document.getElementById('_chatInput')?.focus();
+}
+async function _chatNewChat() {
+  try { await window._agEnsureLoaded(); if (document.getElementById('_chatInput')) _chatSwitchSession(null, true); }
+  catch (e) { window.showToast?.(e.message, 'error'); }
+}
 async function _chatOpenSessions() {
   try { await window._agEnsureLoaded(); } catch { window.showToast?.(_chatTl('no_adapter'), 'error'); return; }
   if (document.getElementById('_chatSessions')) return;
@@ -141,19 +154,31 @@ async function _chatOpenSessions() {
   const release = window.AgentDialog.trap(overlay, box, close);
   box.querySelector('#_chatSessionsClose').onclick = close;
   const guard = fn => { try { fn(); } catch (e) { status(e.message); } };
-  const available = () => { if (_chatBusy || _chatPreparing) throw new Error(_chatSay('请先停止当前回复再切换或删除会话。', 'Stop the current reply before switching or deleting a conversation.')); clearTimeout(_chatDraftTimer); };
-  const switchTo = (id, create = false) => guard(() => { available(); const value = store.switchTo(id, _chatSnapshot(), _chatSessionId, create); _chatRestoreSession(value); close(); document.getElementById('_chatInput')?.focus(); });
+  const switchTo = (id, create = false) => guard(() => { _chatSwitchSession(id, create); close(); document.getElementById('_chatInput')?.focus(); });
   box.querySelector('#_chatSessionNew').onclick = () => switchTo(null, true);
+  _chatUpdateButtons();
   function render() {
     index = store.ensure(); const query = box.querySelector('#_chatSessionSearch').value.trim().toLocaleLowerCase();
     const list = box.querySelector('#_chatSessionList'); list.replaceChildren();
     const items = [...index.items].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
     for (const item of items) {
       let record; const get = () => record ||= item.id === _chatSessionId ? _chatSnapshot() : store.record(item.id, index);
-      if (query && !item.title.toLocaleLowerCase().includes(query) && !get().messages.some(m => String(m.content || '').toLocaleLowerCase().includes(query))) continue;
+      const matched = query && get().messages.findLast(m => String(m?.content || '').toLocaleLowerCase().includes(query));
+      if (query && !item.title.toLocaleLowerCase().includes(query) && !matched) continue;
       const row = document.createElement('div'); row.className = '_chat-session-row'; row.dataset.sessionId = item.id;
       const select = document.createElement('button'); select.className = '_chat-session-select'; select.dataset.sessionOpen = item.id;
-      select.textContent = (item.pinned ? '★ ' : '') + item.title + (item.id === index.activeId ? _chatSay(' · 当前', ' · active') : ''); select.onclick = () => switchTo(item.id); row.append(select);
+      const title = document.createElement('strong'); title.textContent = (item.pinned ? '★ ' : '') + item.title + (item.id === index.activeId ? _chatSay(' · 当前', ' · active') : ''); select.append(title);
+      const raw = String((matched || get().messages.at(-1))?.content || get().draft || _chatSay('暂无消息', 'No messages yet')).replace(/\s+/g, ' ');
+      const matchAt = query ? raw.toLocaleLowerCase().indexOf(query) : -1, start = Math.max(0, matchAt - 40);
+      const snippet = (start ? '…' : '') + raw.slice(start, start + 160) + (raw.length > start + 160 ? '…' : '');
+      const preview = document.createElement('span'); preview.className = '_chat-session-preview';
+      const at = query ? snippet.toLocaleLowerCase().indexOf(query) : -1;
+      if (at >= 0) { const mark = document.createElement('mark'); mark.textContent = snippet.slice(at, at + query.length); preview.append(snippet.slice(0, at), mark, snippet.slice(at + query.length)); }
+      else preview.textContent = snippet;
+      const updated = document.createElement('time'); updated.className = '_chat-session-time'; const date = new Date(item.updatedAt);
+      if (Number.isFinite(date.getTime())) { updated.dateTime = date.toISOString(); updated.textContent = _chatSay('更新于 ', 'Updated ') + date.toLocaleString(window.getCurrentLang?.() === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); updated.title = date.toLocaleString(); }
+      else updated.textContent = _chatSay('更新时间未知', 'Update time unavailable');
+      select.append(preview, updated); select.onclick = () => switchTo(item.id); row.append(select);
       const actions = document.createElement('div'); actions.className = '_chat-session-actions'; row.append(actions);
       const action = (label, name, fn) => { const button = document.createElement('button'); button.className = '_chat-btn-secondary'; button.textContent = label; button.dataset.sessionAction = name; button.onclick = () => guard(fn); actions.append(button); };
       action(_chatSay('改名', 'Rename'), 'rename', () => {
@@ -164,7 +189,7 @@ async function _chatOpenSessions() {
       });
       action(item.pinned ? _chatSay('取消置顶', 'Unpin') : _chatSay('置顶', 'Pin'), 'pin', () => { store.edit(item.id, { pinned: !item.pinned }); render(); });
       action(_chatSay('导出', 'Export'), 'export', () => _chatExportMd(get().messages, item.title));
-      action(_chatSay('删除', 'Delete'), 'delete', () => { available(); if (!confirm(_chatSay('删除此会话？建议先导出保存。', 'Delete this conversation? Export it first if needed.'))) return; const value = store.remove(item.id, _chatSessionId); if (value.record) _chatRestoreSession(value); render(); });
+      action(_chatSay('删除', 'Delete'), 'delete', () => { _chatRequireIdle(); if (!confirm(_chatSay('删除此会话？建议先导出保存。', 'Delete this conversation? Export it first if needed.'))) return; const value = store.remove(item.id, _chatSessionId); if (value.record) _chatRestoreSession(value); render(); });
       list.append(row);
     }
     if (!list.children.length) { const empty = document.createElement('p'); empty.textContent = _chatSay('没有匹配的会话。', 'No matching conversations.'); list.append(empty); }
@@ -450,10 +475,10 @@ async function _chatSend() {
   if (_chatBusy) return;
 
   if (_chatPreparing) return;
-  _chatPreparing = true;
+  _chatPreparing = true; _chatUpdateButtons();
   try { if (!window.AgentAdapters && !await window._agEnsureLoaded()) return; }
   catch { _chatShowError(_chatTl('no_adapter')); return; }
-  finally { _chatPreparing = false; }
+  finally { _chatPreparing = false; _chatUpdateButtons(); }
   if (!input?.isConnected || _chatBusy) return;
   _chatSyncConfig();
   const cfg = window.AgentConfig.AG.load();
@@ -546,6 +571,11 @@ function _chatUpdateButtons() {
   if (sendBtn) sendBtn.style.display = _chatBusy ? 'none' : '';
   if (stopBtn) stopBtn.style.display = _chatBusy ? '' : 'none';
   if (input) input.setAttribute('aria-busy', String(_chatBusy));
+  for (const id of ['_chatNewBtn', '_chatSessionNew']) {
+    const button = document.getElementById(id); if (!button) continue;
+    button.disabled = _chatBusy || _chatPreparing;
+    button.title = button.disabled ? _chatSay('停止当前回复后可新建对话', 'Stop the current reply before starting a new chat') : _chatSay('新建对话，当前会话和草稿会保留', 'Start a new chat and keep the current conversation and draft');
+  }
 }
 
 // ── Image handling ──
@@ -634,8 +664,14 @@ async function _chatOpenSettings() {
   try { if (!window.AgentConfig && !await window._agEnsureLoaded()) return; window._agOpenConfig(); }
   catch { _chatShowError(_chatTl('no_adapter')); }
 }
-async function _chatOpenModels() {
-  try { if (!window.AgentConfig && !await window._agEnsureLoaded()) return; window._agOpenModelPicker(); }
+async function _chatOpenModels(event) {
+  const anchor = event?.currentTarget || document.getElementById('_chatModelBadge');
+  try { if (!window.AgentConfig && !await window._agEnsureLoaded()) return; window._agOpenQuickSwitch(anchor); }
+  catch { _chatShowError(_chatTl('no_adapter')); }
+}
+async function _chatOpenConnections(event) {
+  const anchor = event.currentTarget;
+  try { if (!window.AgentConfig && !await window._agEnsureLoaded()) return; window._agOpenQuickSwitch(anchor, 'connections'); }
   catch { _chatShowError(_chatTl('no_adapter')); }
 }
 function _chatSyncConfig() {
@@ -799,7 +835,10 @@ function _chatRefreshI18n() {
   });
   // Model badge title
   const modelBadge = document.getElementById('_chatModelBadge');
-  if (modelBadge) modelBadge.title = _chatTl('model');
+  if (modelBadge) modelBadge.title = _chatSay('切换模型', 'Switch model');
+  const connectionBadge = document.getElementById('_chatAdapterBadge'); if (connectionBadge) connectionBadge.title = _chatSay('切换连接', 'Switch connection');
+  const newChat = document.getElementById('_chatNewBtn'); if (newChat) newChat.textContent = _chatSay('＋ 新对话', '＋ New chat');
+  _chatUpdateButtons();
   // Attach button title
   const attachBtn = document.getElementById('_chatAttachBtn');
   if (attachBtn) attachBtn.title = _chatTl('attach_img');
@@ -858,6 +897,9 @@ function renderAiChat(container) {
     ._chat-session-hint{font-size:12px;color:var(--text-muted);line-height:1.6}
     ._chat-session-row{padding:12px 0;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px}
     ._chat-session-select{display:block;width:100%;text-align:left;overflow-wrap:anywhere;border:0;background:transparent;color:var(--text);padding:4px;font:inherit;cursor:pointer}
+    ._chat-session-select:hover{background:var(--surface);border-radius:8px}._chat-session-select:focus-visible{outline:2px solid var(--accent)}
+    ._chat-session-preview,._chat-session-time{display:block;font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.6}._chat-session-time{font-size:11px}._chat-session-preview mark{background:color-mix(in srgb,var(--accent) 20%,var(--surface));color:var(--text);border-radius:3px}
+    #_chatNewBtn{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--border))}#_chatNewBtn:disabled{opacity:.5;cursor:default}
     ._chat-session-actions{display:flex;gap:8px;flex-wrap:wrap}
     ._chat-toolbar label{font-size:10px;color:var(--text-muted,rgba(241,245,249,.5));white-space:nowrap;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
     ._chat-toolbar-sep{width:1px;height:18px;background:var(--border,rgba(255,255,255,.08));margin:0 2px;flex-shrink:0}
@@ -1048,7 +1090,7 @@ function renderAiChat(container) {
     @media(max-width:600px){
       ._chat-toolbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:7px;padding:8px 10px;overflow:visible}
       ._chat-toolbar button{white-space:nowrap;min-height:30px}
-      #_chatHome{grid-area:1/1} #_chatSessionsBtn{grid-area:1/2;max-width:100%;min-width:0} #_chatClearBtn{grid-area:3/1;justify-self:start}
+      #_chatHome{grid-area:1/1} #_chatSessionsBtn{grid-area:1/2;max-width:100%;min-width:0} #_chatNewBtn{grid-area:3/1;justify-self:start} #_chatClearBtn{grid-area:3/2;justify-self:start}
       ._chat-settings-btn{grid-area:1/3}
       #_chatAdapterBadge{grid-area:2/1;max-width:120px}
       #_chatModelBadge{grid-area:2/2;max-width:100%;min-width:0}
@@ -1113,13 +1155,14 @@ function renderAiChat(container) {
   toolbar.className = '_chat-toolbar';
   const home = document.createElement('button'); home.id = '_chatHome'; home.className = '_chat-adapter-btn'; home.textContent = _chatSay('← 工具箱', '← Toolbox'); home.onclick = () => navigateTo('home'); toolbar.appendChild(home);
   const sessions = document.createElement('button'); sessions.id = '_chatSessionsBtn'; sessions.className = '_chat-adapter-btn'; sessions.textContent = _chatSay('会话 ▾', 'Chats ▾'); sessions.onclick = _chatOpenSessions; toolbar.append(sessions);
+  const newChat = document.createElement('button'); newChat.id = '_chatNewBtn'; newChat.className = '_chat-adapter-btn'; newChat.textContent = _chatSay('＋ 新对话', '＋ New chat'); newChat.onclick = _chatNewChat; newChat.disabled = _chatBusy || _chatPreparing; toolbar.append(newChat);
   const clear = document.createElement('button'); clear.id = '_chatClearBtn'; clear.className = '_chat-adapter-btn'; clear.textContent = _chatSay('清空对话', 'Clear chat'); clear.onclick = _chatClear; toolbar.appendChild(clear);
 
   // Current adapter badge
   const adapterBadge = document.createElement('button');
   adapterBadge.className = '_chat-adapter-badge';
   adapterBadge.id = '_chatAdapterBadge';
-  adapterBadge.onclick = _chatOpenSettings; adapterBadge.title = _chatTl('settings');
+  adapterBadge.onclick = _chatOpenConnections; adapterBadge.title = _chatSay('切换连接', 'Switch connection');
   const _adapterIcons = { claude: '✦', 'openai-chat': '⬡', openai: '⬡', gemini: '✴', custom: '⚙' };
   function _chatUpdateBadge() {
     const icon = _adapterIcons[_chatAdapterId] || '◈';

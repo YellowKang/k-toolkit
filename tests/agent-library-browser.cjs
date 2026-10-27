@@ -40,7 +40,7 @@ const { chromium, firefox } = require('playwright');
     await page.locator('#cfgApiKey').fill('fixture-b'); await page.locator('#cfgModel').fill('model-b'); await page.locator('#cfgSaveBtn').click();
     const b = await page.evaluate(() => AgentConfig.AG.load().connectionId); assert.notEqual(a, b);
     await page.reload(); await page.evaluate(() => _agEnsureLoaded()); await page.locator('#_chatModelBadge').filter({ hasText: 'model-b' }).waitFor();
-    await page.locator('#_chatModelBadge').click(); await page.locator('#cfgSavedConnection').selectOption(a); assert.equal(await page.locator('#cfgModel').inputValue(), 'model-a');
+    await page.locator('#_chatModelBadge').click(); await page.locator('#agQuickManage').click(); await page.locator('#cfgSavedConnection').selectOption(a); assert.equal(await page.locator('#cfgModel').inputValue(), 'model-a');
     assert.equal(await page.locator('#cfgRemoteModel button').count(), 2); await page.locator('#cfgSaveBtn').click();
     assert.equal(await page.locator('#_chatAdapterBadge').textContent(), 'Local A');
     assert.equal(await page.evaluate(() => AgentConfig.AG.load().apiKey), 'fixture-a');

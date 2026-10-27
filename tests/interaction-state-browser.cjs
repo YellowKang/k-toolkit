@@ -1,0 +1,124 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
+const express = require('express');
+const { chromium, firefox } = require('playwright');
+(async () => {
+  let browser, server, temp;
+  try {
+    const root = path.join(__dirname, '..'); let source = path.join(root, 'public');
+    if (process.env.TEST_BUILD === '1') {
+      temp = fs.mkdtempSync(path.join(os.tmpdir(), 'k-toolkit-interaction-'));
+      for (const dir of ['public', 'scripts']) fs.cpSync(path.join(root, dir), path.join(temp, dir), { recursive: true });
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' }); source = path.join(temp, 'dist');
+    }
+    const app = express(); app.use('/k-toolkit', express.static(source));
+    server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch({ headless: true });
+    const page = await browser.newPage({ serviceWorkers: 'block', viewport: { width: 1440, height: 1000 } });
+    page.setDefaultTimeout(10000); const errors = []; let remoteRequests = 0;
+    page.on('pageerror', e => errors.push(e.message)); page.on('dialog', dialog => dialog.accept());
+    await page.route(/^https:\/\//, route => { if (route.request().url().startsWith('https://fixture.invalid')) remoteRequests++; return route.abort(); });
+    const base = `http://127.0.0.1:${server.address().port}/k-toolkit/`;
+    await page.goto(base + 'dashboard.html#workflow-studio'); await page.locator('#wfInput').waitFor();
+    await page.locator('#wfInput').fill('{"old":true}'); await page.locator('#wfIntermediate').check();
+    await page.locator('#wfRun').click(); await page.locator('#wfStatus').filter({ hasText: '已完成 2/2' }).waitFor();
+    assert.equal(await page.locator('#wfIntermediate').isChecked(), true);
+    assert.equal(await page.locator('#wfResult [data-result-select] option').count(), 3);
+    await page.locator('#wfName').fill('仍可用的结果'); assert.equal(await page.locator('[data-result-copy]').isEnabled(), true, 'renaming does not change execution');
+    await page.locator('#wfInput').fill('{"new":true}'); assert.match(await page.locator('#wfResultState').textContent(), /上次运行/);
+    assert.equal(await page.locator('[data-result-copy]').isEnabled(), false); assert.equal(await page.locator('[data-result-download]').isEnabled(), false);
+    await page.locator('#wfRun').click(); await page.locator('#wfStatus').filter({ hasText: '已完成 2/2' }).waitFor();
+    assert.equal(await page.locator('[data-result-copy]').isEnabled(), true); assert.match(await page.locator('#wfResult pre').first().textContent(), /new/);
+    await page.locator('#wfSteps [data-param="minify"]').check(); assert.equal(await page.locator('[data-result-copy]').isEnabled(), false);
+    await page.locator('#wfName').fill('恢复我的草稿'); await page.reload(); await page.locator('#wfInput').waitFor();
+    assert.equal(await page.locator('#wfName').inputValue(), '恢复我的草稿'); assert.equal(await page.locator('#wfInput').inputValue(), '{"new":true}'); assert.equal(await page.locator('#wfIntermediate').isChecked(), true);
+    assert.equal(await page.locator('#wfSteps [data-param="minify"]').isChecked(), true);
+    await page.locator('#wfSave').click(); const template = await page.locator('#wfLibrary').inputValue();
+    assert.doesNotMatch(await page.evaluate(() => localStorage.getItem('ag_custom_workflows')), /"new"/);
+    const download = page.waitForEvent('download'); await page.locator('#wfExportDraft').click(); assert.equal((await download).suggestedFilename(), 'workflow-draft.json');
+    // Quota failure remains visible and navigation retains the newest in-memory draft.
+    await page.evaluate(() => { window.__draftWrite = AgentDrafts.write; window.AgentDrafts = { ...AgentDrafts, write(name, value) { if (name === 'workflow') throw new Error('草稿暂存失败：空间不足'); return __draftWrite(name, value); } }; });
+    await page.locator('#wfInput').fill('quota-unsaved'); await page.locator('#wfDraftStatus.error').waitFor();
+    await page.evaluate(() => navigateTo('home')); await page.evaluate(() => navigateTo('workflow-studio')); await page.locator('#wfInput').waitFor();
+    assert.equal(await page.locator('#wfInput').inputValue(), 'quota-unsaved');
+    await page.evaluate(() => { window.AgentDrafts = { ...AgentDrafts, write: __draftWrite }; });
+    await page.locator('#wfClearDraft').click(); assert.equal(await page.locator('#wfInput').inputValue(), '');
+    assert.equal(await page.evaluate(() => localStorage.getItem('dtb_workflow_draft')), null);
+    assert.equal(await page.locator(`#wfLibrary option[value="${template}"]`).count(), 1, 'clearing a draft retains saved workflows');
+    await page.reload(); await page.locator('#wfInput').waitFor(); assert.equal(await page.locator('#wfInput').inputValue(), '');
+
+    await page.evaluate(() => {
+      const AG = AgentConfig.AG;
+      const base = { ...AG.load(), adapter: 'custom', baseUrl: 'https://fixture.invalid', apiKey: 'fixture-saved', model: 'model-a' };
+      const catalog = { endpoint: 'https://fixture.invalid/v1/models', models: ['model-a', 'model-b'], recent: [], fetchedAt: 1 };
+      AG.save({ ...base, connectionId: 'connection-a', connectionName: '连接 A' }, catalog);
+      AG.save({ ...base, connectionId: 'connection-b', connectionName: '连接 B', model: 'model-b' }, catalog, { activate: false });
+    });
+    await page.evaluate(() => navigateTo('ai-chat')); await page.locator('._chat-settings-btn').click();
+    await page.locator('#cfgModel').fill('draft-a'); await page.locator('#cfgApiKey').fill('fixture-unsaved-secret');
+    await page.locator('#cfgSavedConnection').selectOption('connection-b'); await page.locator('#cfgModel').fill('saved-b'); await page.locator('#cfgSaveOnlyBtn').click();
+    assert.equal(await page.evaluate(() => AgentConfig.AG.load().connectionId), 'connection-a');
+    assert.equal(await page.evaluate(() => AgentConfig.AG.connection('connection-b').model), 'saved-b');
+    assert.equal(await page.evaluate(() => AgentConfig.AG.load().model), 'model-a');
+    assert.match(await page.locator('#cfgDraftStatus').textContent(), /1 个连接/);
+    await page.locator('#cfgSaveBtn').click(); await page.locator('#agConfigModal').waitFor({ state: 'detached' });
+    assert.equal(await page.evaluate(() => AgentConfig.AG.load().connectionId), 'connection-b');
+    assert.doesNotMatch(await page.evaluate(() => JSON.stringify(localStorage)), /fixture-unsaved-secret/);
+    assert.match(await page.evaluate(() => sessionStorage.getItem('dtb_connection_drafts')), /fixture-unsaved-secret/);
+    await page.reload(); await page.locator('._chat-settings-btn').click(); await page.locator('#cfgSavedConnection').selectOption('connection-a');
+    assert.equal(await page.locator('#cfgModel').inputValue(), 'draft-a'); assert.equal(await page.locator('#cfgApiKey').inputValue(), 'fixture-unsaved-secret');
+    await page.locator('#cfgModel').fill('draft-a-immediate'); await page.reload(); await page.locator('._chat-settings-btn').click();
+    assert.equal(await page.locator('#cfgSavedConnection').inputValue(), 'connection-a'); assert.equal(await page.locator('#cfgModel').inputValue(), 'draft-a-immediate');
+    await page.locator('#cfgDiscardDraft').click(); assert.equal(await page.locator('#cfgModel').inputValue(), 'model-a');
+    await page.keyboard.press('Escape'); assert.equal(await page.evaluate(() => sessionStorage.getItem('dtb_connection_drafts')), null);
+
+    await page.locator('#_chatAdapterBadge').click(); await page.locator('[data-quick-value="connection-a"]').click();
+    assert.equal(await page.locator('#_chatAdapterBadge').textContent(), '连接 A');
+    await page.locator('#_chatModelBadge').click(); assert.equal(await page.locator('#agConfigModal').count(), 0);
+    await page.locator('#agQuickSearch').fill('model-b'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+    assert.equal(await page.locator('#_chatModelBadge').textContent(), 'model-b'); assert.equal(remoteRequests, 0, 'quick switching does not fetch or test a connection');
+    assert.equal(await page.evaluate(() => document.activeElement.id), '_chatModelBadge');
+    await page.locator('#_chatModelBadge').click(); await page.locator('#agQuickSearch').fill('my-deployment'); await page.locator('[data-quick-value="my-deployment"]').click();
+    await page.reload(); await page.locator('#_chatModelBadge').filter({ hasText: 'my-deployment' }).waitFor();
+    await page.locator('#_chatModelBadge').click(); await page.locator('#agQuickClose').focus(); await page.keyboard.press('Shift+Tab'); assert.equal(await page.evaluate(() => document.activeElement.id), 'agQuickManage'); await page.keyboard.press('Escape');
+    await page.evaluate(() => {
+      const AG = AgentConfig.AG; AG.save({ ...AG.load(), model: 'model-a' });
+      AgentAdapters.getAdapter('custom').chatStream = async function* () { yield { type: 'delta', text: '消息内 needle <img data-search-probe src=x onerror=alert(1)> end' }; };
+    });
+    await page.locator('#_chatInput').fill('独立会话'); await page.locator('#_chatSendBtn').click();
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history')).at(-1)?.role === 'assistant');
+    const first = await page.evaluate(() => ChatConversations.ensure().activeId);
+    await page.locator('#_chatInput').fill('待发送草稿'); await page.locator('#_chatNewBtn').click();
+    assert.equal(await page.locator('#_chatInput').inputValue(), ''); assert.equal(await page.locator('._chat-row').count(), 0);
+    await page.locator('#_chatSessionsBtn').click(); await page.locator('#_chatSessionSearch').fill('needle');
+    await page.waitForFunction(() => document.querySelectorAll('._chat-session-row').length === 1);
+    assert.equal(await page.locator('._chat-session-preview mark').textContent(), 'needle'); assert.equal(await page.locator('[data-search-probe]').count(), 0);
+    assert.match(await page.locator('._chat-session-time').textContent(), /更新于/);
+    await page.locator(`[data-session-open="${first}"]`).click(); assert.equal(await page.locator('#_chatInput').inputValue(), '待发送草稿');
+    await page.evaluate(() => { AgentAdapters.getAdapter('custom').chatStream = async function* () { yield { type: 'delta', text: '生成中' }; await new Promise(resolve => { window.__releaseReply = resolve; }); }; });
+    await page.locator('#_chatSendBtn').click(); await page.locator('#_chatStopBtn').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#_chatNewBtn').isEnabled(), false);
+    await page.evaluate(() => _chatNewChat()); assert.equal(await page.evaluate(() => ChatConversations.ensure().activeId), first);
+    await page.locator('#_chatStopBtn').click(); await page.evaluate(() => window.__releaseReply?.());
+    assert.equal(await page.locator('#_chatNewBtn').isEnabled(), true);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.ok(await page.locator('._chat-toolbar').evaluate(el => el.scrollWidth <= el.clientWidth));
+    await page.locator('#_chatAdapterBadge').click();
+    assert.ok(await page.locator('.ag-quick-box').evaluate(el => { const r = el.getBoundingClientRect(); return el.scrollWidth <= el.clientWidth && r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; }));
+    if (process.env.VISUAL_CHECK) await page.screenshot({ path: '/tmp/ktool-quick-mobile.png' });
+    await page.keyboard.press('Escape'); await page.locator('._chat-settings-btn').click();
+    assert.ok(await page.locator('.ag-config-box').evaluate(el => el.scrollWidth <= el.clientWidth));
+    if (process.env.VISUAL_CHECK) await page.screenshot({ path: '/tmp/ktool-drafts-mobile.png' });
+    await page.keyboard.press('Escape'); await page.evaluate(() => setLang('en'));
+    assert.match(await page.locator('#_chatNewBtn').textContent(), /New chat/);
+    await page.locator('#_chatModelBadge').click(); assert.equal(await page.locator('#agQuickManage').textContent(), 'Manage connections and models…');
+    await page.keyboard.press('Escape'); await page.locator('#_chatSessionsBtn').click();
+    assert.match(await page.locator('._chat-session-time').first().textContent(), /Updated/);
+    assert.deepEqual(errors, []);
+    console.log('Workflow state, immediate draft recovery, connection isolation, quick switching, session snippets, busy guards and mobile/English UI passed.');
+  } finally { await browser?.close(); await new Promise(resolve => server ? server.close(resolve) : resolve()); if (temp) fs.rmSync(temp, { recursive: true, force: true }); }
+})().catch(error => { console.error(error); process.exitCode = 1; });

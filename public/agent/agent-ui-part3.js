@@ -1,7 +1,7 @@
 'use strict';
 
 // One settings surface for the panel, quick assistant and AI chat.
-function openConfig({ modelsOnly = false } = {}) {
+function openConfig({ modelsOnly = false, initialConnectionId } = {}) {
   if (document.getElementById('agConfigModal')) return;
   window._agInjectCSS?.();
   const { AG } = window.AgentConfig;
@@ -10,6 +10,15 @@ function openConfig({ modelsOnly = false } = {}) {
   const t = window.AgentI18n?.t || (k => k);
   const say = (zh, en) => window.getCurrentLang?.() === 'en' ? en : zh;
   let connectionId = AG.connectionId(cfg);
+  let draftTimer, draftError = '';
+  try {
+    const saved = window.AgentDrafts.read('connections')?.value || window._agConnectionDraftMemory;
+    for (const [id, draft] of saved?.drafts || []) {
+      if (/^(connection-[a-zA-Z0-9-]{1,80}|legacy-[a-z-]+)$/.test(id) && draft?.config?.connectionId === id && adapters.some(a => a.id === draft.config.adapter)) drafts.set(id, draft);
+    }
+    if (drafts.has(saved?.selectedConnectionId)) connectionId = saved.selectedConnectionId;
+  } catch { draftError = say('连接草稿无法读取，已有的连接仍可使用。', 'Connection drafts could not be read. Saved connections are still available.'); }
+  if (initialConnectionId && (drafts.has(initialConnectionId) || AG.connection(initialConnectionId))) connectionId = initialConnectionId;
   let selected = cfg.adapter, testing = null, discovering = null, catalog;
   const modal = document.createElement('div'); modal.id = 'agConfigModal';
   const box = document.createElement('div'); box.className = 'ag-config-box';
@@ -20,6 +29,7 @@ function openConfig({ modelsOnly = false } = {}) {
     <div class="ag-config-section">
       <p class="ag-hint">${modelsOnly ? t('models_switch_hint') : say('Agent、快捷助手和 AI 对话共用；每个连接独立保存模型与参数。', 'Shared by Agent, quick assistant and AI chat. Named connections keep separate settings.')}</p>
       <div class="ag-config-row"><label class="ag-config-label" for="cfgSavedConnection">${say('使用的连接', 'Connection')}</label><select id="cfgSavedConnection"></select></div>
+      <div class="ag-draft-status"><p id="cfgDraftStatus" class="ag-hint" role="status" aria-live="polite"></p><button class="ag-btn" id="cfgDiscardDraft" hidden>${say('放弃此连接的修改', 'Discard changes to this connection')}</button></div>
       <details id="cfgConnection" class="ag-config-connection" ${modelsOnly ? '' : 'open'}><summary><span>${t('models_connection')}</span><span id="cfgConnectionSummary"></span></summary>
       <div class="ag-connection-actions"><button class="ag-btn" id="cfgNewConnection">${say('新建连接', 'New connection')}</button><button class="ag-btn" id="cfgCopyConnection">${say('复制连接', 'Duplicate')}</button><button class="ag-btn" id="cfgDeleteConnection">${say('删除', 'Delete')}</button></div>
       <div class="ag-config-row" id="cfgNameRow"><label class="ag-config-label" for="cfgConnectionName">${say('连接名称', 'Connection name')}</label><input id="cfgConnectionName" maxlength="60" autocomplete="off"></div>
@@ -44,14 +54,42 @@ function openConfig({ modelsOnly = false } = {}) {
       <p id="cfgStatus" role="status" aria-live="polite"></p>
       <p id="cfgVersion" class="ag-hint"></p>
     </div>
-    <div class="ag-config-footer"><button class="ag-btn" id="cfgCancelBtn">${t('cancel')}</button><button class="ag-btn" id="cfgSaveBtn">${modelsOnly ? t('models_save_switch') : say('保存并使用', 'Save and use')}</button></div>`;
+    <div class="ag-config-footer"><button class="ag-btn" id="cfgCancelBtn">${say('关闭 · 保留草稿', 'Close · keep drafts')}</button><button class="ag-btn" id="cfgSaveOnlyBtn">${say('保存此连接', 'Save connection')}</button><button class="ag-btn" id="cfgSaveBtn">${modelsOnly ? t('models_save_switch') : say('保存并使用', 'Save and use')}</button></div>`;
   modal.appendChild(box); document.body.appendChild(modal);
   window.AgentConfig.applySkin(cfg.skin);
   const field = id => box.querySelector('#' + id);
   const status = (message, error = false) => { field('cfgStatus').textContent = message; field('cfgStatus').classList.toggle('error', error); };
   const modelStatus = (message, error = false) => { field('cfgModelsStatus').textContent = message; field('cfgModelsStatus').classList.toggle('error', error); };
   const read = () => ({ ...cfg, connectionId, connectionName: field('cfgConnectionName').value.trim(), adapter: selected, apiKey: field('cfgApiKey').value.trim(), baseUrl: field('cfgBaseUrl').value.trim(), model: field('cfgModel').value.trim(), temperature: Number(field('cfgTemp').value), max_tokens: Number(field('cfgMaxTokens').value), position: field('cfgPosition').value, size: field('cfgSize').value });
-  const picker = window.AgentModelPicker.mount(field('cfgModelLibrary'), { getConfig: read, onSelect(model) { field('cfgModel').value = model; stopTest(); status(''); } });
+  const picker = window.AgentModelPicker.mount(field('cfgModelLibrary'), { getConfig: read, onSelect(model) { field('cfgModel').value = model; stopTest(); status(''); queueDraft(); } });
+  // Compare only editable fields. A displayed default model is not an edit.
+  function fingerprint(config, modelCatalog) {
+    const values = ['connectionId', 'connectionName', 'adapter', 'apiKey', 'baseUrl', 'model', 'temperature', 'max_tokens', 'position', 'size'].map(key => config[key]);
+    return JSON.stringify([values, modelCatalog?.endpoint || '', AG.modelIds(modelCatalog?.models), AG.modelIds(modelCatalog?.recent, 12), modelCatalog?.fetchedAt || 0]);
+  }
+  function stashCurrent() {
+    clearTimeout(draftTimer);
+    const config = read(), saved = AG.connection(connectionId);
+    const baseline = saved && { ...AG.load(), ...saved, model: saved.model || adapters.find(a => a.id === saved.adapter).defaultModel };
+    if (baseline && fingerprint(config, catalog) === fingerprint(baseline, AG.modelCatalog(saved))) drafts.delete(connectionId);
+    else drafts.set(connectionId, { config, catalog });
+  }
+  function persistDrafts() {
+    const value = { selectedConnectionId: connectionId, drafts: [...drafts] };
+    window._agConnectionDraftMemory = value;
+    try {
+      if (drafts.size) window.AgentDrafts.write('connections', value); else window.AgentDrafts.remove('connections');
+      draftError = ''; showDrafts(); return true;
+    } catch (e) { draftError = e.message; showDrafts(); return false; }
+  }
+  function showDrafts() {
+    field('cfgDraftStatus').textContent = draftError || (drafts.size ? say(`${drafts.size} 个连接有未保存修改；草稿暂存在当前标签页，关闭设置或刷新可恢复。保存仅作用于所选连接。`, `${drafts.size} connection(s) have unsaved changes. Drafts stay in this tab across closing settings and reloads. Saving affects only the selected connection.`) : say('修改按连接自动暂存在当前标签页；只有“保存并使用”会切换连接。', 'Edits are kept per connection in this tab. Only “Save and use” switches connections.'));
+    field('cfgDraftStatus').classList.toggle('error', !!draftError);
+    field('cfgDiscardDraft').hidden = !drafts.has(connectionId);
+    connectionOptions();
+  }
+  function flushDrafts() { stashCurrent(); return persistDrafts(); }
+  function queueDraft() { clearTimeout(draftTimer); draftTimer = setTimeout(flushDrafts, 250); }
   const version = document.querySelector('meta[name="toolkit-version"]')?.content || 'dev';
   field('cfgVersion').textContent = t('models_version') + ' · ' + (version === 'dev' ? t('models_dev') : version);
   function stopTest() {
@@ -81,7 +119,7 @@ function openConfig({ modelsOnly = false } = {}) {
     const select = field('cfgSavedConnection'); select.replaceChildren();
     const entries = new Map(AG.connections().map(c => [c.id, c]));
     for (const [id, draft] of drafts) if (id.startsWith('connection-')) entries.set(id, { id, name: draft.config.connectionName || say('未命名连接', 'Untitled connection') });
-    for (const entry of entries.values()) { const option = document.createElement('option'); option.value = entry.id; option.textContent = entry.name + (entry.legacy ? say(' · 默认', ' · default') : ''); select.appendChild(option); }
+    for (const entry of entries.values()) { const option = document.createElement('option'); option.value = entry.id; option.textContent = entry.name + (entry.legacy ? say(' · 默认', ' · default') : '') + (drafts.has(entry.id) ? say(' · 未保存', ' · unsaved') : ''); select.appendChild(option); }
     select.value = connectionId;
   }
   function populate() {
@@ -97,40 +135,48 @@ function openConfig({ modelsOnly = false } = {}) {
     field('cfgBaseUrl').value = p.baseUrl; field('cfgModel').value = p.model || adapter.defaultModel;
     field('cfgTemp').value = p.temperature; field('cfgTempVal').textContent = p.temperature;
     field('cfgMaxTokens').value = p.max_tokens;
+    field('cfgPosition').value = p.position || cfg.position; field('cfgSize').value = p.size || cfg.size;
     resetModels(draft?.catalog || AG.modelCatalog(read()));
     box.querySelectorAll('[data-adapter]').forEach(button => { const active = button.dataset.adapter === selected; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); });
-    status(''); endpoint();
+    status(''); endpoint(); showDrafts();
   }
   for (const adapter of adapters) {
     const button = document.createElement('button'); button.className = 'ag-opt-btn'; button.dataset.adapter = adapter.id; button.textContent = adapter.name;
-    button.onclick = () => { if (selected === adapter.id) return; stopTest(); stopDiscovery(); drafts.set(connectionId, { config: read(), catalog });
+    button.onclick = () => { if (selected === adapter.id) return; stopTest(); stopDiscovery(); stashCurrent();
       if (connectionId.startsWith('legacy-')) connectionId = 'legacy-' + adapter.id;
       else drafts.set(connectionId, { config: { ...read(), adapter: adapter.id, model: adapter.defaultModel }, catalog: { models: [], recent: [] } });
-      selected = adapter.id; populate(); };
+      selected = adapter.id; populate(); flushDrafts(); };
     field('cfgAdapterBtns').appendChild(button);
   }
   field('cfgSavedConnection').onchange = event => {
-    stopTest(); stopDiscovery(); drafts.set(connectionId, { config: read(), catalog }); connectionId = event.target.value; populate();
+    const nextId = event.target.value; stopTest(); stopDiscovery(); stashCurrent(); connectionId = nextId; populate(); persistDrafts();
   };
   function addConnection(copy) {
-    stopTest(); stopDiscovery(); const current = read(); drafts.set(connectionId, { config: current, catalog });
+    stopTest(); stopDiscovery(); const current = read(); stashCurrent();
     if (new Set([...AG.connections().filter(c => !c.legacy).map(c => c.id), ...[...drafts.keys()].filter(id => id.startsWith('connection-'))]).size >= 20) { status(say('最多保存 20 个命名连接。', 'Up to 20 named connections.'), true); return; }
     connectionId = 'connection-' + crypto.randomUUID();
     drafts.set(connectionId, { config: { ...current, connectionId, connectionName: copy ? (current.connectionName + say(' 副本', ' copy')).slice(0, 60) : say('新连接', 'New connection'), ...(copy ? {} : { apiKey: '', baseUrl: '', model: adapters.find(a => a.id === selected).defaultModel }) }, catalog: copy ? catalog : { models: [], recent: [] } });
-    populate(); field('cfgConnection').open = true; field('cfgConnectionName').focus(); field('cfgConnectionName').select();
+    populate(); persistDrafts(); field('cfgConnection').open = true; field('cfgConnectionName').focus(); field('cfgConnectionName').select();
   }
   field('cfgNewConnection').onclick = () => addConnection(false);
   field('cfgCopyConnection').onclick = () => addConnection(true);
   field('cfgDeleteConnection').onclick = () => {
     if (!confirm(say('删除这个连接及其本地密钥？', 'Delete this connection and its local API key?'))) return;
-    try { AG.removeConnection(connectionId); drafts.delete(connectionId); connectionId = AG.connectionId(AG.load()); populate(); } catch (e) { status(e.message, true); }
+    try { clearTimeout(draftTimer); stopTest(); stopDiscovery(); AG.removeConnection(connectionId); drafts.delete(connectionId); connectionId = AG.connectionId(AG.load()); populate(); persistDrafts(); } catch (e) { status(e.message, true); }
+  };
+  field('cfgDiscardDraft').onclick = () => {
+    if (!confirm(say('放弃此连接尚未保存的修改？', 'Discard unsaved changes to this connection?'))) return;
+    clearTimeout(draftTimer); stopTest(); stopDiscovery(); drafts.delete(connectionId);
+    if (!AG.connection(connectionId)) connectionId = AG.connectionId(AG.load());
+    populate(); persistDrafts();
   };
   field('cfgPosition').value = cfg.position; field('cfgSize').value = cfg.size; populate();
   box.addEventListener('input', event => {
-    if (event.target.id === 'cfgModelSearch') return;
+    if (['cfgModelSearch', 'cfgSavedConnection'].includes(event.target.id)) return;
     stopTest(); status(''); field('cfgTempVal').textContent = field('cfgTemp').value;
     if (['cfgApiKey', 'cfgBaseUrl'].includes(event.target.id)) { resetModels(); endpoint(); }
     if (event.target.id === 'cfgModel') picker.updateSelection();
+    queueDraft();
   });
   field('cfgFetchModels').onclick = async () => {
     if (discovering) { stopDiscovery(); modelStatus(say('获取已取消。', 'Fetch cancelled.')); return; }
@@ -144,12 +190,18 @@ function openConfig({ modelsOnly = false } = {}) {
       const models = await window.AgentTransport.wait(window.AgentTransport.listModels({ ...config, signal: run.controller.signal }), run.controller.signal);
       if (discovering !== run) return;
       catalog = { ...catalog, endpoint: window.AgentTransport.modelsEndpoint(config.adapter, config.baseUrl), models, fetchedAt: Date.now() }; picker.setCatalog(catalog);
+      queueDraft();
       modelStatus(say('已获取 ', 'Fetched ') + models.length + say(' 个模型，选择后可测试连接。', ' models. Select one and test the connection.'));
     } catch (error) { if (discovering === run) modelStatus(([404, 405].includes(error.status) ? t('models_route_error') : window.AgentTransport.message(error, config)) + ' ' + t('models_failed_hint'), true); }
     finally { clearTimeout(run.timer); if (discovering === run) stopDiscovery(false); }
   };
   field('cfgEye').onclick = () => { const show = field('cfgApiKey').type === 'password'; field('cfgApiKey').type = show ? 'text' : 'password'; field('cfgEye').setAttribute('aria-pressed', String(show)); field('cfgEye').setAttribute('aria-label', show ? say('隐藏密钥', 'Hide API key') : say('显示密钥', 'Show API key')); };
-  function close() { stopTest(); stopDiscovery(); modal.remove(); releaseFocus(); }
+  function close() {
+    if (!flushDrafts()) { field('cfgDraftStatus').scrollIntoView({ block: 'nearest' }); return; }
+    stopTest(); stopDiscovery(); window.removeEventListener('beforeunload', beforeLeave); window.removeEventListener('pagehide', flushDrafts); modal.remove(); releaseFocus();
+  }
+  function beforeLeave(event) { if (!flushDrafts()) { event.preventDefault(); event.returnValue = ''; } }
+  window.addEventListener('beforeunload', beforeLeave); window.addEventListener('pagehide', flushDrafts);
   const releaseFocus = window.AgentDialog.trap(modal, box, close);
   field('cfgCloseBtn').onclick = close; field('cfgCancelBtn').onclick = close;
   field('cfgTestBtn').onclick = async () => {
@@ -171,10 +223,17 @@ function openConfig({ modelsOnly = false } = {}) {
     } catch (e) { if (testing === run) status(window.AgentTransport.message(e, config), true); }
     finally { clearTimeout(run.timer); if (testing === run) stopTest(); }
   };
-  field('cfgSaveBtn').onclick = () => {
-    try { const config = read(); if (!AG.modelIds([config.model]).length) { field('cfgModel').focus(); throw new Error(t('models_required')); } AG.save(config, catalog); close(); window.showToast?.(t('saved')); }
+  function save(activate) {
+    try {
+      const config = read(); if (!AG.modelIds([config.model]).length) { field('cfgModel').focus(); throw new Error(t('models_required')); }
+      AG.save(config, catalog, { activate }); clearTimeout(draftTimer); drafts.delete(connectionId); populate(); persistDrafts();
+      if (activate) close(); else status(say('此连接已保存，当前使用的连接未切换。', 'Connection saved. The active connection was not switched.'));
+      window.showToast?.(t('saved'));
+    }
     catch (e) { status(e.message, true); field('cfgStatus').scrollIntoView({ block: 'nearest' }); }
-  };
+  }
+  field('cfgSaveOnlyBtn').onclick = () => save(false);
+  field('cfgSaveBtn').onclick = () => save(true);
   if (modelsOnly) picker.focus(); else field('cfgAdapterBtns').querySelector('[aria-pressed="true"]')?.focus();
 }
 

@@ -10,6 +10,7 @@ const AG_SCRIPT_GROUPS = [
     'agent/agent-context.js',
     'agent/agent-result-store.js',
     'agent/agent-dialog.js',
+    'agent/agent-drafts.js',
     'agent/agent-conversations.js',
   ],
   // Group 1: 无依赖的独立模块（适配器 + actions + 工具模块）
@@ -53,6 +54,7 @@ const AG_SCRIPT_GROUPS = [
     'agent/agent-ui-part2.js',
     'agent/agent-ui-part3.js',
     'agent/agent-model-picker.js',
+    'agent/agent-quick-switch.js',
     'agent/agent-results.js',
   ],
 ];

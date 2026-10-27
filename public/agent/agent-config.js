@@ -86,7 +86,7 @@ const AG = {
     if (!Number.isFinite(cfg.temperature) || cfg.temperature < 0 || cfg.temperature > 1) throw new Error('Temperature: 0–1');
     if (!Number.isInteger(cfg.max_tokens) || cfg.max_tokens < 1 || cfg.max_tokens > 128000) throw new Error('Max tokens: 1–128000');
   },
-  save(cfg, catalog) {
+  save(cfg, catalog, { activate = true } = {}) {
     AG.validate(cfg);
     const endpoint = window.AgentTransport.modelsEndpoint(cfg.adapter, cfg.baseUrl);
     const current = catalog?.endpoint === endpoint ? catalog : AG.modelCatalog(cfg);
@@ -99,7 +99,7 @@ const AG = {
       const connections = AG.connections().filter(c => !c.legacy && c.id !== id);
       if (connections.length >= 20) throw new Error(window.getCurrentLang?.() === 'en' ? 'Up to 20 named connections.' : '最多保存 20 个命名连接。');
       connections.push({ id, name, adapter: cfg.adapter, baseUrl: cfg.baseUrl, model: cfg.model, temperature: cfg.temperature, max_tokens: cfg.max_tokens });
-      AG.write({ connections, active_connection: id, model_catalogs: catalogs, ['key_' + id]: cfg.apiKey,
+      AG.write({ connections, ...(activate ? { active_connection: id } : {}), model_catalogs: catalogs, ['key_' + id]: cfg.apiKey,
         skin: cfg.skin, position: cfg.position, size: cfg.size, show_cards: cfg.show_cards });
       return;
     }
@@ -110,8 +110,8 @@ const AG = {
       const profile = id === cfg.adapter ? cfg : AG.profile(id);
       profiles[id] = { baseUrl: profile.baseUrl, model: profile.model, temperature: profile.temperature, max_tokens: profile.max_tokens };
     }
-    const values = { profiles, active_connection: id, model_catalogs: catalogs, adapter: cfg.adapter, ['key_' + cfg.adapter]: cfg.apiKey,
-      base_url: cfg.baseUrl, model: cfg.model, temperature: cfg.temperature, max_tokens: cfg.max_tokens,
+    const values = { profiles, model_catalogs: catalogs, ['key_' + cfg.adapter]: cfg.apiKey,
+      ...(activate ? { active_connection: id, adapter: cfg.adapter, base_url: cfg.baseUrl, model: cfg.model, temperature: cfg.temperature, max_tokens: cfg.max_tokens } : {}),
       skin: cfg.skin, position: cfg.position, size: cfg.size, show_cards: cfg.show_cards };
     AG.write(values);
   },

@@ -19,7 +19,7 @@
     "test": "node --test tests/*.test.cjs && node scripts/catalog-docs.js --check",
     "test:images": "node tests/image-tools.cjs",
     "test:catalog": "node tests/catalog-browser.cjs",
-    "test:browser": "npm run test:images && npm run test:catalog && npm run test:workflows && npm run test:updates && npm run test:xss && npm run test:i18n && npm run test:totp && npm run test:backup && npm run test:ux && npm run test:performance && npm run test:quality && npm run test:json-workflow && npm run test:agent-ux && npm run test:agent-shared && npm run test:capabilities && npm run test:capabilities-next && npm run test:agent-library",
+    "test:browser": "npm run test:images && npm run test:catalog && npm run test:workflows && npm run test:updates && npm run test:xss && npm run test:i18n && npm run test:totp && npm run test:backup && npm run test:ux && npm run test:performance && npm run test:quality && npm run test:json-workflow && npm run test:agent-ux && npm run test:agent-shared && npm run test:capabilities && npm run test:capabilities-next && npm run test:agent-library && npm run test:interaction-state",
     "docs:catalog": "node scripts/catalog-docs.js",
     "test:updates": "node tests/updates-browser.cjs",
     "test:workflows": "node tests/workflow-browser.cjs",
@@ -35,7 +35,8 @@
     "test:agent-shared": "node tests/agent-shared-browser.cjs",
     "test:capabilities": "node tests/capabilities-round2-browser.cjs",
     "test:capabilities-next": "node tests/capabilities-round3-browser.cjs",
-    "test:agent-library": "node tests/agent-library-browser.cjs"
+    "test:agent-library": "node tests/agent-library-browser.cjs",
+    "test:interaction-state": "node tests/interaction-state-browser.cjs"
   },
   "dependencies": {
     "express": "^4.18.3"

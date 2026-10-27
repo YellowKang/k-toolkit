@@ -325,7 +325,10 @@ const AG_CSS = `
 .ag-connection-test { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
 #cfgStatus,#cfgModelsStatus { font-size:12px; line-height:1.6; color:var(--text-muted); overflow-wrap:anywhere; }
 #cfgStatus:empty,#cfgModelsStatus:empty { display:none; }
-#cfgStatus.error,#cfgModelsStatus.error { color:var(--danger,#ef4444); }
+#cfgStatus.error,#cfgModelsStatus.error,#cfgDraftStatus.error { color:var(--danger,#ef4444); }
+.ag-draft-status { padding:8px 12px; border:1px solid var(--border); border-radius:8px; margin-bottom:14px; }
+.ag-draft-status p { margin:0; } .ag-draft-status button { margin-top:8px; }
+.ag-config-footer { flex-wrap:wrap; }
 .ag-config-box button:focus-visible,.ag-config-box summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 .ag-config-box::-webkit-scrollbar { width: 4px; }
 .ag-config-box::-webkit-scrollbar-thumb { background: var(--ag-border,rgba(255,255,255,0.1)); border-radius: 2px; }
@@ -401,6 +404,7 @@ const AG_CSS = `
   justify-content: flex-end;
 }
 .ag-config-footer .ag-btn { padding: 6px 18px; font-size: 13px; }
+@media(max-width:480px) { .ag-config-footer { display:grid;grid-template-columns:1fr 1fr;padding:12px 14px; } #cfgCancelBtn { grid-column:1/-1; } .ag-config-footer .ag-btn { justify-content:center;padding:8px; } }
 .ag-key-wrap { position: relative; }
 .ag-key-wrap input { padding-right: 36px; }
 .ag-eye-btn {
@@ -999,7 +1003,7 @@ function buildPanel() {
     _cardMap = {};
   };
   document.getElementById('agConfigBtn').onclick = () => openConfig();
-  document.getElementById('agModelBtn').onclick = () => window._agOpenModelPicker();
+  document.getElementById('agModelBtn').onclick = event => window._agOpenQuickSwitch(event.currentTarget);
   window._agSyncModelButton();
 
   const input   = document.getElementById('agInput');
