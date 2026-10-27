@@ -143,7 +143,7 @@ function finishCard(tc, result) {
     const manage = document.createElement('button'); manage.type = 'button'; manage.className = 'ag-btn'; manage.textContent = window.getCurrentLang?.() === 'en' ? 'Edit my workflows' : '编排我的流程'; manage.onclick = () => { document.getElementById('agentPanel').style.display = 'none'; navigateTo('workflow-studio'); }; actions.append(manage);
     for (const template of result.data?.templates || []) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'ag-btn';
-      button.textContent = _agT('workflow_use') + ': ' + (template.name || template.id); button.title = template.id;
+      button.textContent = _agT('workflow_use') + ': ' + (template.name || template.id); button.title = template.id; button.dataset.workflowId = template.id;
       button.addEventListener('click', () => { const input = document.getElementById('agInput'); input.value = '/workflow ' + template.id + ' '; input.focus(); });
       body.querySelector('.ag-card-actions').appendChild(button);
     }

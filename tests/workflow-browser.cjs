@@ -24,7 +24,7 @@ const {execFileSync}=require('node:child_process');const express=require('expres
   const actionBase64=await page.evaluate(()=>_AGENT_ALL_ACTIONS.get('base64_encode').execute({text:'中文🙂 some status'}));assert.equal(actionBase64.data.result,pageBase64);
   await page.locator('[data-chip="chip_workflows"]').click();
   await page.locator('.ag-card.success').waitFor();assert.match(await page.locator('.ag-card').last().innerText(),/decode-json/);
-  await page.locator('.ag-card button').filter({hasText:'clean-base64'}).click();assert.equal(await page.locator('#agInput').inputValue(),'/workflow clean-base64 ');
+  await page.locator('.ag-card button[data-workflow-id="clean-base64"]').click();assert.equal(await page.locator('#agInput').inputValue(),'/workflow clean-base64 ');
   const send=async text=>{const count=await page.locator('.ag-card').count();await page.locator('#agInput').fill(text);await page.locator('#agSendBtn').click();await page.waitForFunction(n=>{const cards=document.querySelectorAll('.ag-card');return cards.length===n+1&&cards[cards.length-1].matches('.success,.error')},count);};
   await send('/workflow clean-base64  beta \nalpha\n beta\n');assert.equal(await page.locator('.ag-card').last().locator('ol li').count(),2);
   assert.equal(await page.locator('.ag-workflow-preview').last().textContent(),Buffer.from('beta\nalpha').toString('base64'));
