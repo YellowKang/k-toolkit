@@ -22,10 +22,11 @@ window.renderTodo = function(el) {
 };
 
 function _getTodos() {
-  try { return JSON.parse(localStorage.getItem('dtb_todo') || '[]'); } catch { return []; }
+  try { const values = JSON.parse(localStorage.getItem('dtb_todo') || '[]'); return Array.isArray(values) ? values.filter(item => item && typeof item.text === 'string') : []; } catch { return []; }
 }
 function _saveTodos(arr) {
-  try { localStorage.setItem('dtb_todo', JSON.stringify(arr)); } catch {}
+  try { localStorage.setItem('dtb_todo', JSON.stringify(arr)); return true; }
+  catch { showToast(window.getCurrentLang?.() === 'en' ? 'Save failed. Free browser storage and retry.' : '保存失败，请释放浏览器存储后重试。', 'error'); return false; }
 }
 
 function renderTodoList() {
@@ -55,7 +56,7 @@ function addTodo() {
   const todos = _getTodos();
   const id = globalThis.crypto?.randomUUID?.() || Date.now() + '-' + Math.random().toString(36).slice(2);
   todos.push({id, text, done: false});
-  _saveTodos(todos);
+  if (!_saveTodos(todos)) return;
   input.value = '';
   renderTodoList();
 }
@@ -69,14 +70,14 @@ function deleteTodo(i) {
   const todos = _getTodos();
   const [removed] = todos.splice(i, 1);
   if (!removed) return;
-  _saveTodos(todos);
+  if (!_saveTodos(todos)) return;
   renderTodoList();
   const T = makeToolI18n(_todoDict);
   const notice = showToast(T('deleted'), 'info', 8000);
   const undo = document.createElement('button'); undo.type = 'button'; undo.className = 'btn btn-secondary'; undo.textContent = T('undo');
   undo.onclick = () => {
     const latest = _getTodos();
-    if (removed.id == null || !latest.some(item => item.id === removed.id)) { latest.splice(Math.min(i, latest.length), 0, removed); _saveTodos(latest); }
+    if (removed.id == null || !latest.some(item => item.id === removed.id)) { latest.splice(Math.min(i, latest.length), 0, removed); if (!_saveTodos(latest)) return; }
     renderTodoList(); notice.remove();
   };
   notice.appendChild(undo);

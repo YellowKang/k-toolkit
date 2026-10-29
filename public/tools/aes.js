@@ -161,6 +161,17 @@ const _aesDict = {
 };
 
 let _aesRunId = 0;
+const _aesTask = ToolRuntime.task();
+function _aesInvalidate() {
+  _aesRunId++; _aesTask.invalidate();
+  const button = document.getElementById('aesRunBtn'), status = document.getElementById('aesStatus');
+  if (button) button.disabled = false;
+  if (status?.dataset.state) {
+    status.dataset.state = 'stale';
+    status.textContent = window.getCurrentLang?.() === 'en' ? 'Input changed. Run again for a current result.' : '输入已变化，请重新运行以更新结果。';
+    document.querySelectorAll('#aesResult button').forEach(button => { button.disabled = true; });
+  }
+}
 const _aesJava = { GCM: 'AES/GCM/NoPadding', CBC: 'AES/CBC/PKCS5Padding', CTR: 'AES/CTR/NoPadding' };
 
 function renderAES(el) {
@@ -230,11 +241,14 @@ function renderAES(el) {
       </details>
     </div>`;
   window._aesMode = 'enc';
+  el.addEventListener('input', _aesInvalidate); el.addEventListener('change', _aesInvalidate);
+  window._activeCleanup = () => { _aesTask.dispose(); _aesRunId++; el.removeEventListener('input', _aesInvalidate); el.removeEventListener('change', _aesInvalidate); };
   _aesSync();
   ToolCompute.load('aes').then(_aesSync).catch(() => {});
 }
 
 function setAESMode(mode) {
+  _aesInvalidate();
   window._aesMode = mode === 'dec' ? 'dec' : 'enc';
   const encBtn = document.getElementById('aesEncBtn'), decBtn = document.getElementById('aesDecBtn');
   if (!encBtn) return;
@@ -306,6 +320,7 @@ function _aesKeyHint() {
 async function _aesRandom(kind) {
   const aes = await ToolCompute.load('aes'), $ = id => document.getElementById(id);
   if (!$('aesMode')) return;
+  _aesInvalidate();
   const o = _aesOptions();
   if (kind === 'Salt') { $('aesSaltType').value = 'hex'; $('aesSalt').value = aes.randomHex(o.keyType === 'openssl' ? aes.OPENSSL_SALT_BYTES : aes.SALT_BYTES); }
   else { $('aesIvType').value = 'hex'; $('aesIv').value = aes.randomHex(aes.IV_BYTES[o.mode]); }
@@ -316,19 +331,22 @@ async function doAES() {
   const T = makeToolI18n(_aesDict), $ = id => document.getElementById(id);
   if (!$('aesInput')) return;
   const runId = ++_aesRunId, enc = window._aesMode !== 'dec', o = _aesOptions(), input = $('aesInput').value;
+  const run = _aesTask.start({ root: $('toolBody') }), encoding = $('aesEncoding').value;
   $('aesRunBtn').disabled = true;
+  document.querySelectorAll('#aesResult button').forEach(button => { button.disabled = true; });
   _aesStatus(T('working'), 'var(--text-muted)', 'busy');
   try {
     const missing = !input || (!enc && !input.trim()) ? 'EMPTY_INPUT' : !o.key ? 'EMPTY_KEY'
       : o.saltType !== 'auto' && !o.salt.trim() ? 'NEED_SALT' : o.ivType !== 'auto' && !o.iv ? 'NEED_IV' : '';
     if (missing) throw Object.assign(new Error(missing), { code: missing });
     const aes = await ToolCompute.load('aes');
-    const result = enc ? await aes.encrypt(input, { ...o, encoding: $('aesEncoding').value }) : await aes.decrypt(input, o);
-    if (runId === _aesRunId && $('aesOutput')) _aesShowResult(T, enc, result, o);
+    const result = enc ? await aes.encrypt(input, { ...o, encoding }) : await aes.decrypt(input, o);
+    if (run.current() && runId === _aesRunId) { _aesShowResult(T, enc, result, o); document.querySelectorAll('#aesResult button').forEach(button => { button.disabled = false; }); }
   } catch (error) {
-    if (runId === _aesRunId && $('aesOutput')) _aesShowError(T, enc, error, o);
+    if (run.current() && runId === _aesRunId) _aesShowError(T, enc, error, o);
   } finally {
     if (runId === _aesRunId && $('aesRunBtn')) $('aesRunBtn').disabled = false;
+    run.finish();
   }
 }
 
@@ -439,6 +457,7 @@ function aesSwap() {
 }
 
 function _aesClear() {
+  _aesInvalidate();
   document.getElementById('aesInput').value = '';
   document.getElementById('aesResult').style.display = 'none';
 }

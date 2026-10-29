@@ -1,4 +1,4 @@
-const {chromium,firefox}=require('playwright');
+const { launchBrowser } = require('./browser-launch.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');const path=require('node:path');const os=require('node:os');
 const {execFileSync}=require('node:child_process');const express=require('express');
@@ -9,11 +9,11 @@ const {execFileSync}=require('node:child_process');const express=require('expres
   if(process.env.TEST_BUILD==='1'){
    temp=fs.mkdtempSync(path.join(os.tmpdir(),'toolkit-workflow-'));
    for(const dir of ['public','scripts'])fs.cpSync(path.join(root,dir),path.join(temp,dir),{recursive:true});
-   execFileSync(process.execPath,['scripts/build.js'],{cwd:temp,stdio:'pipe'});source=path.join(temp,'dist');
+   execFileSync(process.execPath,['scripts/build.js'],{cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') }});source=path.join(temp,'dist');
   }
   const app=express();app.use('/k-toolkit',express.static(source));server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s))});
   const options={headless:true};if(process.env.TEST_BROWSER_CHANNEL)options.channel=process.env.TEST_BROWSER_CHANNEL;if(process.env.TEST_BROWSER_EXECUTABLE)options.executablePath=process.env.TEST_BROWSER_EXECUTABLE;
-  browser=await(process.env.TEST_BROWSER==='firefox'?firefox:chromium).launch(options);
+  browser=await launchBrowser(options);
   const page=await browser.newPage({serviceWorkers:'block'});page.setDefaultTimeout(12000);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route(/^https:\/\//,route=>route.abort());

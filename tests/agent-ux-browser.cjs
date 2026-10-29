@@ -4,7 +4,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const express = require('express');
-const { chromium, firefox } = require('playwright');
+const { launchBrowser } = require('./browser-launch.cjs');
 (async () => {
   let browser, server, temp;
   try {
@@ -12,11 +12,11 @@ const { chromium, firefox } = require('playwright');
     if (process.env.TEST_BUILD === '1') {
       temp = fs.mkdtempSync(path.join(os.tmpdir(), 'k-toolkit-agent-ux-'));
       for (const dir of ['public', 'scripts']) fs.cpSync(path.join(root, dir), path.join(temp, dir), { recursive: true });
-      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' }); source = path.join(temp, 'dist');
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') } }); source = path.join(temp, 'dist');
     }
     const app = express(); app.use('/k-toolkit', express.static(source));
     server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
-    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch({ headless: true });
+    browser = await launchBrowser();
     const page = await browser.newPage({ serviceWorkers: 'block', viewport: { width: 1440, height: 1000 } });
     page.setDefaultTimeout(10000); const errors = []; page.on('pageerror', e => errors.push(e.message));
     let emptyReply = false, finishReason = 'stop';
@@ -142,9 +142,9 @@ const { chromium, firefox } = require('playwright');
     await page.getByText('部分回复', { exact: false }).first().waitFor();
     await page.locator('#_chatInput').fill('输入中的下一条'); await page.locator('#_chatStopBtn').click();
     assert.equal(await page.locator('#_chatInput').inputValue(), '输入中的下一条');
-    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('dtb_chat_history')).at(-1).content), '部分回复 **保留**');
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history') || '[]').at(-1)?.content === '部分回复 **保留**');
     await page.evaluate(() => { window.__mode = 'normal'; }); await page.locator('#_chatSendBtn').click();
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history')).at(-1).content.startsWith('最终回复'));
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history') || '[]').at(-1).content.startsWith('最终回复'));
     await page.evaluate(() => { window.__late.forEach(resolve => resolve()); }); await page.waitForTimeout(150);
     assert.doesNotMatch(await page.locator('#_chatMsgList').textContent(), /迟到/);
     assert.equal(await page.locator('._chat-cursor').count(), 0);
@@ -174,7 +174,7 @@ const { chromium, firefox } = require('playwright');
     await page.waitForFunction(() => { const el = document.querySelector('#_chatMsgList'); return el.scrollHeight - el.scrollTop - el.clientHeight < 5; });
     if (process.env.QA_SHOTS) await page.screenshot({ animations: 'disabled', path: path.join(os.tmpdir(), 'k-toolkit-ai-chat.png') });
     await page.evaluate(() => { window.__mode = 'xss'; }); await page.locator('#_chatInput').fill('unsafe fixture'); await page.locator('#_chatSendBtn').click();
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history')).at(-1).content.includes('data-agent-probe'));
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history') || '[]').at(-1).content.includes('data-agent-probe'));
     assert.equal(await page.locator('[data-agent-probe],a[href^="javascript:"]').count(), 0);
 
     // Quick assistant retains its real history and composer on reopen.

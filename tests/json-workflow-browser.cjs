@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const {execFileSync}=require('node:child_process');
 const express=require('express');
-const {chromium,firefox}=require('playwright');
+const { launchBrowser } = require('./browser-launch.cjs');
 (async()=>{
   let browser,server,temp;
   try {
@@ -12,11 +12,11 @@ const {chromium,firefox}=require('playwright');
     if(process.env.TEST_BUILD==='1') {
       temp=fs.mkdtempSync(path.join(os.tmpdir(),'k-toolkit-json-workflow-'));
       for(const dir of ['public','scripts'])fs.cpSync(path.join(root,dir),path.join(temp,dir),{recursive:true});
-      execFileSync(process.execPath,['scripts/build.js'],{cwd:temp,stdio:'pipe'});source=path.join(temp,'dist');
+      execFileSync(process.execPath,['scripts/build.js'],{cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') }});source=path.join(temp,'dist');
     }
     const app=express();app.use('/k-toolkit',express.static(source));
     server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
-    browser=await(process.env.TEST_BROWSER==='firefox'?firefox:chromium).launch({headless:true});
+    browser=await launchBrowser();
     const page=await browser.newPage({serviceWorkers:'block',viewport:{width:1440,height:1000}});
     page.setDefaultTimeout(8000);const errors=[];page.on('pageerror',error=>errors.push(error.message));
     await page.route(/^https:\/\//,route=>route.abort());
@@ -97,7 +97,7 @@ const {chromium,firefox}=require('playwright');
     await page.locator('#unesc-btn').click();assert.equal(await page.locator('#esc-output').inputValue(),'&lt; 🙂 ©');
     await page.locator('#escMode').selectOption('url');await page.locator('#esc-input').fill('%zz');await page.locator('#unesc-btn').click();
     assert.match(await page.locator('#escStatus').textContent(),/Invalid URL/);
-    await page.addScriptTag({url:origin+'agent/actions/nav.js'});
+    await page.evaluate(() => _agEnsureLoaded());
     const agent=await page.evaluate(()=>NavActions.find(action=>action.name==='fill_and_run_tool').execute({toolId:'text-escape',inputs:{type:'json',text:'"hello\\nworld"'},action:'unescape'}));
     assert.equal(agent.success,true);assert.equal(agent.data.result,'hello\nworld');
     const invalid=await page.evaluate(()=>NavActions.find(action=>action.name==='fill_and_run_tool').execute({toolId:'text-escape',inputs:{type:'json',text:'\\q'},action:'unescape'}));

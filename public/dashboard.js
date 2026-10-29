@@ -14,7 +14,14 @@ const CAT_ICONS = Object.fromEntries(Object.entries(window.ToolCatalog.categorie
 
 // ── 持久化 ──
 const LS = {
-  get: (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } },
+  get: (k, def) => {
+    try {
+      const value = JSON.parse(localStorage.getItem(k)) ?? def;
+      if (Array.isArray(def)) return Array.isArray(value) ? value.filter(item => typeof item === 'string') : def;
+      if (typeof value !== typeof def || (def && typeof def === 'object' && (!value || Array.isArray(value)))) return def;
+      return value;
+    } catch { return def; }
+  },
   set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 
@@ -71,7 +78,7 @@ function addUsage(id) {
 }
 
 // ── 首页渲染 ──
-async function renderHomePage(mode) {
+async function renderHomePage(mode, navigation = _navigationId) {
   const content = document.getElementById('content');
   if (!content) return;
   const tools = getLocalizedTools(TOOLS);
@@ -84,9 +91,18 @@ async function renderHomePage(mode) {
     if (!aiTool) return;
     content.innerHTML = `<div id="_chatPageRoot"></div>`;
     content.classList.add('chat-page-mode');
-    try { await loadTool(aiTool.id); } catch(e) { content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">${t('load_fail')}</div></div>`; content.classList.remove('chat-page-mode'); return; }
+    const root = document.getElementById('_chatPageRoot');
+    try {
+      await loadTool(aiTool.id);
+      if (navigation !== _navigationId || !root.isConnected) return;
+      if (!await window._agEnsureLoaded()) throw new Error('Assistant could not load');
+    } catch(e) {
+      if (navigation !== _navigationId || !root.isConnected) return;
+      content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">${t('load_fail')}</div></div>`; content.classList.remove('chat-page-mode'); return;
+    }
+    if (navigation !== _navigationId || !root.isConnected) return;
     const fn = window[aiTool.render];
-    if (fn) fn(document.getElementById('_chatPageRoot'));
+    if (fn) fn(root);
     return;
   }
 
@@ -128,7 +144,7 @@ async function renderHomePage(mode) {
   html += `<div class="home-hero">
     <div class="home-hero-top">
       <div class="home-hero-title">K Toolkit</div>
-      <div class="home-hero-sub">${greeting}，${t('hero_sub', CATALOG_ENTRIES.filter(tool => tool.id !== 'ai-chat').length)}</div>
+      <div class="home-hero-sub"><span class="home-greeting">${greeting} · </span>${t('hero_sub', CATALOG_ENTRIES.filter(tool => tool.id !== 'ai-chat').length)}</div>
     </div>
     ${topHtml}
     ${window.ToolWorkspace?.last() ? `<div class="home-resume"><button class="btn btn-secondary" onclick="navigateTo('${ToolWorkspace.last()}')">↩ ${ToolWorkspace.T('resume')} · ${tools.find(tool => tool.id === ToolWorkspace.last())?.name || ''}</button></div>` : ''}
@@ -309,6 +325,8 @@ function init() {
   // Sync lang button text with saved language
   const langBtn = document.getElementById('langBtn');
   if (langBtn) langBtn.textContent = t('lang_btn');
+  const search = document.getElementById('searchInput');
+  if (search) { search.placeholder = t('search_placeholder'); search.setAttribute('aria-label', t('search_placeholder')); }
   buildSidebarNav();
   applyTheme();
   applySidebarCollapse();
@@ -385,6 +403,7 @@ function initScrollTop() {
 
 // ── 路由 ──
 let _homeScrollTop = 0;
+let _navigationId = 0;
 
 async function navigateTo(page, pushHash = true) {
   if (pushHash && location.hash !== '#' + page) {
@@ -392,6 +411,7 @@ async function navigateTo(page, pushHash = true) {
     location.hash = page;
     return;
   }
+  const navigation = ++_navigationId;
   window.ToolWorkspace?.capture(currentPage);
   // 清理上一个工具的副作用（如 setInterval）
   if (window._activeCleanup) { window._activeCleanup(); window._activeCleanup = null; }
@@ -406,12 +426,13 @@ async function navigateTo(page, pushHash = true) {
   updateNavActive(page);
   const isSpecial = ['home','favorites','recent','ai-chat'].includes(page);
   if (isSpecial) {
-    await renderHomePage(page);
+    await renderHomePage(page, navigation);
   } else {
     const tool = TOOLS.find(t => t.id === page);
-    if (tool) { addUsage(page); await renderToolPageFull(tool); }
+    if (tool) { addUsage(page); await renderToolPageFull(tool, navigation); }
     else renderHomePage('home');
   }
+  if (navigation !== _navigationId) return;
   if (!isSpecial && TOOLS.find(t => t.id === page)) addRecent(page);
   // 回到首页恢复滚动位置，进入工具页滚到顶
   const isHomeGroup = ['home','favorites','recent'].includes(page);
@@ -492,7 +513,7 @@ function handleSearchKey(e) {
   else if (e.key === 'Enter') {
     e.preventDefault();
     const active = drop.querySelector('.sdrop-item.active');
-    if (active) { hideSearchDropdown(); clearSearch(); navigateTo(active.dataset.id); }
+    if (active) { if (active.dataset.q !== undefined) _useHistory(active.dataset.q); else sdropClick(active.dataset.id); }
     else if (searchQuery) {
       _addSearchHistory(searchQuery);
       hideSearchDropdown(); renderSearchResults(searchQuery); currentPage = '__search__'; updateNavActive('');
@@ -501,7 +522,10 @@ function handleSearchKey(e) {
 }
 
 function updateDropdownActive(items) {
-  items.forEach((el, i) => el.classList.toggle('active', i === searchDropdownIdx));
+  items.forEach((el, i) => { el.classList.toggle('active', i === searchDropdownIdx); el.setAttribute('aria-selected', String(i === searchDropdownIdx)); });
+  const input = document.getElementById('searchInput');
+  if (items[searchDropdownIdx]) input?.setAttribute('aria-activedescendant', items[searchDropdownIdx].id);
+  else input?.removeAttribute('aria-activedescendant');
   if (items[searchDropdownIdx]) items[searchDropdownIdx].scrollIntoView({ block: 'nearest' });
 }
 
@@ -523,6 +547,17 @@ function _hlMatch(text, q) {
   const testRe = new RegExp('^(' + escaped.join('|') + ')$', 'i');
   const parts = text.split(re);
   return parts.map(p => testRe.test(p) ? '<span class="search-highlight">' + escHtml(p) + '</span>' : escHtml(p)).join('');
+}
+
+function _searchDropdownReady(drop) {
+  drop.setAttribute('role', 'listbox'); drop.setAttribute('aria-label', t('search_suggestions'));
+  const items = drop.querySelectorAll('.sdrop-item');
+  items.forEach((el, i) => { el.id = 'searchOption-' + i; el.setAttribute('role', 'option'); el.setAttribute('aria-selected', 'false'); });
+  searchDropdownIdx = -1;
+  const input = document.getElementById('searchInput');
+  input?.setAttribute('aria-expanded', 'true'); input?.removeAttribute('aria-activedescendant');
+  const status = document.getElementById('searchStatus');
+  if (status) status.textContent = t('search_results', items.length);
 }
 
 function showSearchDropdown(q) {
@@ -573,11 +608,15 @@ function showSearchDropdown(q) {
     drop.innerHTML = html;
   }
   drop.style.display = 'block';
+  _searchDropdownReady(drop);
 }
 
 function hideSearchDropdown() {
   const drop = document.getElementById('searchDropdown');
   if (drop) drop.style.display = 'none';
+  const input = document.getElementById('searchInput');
+  input?.setAttribute('aria-expanded', 'false'); input?.removeAttribute('aria-activedescendant');
+  const status = document.getElementById('searchStatus'); if (status) status.textContent = '';
   searchDropdownIdx = -1;
 }
 
@@ -639,13 +678,13 @@ function _showSearchHistory() {
   const showHot = hotTools.length ? hotTools : localTools.slice(0,5);
   let html = '';
   if (searchHistory.length) {
-    html += `<div class="sdrop-header"><span>${t('search_history')}</span><span class="sdrop-clear-all" onclick="_clearSearchHistory()" style="cursor:pointer;font-size:11px;color:var(--text-muted);padding:2px 6px;border-radius:4px;transition:color 0.15s" onmouseenter="this.style.color='var(--accent)'" onmouseleave="this.style.color='var(--text-muted)'">✕ 清除</span></div>`;
+    html += `<div class="sdrop-header"><span>${t('search_history')}</span><button type="button" class="sdrop-clear-all" onclick="_clearSearchHistory()" style="cursor:pointer;font-size:11px;color:var(--text-muted);padding:2px 6px;border-radius:4px;transition:color 0.15s" onmouseenter="this.style.color='var(--accent)'" onmouseleave="this.style.color='var(--text-muted)'">✕ ${t('search_clear')}</button></div>`;
     searchHistory.forEach((h,i) => {
       html += `<div class="sdrop-item" data-q="${escHtml(h)}" onclick="_useHistory(this.dataset.q)"><span style="color:var(--text-muted);font-size:12px;margin-right:8px">🕐</span><span style="flex:1">${escHtml(h)}</span><span onclick="event.stopPropagation();_removeSearchHistory(${i})" style="color:var(--text-muted);padding:2px 6px;border-radius:4px;font-size:12px;cursor:pointer" onmouseenter="this.style.color='var(--text)'" onmouseleave="this.style.color='var(--text-muted)'">✕</span></div>`;
     });
     html += `<div style="height:1px;background:rgba(255,255,255,0.06);margin:6px 8px"></div>`;
   }
-  html += `<div class="sdrop-header"><span>${searchHistory.length ? '🔥 热门' : '🔥 热门工具'}</span></div>`;
+  html += `<div class="sdrop-header"><span>🔥 ${t('search_popular')}</span></div>`;
   showHot.forEach(tool => {
     html += `<div class="sdrop-item" data-id="${tool.id}" onclick="sdropClick('${tool.id}')">`;
     html += `<span class="sdrop-icon" style="background:${tool.color}22">${tool.icon}</span>`;
@@ -655,6 +694,7 @@ function _showSearchHistory() {
   });
   drop.innerHTML = html;
   drop.style.display = '';
+  _searchDropdownReady(drop);
 }
 
 function _clearSearchHistory() {
@@ -852,16 +892,16 @@ function renderWorkbenchNav(id) {
 }
 
 // ── 工具页面（完整版，替代旧的 renderToolPage）──
-async function renderToolPageFull(tool) {
+async function renderToolPageFull(tool, navigation = _navigationId) {
   const content = document.getElementById('content');
   if (!content) return;
   content.innerHTML = `<div class="tool-loading"><div class="tool-loading-spinner"></div><span>${t('loading')}</span></div>`;
   try { await loadTool(tool.id); } catch(e) {
-    if (currentPage !== tool.id) return;
+    if (currentPage !== tool.id || navigation !== _navigationId) return;
     content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">${t('load_fail')}</div><div class="empty-sub">${escHtml(e.message)}</div><div style="display:flex;gap:10px;justify-content:center;margin-top:16px"><button class="btn btn-primary" onclick="navigateTo('${tool.id}')">${t('retry')}</button><button class="btn btn-secondary" onclick="navigateTo('home')">${t('back_home')}</button></div></div>`;
     return;
   }
-  if (currentPage !== tool.id) return;
+  if (currentPage !== tool.id || navigation !== _navigationId) return;
   const fn = window[tool.render];
   const isFav = favorites.includes(tool.id);
   const localTool = getLocalizedTools(TOOLS).find(x => x.id === tool.id) || tool;

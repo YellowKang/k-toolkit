@@ -198,6 +198,7 @@ function renderPasswordGen(el) {
   window._activeCleanup = function() {
     clearTimeout(_pwdPwnedTimer);
     _pwdPwnedTimer = null;
+    _pwdPwnedTask.dispose();
   };
 }
 
@@ -213,27 +214,35 @@ function pwdSwitchTab(tab) {
 }
 
 /* ── HIBP Breach Detection (k-anonymity) ── */
-async function _pgCheckPwned(pwd) {
-  const enc = new TextEncoder();
-  const buf = await crypto.subtle.digest('SHA-1', enc.encode(pwd));
-  const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-  const prefix = hash.slice(0, 5), suffix = hash.slice(5);
+const _pwdPwnedTask = ToolRuntime.task();
+async function _pgCheckPwned(pwd, signal = AbortSignal.timeout(8000)) {
   try {
-    const res = await fetch('https://api.pwnedpasswords.com/range/' + prefix);
+    const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(pwd));
+    const hash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const prefix = hash.slice(0, 5), suffix = hash.slice(5);
+    if (signal.aborted) return -1;
+    const res = await fetch('https://api.pwnedpasswords.com/range/' + prefix, { signal, headers: { 'Add-Padding': 'true' } });
+    if (!res.ok) return -1;
     const text = await res.text();
-    const match = text.split('\n').find(l => l.startsWith(suffix));
-    return match ? parseInt(match.split(':')[1]) : 0;
+    const lines = text.trim().split(/\r?\n/);
+    if (signal.aborted || !text.trim() || text.length > 2 * 1024 * 1024 || !lines.every(line => /^[A-F0-9]{35}:\d+$/.test(line))) return -1;
+    const match = lines.find(line => line.startsWith(suffix + ':'));
+    const count = match ? Number(match.split(':')[1]) : 0;
+    return Number.isSafeInteger(count) ? count : -1;
   } catch (e) { return -1; }
 }
 
 function _pwdShowPwnedResult(pwd) {
   clearTimeout(_pwdPwnedTimer);
+  _pwdPwnedTask.invalidate();
   const el = document.getElementById('pwdPwnedResult');
   if (!el) return;
   const T = _pgT || makeToolI18n(_pwdI18nDict);
   el.innerHTML = `<span style="color:var(--text-muted)">${T('pwned_checking')}</span>`;
   _pwdPwnedTimer = setTimeout(async () => {
-    const count = await _pgCheckPwned(pwd);
+    const run = _pwdPwnedTask.start({ root: el, timeout: 8000 });
+    const count = await _pgCheckPwned(pwd, run.signal);
+    if (!run.owns()) return;
     if (count === -1) {
       el.innerHTML = `<span style="color:var(--text-muted)">${T('pwned_error')}</span>`;
     } else if (count === 0) {
@@ -241,6 +250,7 @@ function _pwdShowPwnedResult(pwd) {
     } else {
       el.innerHTML = `<span style="color:#ef4444">${T('pwned_found', count)}</span>`;
     }
+    run.finish();
   }, 500);
 }
 
@@ -256,11 +266,9 @@ function pwdDiceGenerate() {
   const count = +document.getElementById('pwdDiceCount').value;
   const sep = document.getElementById('pwdDiceSep').value;
   const lang = window._pwdDiceLang || 'en';
-  const list = lang === 'cn' ? _diceCN : _diceEN;
+  const list = [...new Set(lang === 'cn' ? _diceCN : _diceEN)];
   const words = [];
-  const arr = new Uint32Array(count);
-  crypto.getRandomValues(arr);
-  for (let i = 0; i < count; i++) words.push(list[arr[i] % list.length]);
+  for (let i = 0; i < count; i++) words.push(list[ToolCompute.randomIndex(list.length)]);
   const phrase = words.join(sep);
   const entropy = (count * Math.log2(list.length)).toFixed(1);
   document.getElementById('pwdDiceOutput').innerHTML = `
@@ -291,9 +299,7 @@ function pwdCharset() {
 }
 
 function pwdGenOne(len, chars) {
-  const arr = new Uint32Array(len);
-  crypto.getRandomValues(arr);
-  return Array.from(arr, v => chars[v % chars.length]).join('');
+  return ToolCompute.randomString(len, chars);
 }
 
 function pwdGenPreview() {

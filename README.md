@@ -62,14 +62,16 @@ AI 对话和 Agent 共用上下文预算与固定备注，按完整轮次控制�
 哈希校验随最新文本/文件结果更新；文件摘要最多 10 个文件、每个 32 MiB，逐个在 Worker 中处理，停止会终止当前计算并保留已完成结果。文本及 HMAC 支持空消息，过期的异步结果不会覆盖新输入。
 
 - 本地计算工具在浏览器执行；第三方库（二维码、YAML、TOML）以固定版本放在 `public/vendor/`，随站点校验和缓存，离线可用。
-- 网络工具向相应服务发送请求；AI 助手会把对话、页面上下文和工具结果发送到配置的模型接口。
+- 网络工具向相应服务发送请求；AI 助手会把对话、允许的页面上下文和工具结果发送到配置的模型接口。2FA、AES、JWT、环境变量、密码、HTTP/cURL、便签和备份等页面不自动采集输入输出；密码生成等敏感工具结果只在本地展示，模型收到完成状态。
 - 收藏、偏好和部分工具内容保存在浏览器。当前 API Key 配置使用浏览器存储，不应在共享设备上保存长期密钥，也不要把密钥写入仓库。
 - 顶栏 ⇅（“数据备份与迁移”工具）可一键导出 / 导入收藏、设置、便签、待办、AI 对话等本机数据，支持文件或文本、合并或覆盖；API 密钥只能加密导出，2FA 看板以密文携带。
 - 2FA 工具的账号密钥用主密码加密（PBKDF2 60 万次 + AES-GCM）后保存在本机，主密码不保存、无法找回；闲置自动锁定，Agent 不读取该工具。支持 Google Authenticator 迁移二维码、otpauth 链接、Aegis / 2FAS 明文导出的导入，以及加密备份导出。重要账号仍建议使用手机或硬件验证器。
 - 2FA 账号导入后按发行方自动分组，忽略名称大小写，支持分类筛选、多个关键词搜索发行方/账号/备注、命中数量与折叠分组。没有发行方的条目进入「未分类」，可编辑补齐；原始账号不会被自动合并。点击验证码时重新计算当前值，切回页面立即刷新，避免后台计时器延迟时复制旧码；密钥不参与搜索。
+- HTTP 完整历史仅留在本标签页内存；持久摘要去除认证头、URL 查询参数、片段、用户名密码及请求正文。默认备份也会过滤旧历史；选择“完整 HTTP 历史”后必须用备份密码加密。
+- 2FA 与 AI 会话写入使用跨标签页锁和版本检查；冲突会阻止覆盖并提示先导出，再重新解锁或刷新。请在 HTTPS 或 localhost 使用支持 Web Locks 的浏览器；更新后重新打开旧标签页，旧版本页面不具备此保护。便签保存失败保留内存草稿、提供下载并在离开页面时提醒。
 - GitHub Pages 提供静态站点。需要隐藏服务端密钥或统一鉴权时，应单独配置后端代理。
 
-工具脚本按需加载，同一页面会话内只执行一次。Agent 对工具参数做校验，按顺序执行操作，支持任务取消、工具超时和迭代上限。取消会阻止后续步骤；已完成的页面操作不会被撤销，执行中的工具需要配合取消信号才能中止。
+工具脚本按需加载，同一页面会话内只执行一次。生产构建使用 esbuild 解析并压缩 JS/CSS，将 Agent 的 39 个依赖脚本合并为一个延迟加载包；开发模式保留分组源码。构建前需 `npm ci`。Agent 对工具参数做校验，按顺序执行操作，支持任务取消、工具超时和迭代上限。取消会阻止后续步骤；已完成的页面操作不会被撤销，执行中的工具需要配合取消信号才能中止。
 
 无需模型也能串联工具：打开助手点“本地工作流”，或输入 `/workflows` 查看模板。支持 Base64 解码后格式化 JSON、行清洗后编码、JSON 压缩后 SHA-256。自然语言模式可用 `run_workflow` 引用前一步结果，失败即停止；新增 JSON 字段提取、行清洗和 HMAC 调用。详见[工作流使用与后续规划](docs/agent-workflows.md)。
 
@@ -83,17 +85,26 @@ npm run dev
 # http://localhost:3000
 
 npm test
-npx playwright install chromium firefox
+npx playwright install chromium firefox webkit
 TEST_BUILD=1 npm run test:browser
 TEST_BROWSER=firefox TEST_BUILD=1 npm run test:browser
+TEST_BROWSER=webkit TEST_BUILD=1 npm run test:browser
+npm run test:browser -- totp xss --jobs 2   # 只跑名称匹配的套件，2 个并行
+TEST_BROWSER_CHANNEL=chrome npm run test:browser   # 未安装 Playwright 内置浏览器时用本机 Chrome
 npm run build
 ```
 
+`npm run test:browser` 失败后继续跑完其余套件，最后汇总每个套件的结果和耗时；`--bail` 在首个失败处停止，`--jobs N` 并行运行（日志按套件分段输出）。所有浏览器测试都通过 `tests/browser-launch.cjs` 启动，统一支持 `TEST_BROWSER`、`TEST_BROWSER_CHANNEL`、`TEST_BROWSER_EXECUTABLE`。`TEST_BROWSER_CHANNEL` 仅用于 Chromium，未知引擎名会直接报错。新增浏览器套件需登记到 `scripts/browser-tests.js`，`npm test` 会检查遗漏。
+
 `npm test` 检查 Agent 行为、工具目录、构建、CSS、缓存版本、第三方库摘要，以及财务大写、农历、Cron、CSV、单位换算等工具的计算结果。浏览器回归检查图片选择/处理/下载、分类、工作台、旧链接、收藏、脚本重复加载、SVG 预览隔离、Agent 工作流、版本更新；`npm run test:agent-shared` 专项检查手动/Agent 结果一致、正则 Worker、结果卡片、真实图片字节、EXIF/二维码、取消与过期文件引用；`npm run test:agent-ux` 专项检查共享配置、连接测试、流式停止/重试、聊天草稿与滚动、哈希校验和移动端。并对全部工具做 XSS 注入检查（用户输入、本地存储记录、DNS/IP 接口返回、Markdown 原始 HTML），以及英文界面检查：切到 English 后逐个打开工具、点击按钮、切换下拉选项，界面文字、提示和弹窗中不能出现中文。测试自动启动本地服务，生成测试图片，不连接模型服务。
+
+`TEST_BUILD=1 npm run test:browser -- reliability` 专项覆盖双标签页覆盖、保存失败、敏感结果隔离、HTTP 历史与备份、导航和异步结果竞态、HTTP/DNS 错误、测速实际字节数、模板单次替换、搜索 ARIA、移动端和生产 Agent 单包加载。
+
+WebKit 测试按浏览器实际能力验证 WebP 编码（不支持时必须明确失败），用受控 Worker 检查超时和取消；其离线回归通过切断测试服务器连接验证缓存导航，绕过 Playwright 的 [WebKit 离线模拟问题](https://github.com/microsoft/playwright/issues/42775)。这些差异不会跳过整个套件。
 
 可用 `TEST_BROWSER_CHANNEL=chrome` 使用已安装的 Chrome。375px / 768px 检查是桌面浏览器视口模拟，不代替手机真机测试。
 
-构建结果在 `dist/`。PR 执行 Chromium 与 Firefox 检查；`master` 推送通过检查后使用 GitHub 官方 Pages artifact 工作流部署。仓库 **Settings → Pages → Build and deployment → Source** 必须设置为 **GitHub Actions**，并允许 `github-pages` 环境从 `master` 部署。代码未推送、工作流未成功执行或仓库设置未完成时，线上不会更新。见 [GitHub 官方说明](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
+构建结果在 `dist/`。PR 执行 Chromium、Firefox 与 WebKit 检查；`master` 推送通过检查后使用 GitHub 官方 Pages artifact 工作流部署。仓库 **Settings → Pages → Build and deployment → Source** 必须设置为 **GitHub Actions**，并允许 `github-pages` 环境从 `master` 部署。代码未推送、工作流未成功执行或仓库设置未完成时，线上不会更新。见 [GitHub 官方说明](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)。
 
 ## 版本更新与刷新
 
@@ -169,9 +180,9 @@ Local tools process inputs in the browser. Network tools contact external servic
 
 Use `/workflows` in the assistant for local templates that require no model or API key. Typed result references chain validated actions, stop on errors, and keep intermediate data in the browser. See [workflow usage and roadmap](docs/agent-workflows.md).
 
-Use Node.js 20.13+ and `npm ci`, then `npm run dev`. Run `npm test` for unit/build/catalog checks. Install Playwright browsers with `npx playwright install chromium firefox`, then run `TEST_BUILD=1 npm run test:browser`; set `TEST_BROWSER=firefox` for Firefox. The browser suite includes an XSS fuzz pass over every tool and an English-mode pass that opens every tool, clicks its buttons and cycles its selects, failing on any Chinese UI text, toast or dialog. Tool strings come from `makeToolI18n` dictionaries; Chinese data such as lunar dates is wrapped in `lang="zh"`. `npm run build` writes the static site to `dist/`.
+Use Node.js 20.13+ and `npm ci`, then `npm run dev`. Run `npm test` for unit/build/catalog checks. Install Playwright browsers with `npx playwright install chromium firefox webkit`, then run `TEST_BUILD=1 npm run test:browser`; set `TEST_BROWSER=firefox` or `TEST_BROWSER=webkit` to select the engine. The browser suite includes an XSS fuzz pass over every tool and an English-mode pass that opens every tool, clicks its buttons and cycles its selects, failing on any Chinese UI text, toast or dialog. Tool strings come from `makeToolI18n` dictionaries; Chinese data such as lunar dates is wrapped in `lang="zh"`. `npm run build` writes the static site to `dist/`.
 
-Pull requests run Chromium and Firefox checks. Successful pushes to `master` deploy through the official Pages artifact workflow. Set the repository’s Pages Source to **GitHub Actions**. The ↻ button checks for updates and refreshes only when requested; deployment/CDN propagation is not instantaneous. To host locally with Docker, run `docker compose up -d --build` and open port 8080.
+Pull requests run Chromium, Firefox and WebKit checks. Successful pushes to `master` deploy through the official Pages artifact workflow. Set the repository’s Pages Source to **GitHub Actions**. The ↻ button checks for updates and refreshes only when requested; deployment/CDN propagation is not instantaneous. To host locally with Docker, run `docker compose up -d --build` and open port 8080.
 
 ## License
 

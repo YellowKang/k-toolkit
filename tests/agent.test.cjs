@@ -10,7 +10,7 @@ const call = (name, args = '{}') => ({ id: name, function: { name, arguments: ar
 const use = (...calls) => ({ stop_reason: 'tool_use', message: { role: 'assistant', tool_calls: calls } });
 function setup(chat, actions = [], timers = setTimeout) {
   const context = { window: { _AGENT_ALL_ACTIONS: new Map(actions.map(action => [action.name, action])) }, location: { protocol: 'https:' }, AbortController, setTimeout: timers, clearTimeout, console };
-  vm.createContext(context); vm.runInContext(source, context);
+  vm.createContext(context); vm.runInContext(fs.readFileSync(path.join(__dirname, '../public/tool-privacy.js'), 'utf8'), context); vm.runInContext(source, context);
   return new context.window.AgentSession({ adapter: { id: 'test', chat }, config: { apiKey: 'test' } });
 }
 
@@ -107,4 +107,21 @@ test('model timeout aborts the actual request and remains retryable', async () =
   assert.equal(signal.aborted, true); assert.ok(session._retryState); assert.equal(session._run, null);
   session.adapter.chat = async () => end('ok'); await session.retryLast();
   assert.equal(session.messages.at(-1).content, 'ok');
+});
+
+
+test('sensitive tool results remain visible locally but never enter the next model request', async () => {
+  for (const name of ['password_gen', 'env_parse', 'read_tool_output']) {
+    let round = 0, local;
+    const secret = 'SYNTHETIC_PRIVATE_RESULT';
+    const session = setup(async ({ messages }) => {
+      if (++round === 1) return use(call(name));
+      assert.doesNotMatch(JSON.stringify(messages), /SYNTHETIC_PRIVATE_RESULT/);
+      return end('Finished locally');
+    }, [{ name, execute: () => ({ success: true, data: { result: secret, toolId: 'password-gen' }, display: secret }) }]);
+    session.on('tool_done', ({ results }) => { local = results[0].result; });
+    await session.send('Run locally');
+    assert.equal(round, 2); assert.equal(local.data.result, secret);
+    assert.doesNotMatch(JSON.stringify(session.messages), /SYNTHETIC_PRIVATE_RESULT/);
+  }
 });

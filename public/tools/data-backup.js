@@ -6,16 +6,16 @@ const _dbDict = {
     export_title: '导出备份', export_desc: '选择要备份的数据，导出为 JSON 文件或复制为文本，可在另一个浏览器或设备上导入恢复。',
     groups: {
       prefs: '偏好设置（语言、主题、侧栏、2FA 设置）', history: '收藏与使用记录', tools: '工具数据（便签、待办、倒计时、正则、HTTP 历史等）',
-      chat: 'AI 对话记录', agent: 'AI 助手配置（不含 API 密钥）', apikeys: 'API 密钥（必须加密导出）', otp: '2FA 看板（本身已加密）',
+      chat: 'AI 对话记录', agent: 'AI 助手配置（不含 API 密钥）', apikeys: 'API 密钥（必须加密导出）', http: '完整 HTTP 历史（含本标签页认证信息，必须加密）', otp: '2FA 看板（本身已加密）',
     },
     items: n => `${n} 项`, none: '无数据',
-    key_pw: '保护 API 密钥的备份密码（至少 8 位）', key_pw2: '再次输入备份密码',
+    key_pw: '保护敏感数据的备份密码（至少 8 位）', key_pw2: '再次输入备份密码',
     download: '下载备份文件', copy: '复制备份文本', exported: n => `已导出 ${n} 项数据`, copied: '备份文本已复制到剪贴板', copy_failed: '复制失败，请改用下载',
-    pick_groups: '请至少选择一类数据', pw_short: '备份密码至少 8 位', pw_mismatch: '两次输入的备份密码不一致', encrypting: '正在加密 API 密钥…',
+    pick_groups: '请至少选择一类数据', pw_short: '备份密码至少 8 位', pw_mismatch: '两次输入的备份密码不一致', encrypting: '正在加密敏感数据…',
     import_title: '导入备份', drop: '点击选择或拖入备份文件（.json）', paste_ph: '或在这里粘贴备份文本', parse: '解析',
     meta: (at, v) => `备份时间：${at || '未知'} · 版本：${v || '未知'}`,
     import_groups: '选择要导入的数据', rejected: n => `已忽略 ${n} 项无法识别或格式错误的数据`,
-    secret_found: '备份中包含加密的 API 密钥，输入备份密码可一并导入（可跳过）', unlock: '解密', unlocked: n => `已解密 ${n} 个 API 密钥`,
+    secret_found: '备份中包含加密的敏感数据，输入备份密码可一并导入（可跳过）', unlock: '解密', unlocked: n => `已解密 ${n} 项敏感数据`,
     mode: '导入方式', merge: '合并（推荐）：列表去重合并、计数相加，本机已有的设置保持不变', overwrite: '覆盖：用备份替换所选分组中的同名数据',
     overwrite_confirm: '覆盖会用备份替换本机所选分组中的数据，确定继续？', import: '导入',
     done: (w, s) => `已写入 ${w} 项${s ? `，跳过 ${s} 项` : ''}。刷新页面后生效。`, nothing: '本机数据已与备份一致，无需写入',
@@ -27,16 +27,16 @@ const _dbDict = {
     export_title: 'Export a backup', export_desc: 'Choose what to back up, then download a JSON file or copy it as text to restore in another browser or on another device.',
     groups: {
       prefs: 'Preferences (language, theme, sidebar, 2FA settings)', history: 'Favorites and usage history', tools: 'Tool data (notes, to-dos, countdowns, regexes, HTTP history…)',
-      chat: 'AI chat history', agent: 'AI assistant settings (without API keys)', apikeys: 'API keys (always encrypted)', otp: '2FA board (already encrypted)',
+      chat: 'AI chat history', agent: 'AI assistant settings (without API keys)', apikeys: 'API keys (always encrypted)', http: 'Full HTTP history (includes credentials from this tab; encrypted)', otp: '2FA board (already encrypted)',
     },
     items: n => `${n} item${n === 1 ? '' : 's'}`, none: 'no data',
-    key_pw: 'Backup password protecting the API keys (8+ characters)', key_pw2: 'Repeat the backup password',
+    key_pw: 'Backup password protecting sensitive data (8+ characters)', key_pw2: 'Repeat the backup password',
     download: 'Download backup file', copy: 'Copy backup text', exported: n => `Exported ${n} item${n === 1 ? '' : 's'}`, copied: 'Backup text copied to the clipboard', copy_failed: 'Copy failed; download the file instead',
-    pick_groups: 'Choose at least one kind of data', pw_short: 'The backup password needs at least 8 characters', pw_mismatch: 'The backup passwords do not match', encrypting: 'Encrypting API keys…',
+    pick_groups: 'Choose at least one kind of data', pw_short: 'The backup password needs at least 8 characters', pw_mismatch: 'The backup passwords do not match', encrypting: 'Encrypting sensitive data…',
     import_title: 'Import a backup', drop: 'Click to choose or drop a backup file (.json)', paste_ph: 'Or paste backup text here', parse: 'Parse',
     meta: (at, v) => `Backed up: ${at || 'unknown'} · version: ${v || 'unknown'}`,
     import_groups: 'Choose what to import', rejected: n => `Ignored ${n} unknown or malformed item${n === 1 ? '' : 's'}`,
-    secret_found: 'The backup contains encrypted API keys. Enter its password to import them too (optional).', unlock: 'Decrypt', unlocked: n => `Decrypted ${n} API key${n === 1 ? '' : 's'}`,
+    secret_found: 'The backup contains encrypted sensitive data. Enter its password to import it too (optional).', unlock: 'Decrypt', unlocked: n => `Decrypted ${n} sensitive item${n === 1 ? '' : 's'}`,
     mode: 'Import mode', merge: 'Merge (recommended): lists are combined without duplicates, counters add up, local settings stay', overwrite: 'Overwrite: replace matching data in the chosen groups',
     overwrite_confirm: 'Overwrite replaces this browser\'s data in the chosen groups with the backup. Continue?', import: 'Import',
     done: (w, s) => `Wrote ${w} item${w === 1 ? '' : 's'}${s ? `, skipped ${s}` : ''}. Reload the page to apply.`, nothing: 'This browser already matches the backup; nothing to write',
@@ -118,7 +118,7 @@ async function _dbRenderGroups() {
 }
 
 function _dbKeyPwToggle() {
-  const on = !!document.querySelector('#dbGroups input[data-group="apikeys"]:checked');
+  const on = !!document.querySelector('#dbGroups input[data-group="apikeys"]:checked, #dbGroups input[data-group="http"]:checked');
   const box = document.getElementById('dbKeyPw');
   if (box) box.style.display = on ? 'flex' : 'none';
 }
@@ -155,7 +155,10 @@ async function dbExport(kind) {
 
 async function dbLoadFile(file) {
   if (!file) return;
-  document.getElementById('dbImportText').value = (await file.text()).slice(0, 6 * 1024 * 1024);
+  if (file.size > 8 * 1024 * 1024) return _dbMsg('dbImportMsg', _dbErr({ code: 'too-large' }), '#ef4444');
+  const input = document.getElementById('dbImportText'), text = await file.text();
+  if (!input?.isConnected) return;
+  input.value = text;
   dbImportParse();
 }
 
@@ -176,7 +179,7 @@ function _dbRenderPreview() {
   const parsed = _db.parsed, preview = document.getElementById('dbPreview');
   if (!parsed || !preview) return;
   const backupGroups = new Map();
-  const groupOf = window.KCompute.backup.groupOf;
+  const groupOf = key => key === 'dtb_http_history' && Object.hasOwn(_db.secret || {}, key) ? 'http' : window.KCompute.backup.groupOf(key);
   for (const key of [...Object.keys(parsed.data), ...Object.keys(_db.secret || {})]) {
     const g = groupOf(key);
     backupGroups.set(g, (backupGroups.get(g) || 0) + 1);
@@ -229,8 +232,13 @@ async function dbImportCommit() {
   const mode = document.querySelector('input[name="dbMode"]:checked')?.value || 'merge';
   if (mode === 'overwrite' && !confirm(T('overwrite_confirm'))) return;
   const backup = await ToolCompute.load('backup');
-  const { writes, skipped } = backup.plan(localStorage, { ..._db.parsed.data, ...(_db.secret || {}) }, { mode, groups });
-  const { written, failed } = backup.apply(localStorage, writes);
+  let skipped, written, failed;
+  try {
+    await ToolRuntime.exclusive('chat-conversations', () => ToolRuntime.exclusive('otp-vault', () => {
+      const plan = backup.plan(localStorage, { ..._db.parsed.data, ...(_db.secret || {}) }, { mode, groups });
+      skipped = plan.skipped; ({ written, failed } = backup.apply(localStorage, plan.writes));
+    }));
+  } catch (e) { return _dbMsg('dbImportMsg', _dbErr(e), '#ef4444'); }
   const preview = document.getElementById('dbPreview');
   const lines = [written || skipped.length ? T('done', written, skipped.length) : T('nothing')];
   if (skipped.some(s => s.reason === 'otp-exists')) lines.push(T('skip_otp'));

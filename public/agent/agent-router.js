@@ -7,6 +7,7 @@ function initAgentRouter(session) {
   function _sniffToolIO() {
     const page = window.currentPage || 'home';
     if (page === 'home') return {};
+    if (!window.ToolPrivacy?.pageAllowed(page)) return {};
     const caps = window.TOOL_CAPS && window.TOOL_CAPS[page];
     if (!caps || caps.autoRun === false) return {};
     // 尝试从 TOOL_RUNNERS 获取选择器
@@ -14,9 +15,9 @@ function initAgentRouter(session) {
     let input = '', output = '';
     if (runner) {
       const mainEl = runner.mainInput && document.querySelector(runner.mainInput);
-      if (mainEl) input = (mainEl.value || mainEl.textContent || '').slice(0, 200);
+      if (mainEl) input = window.ToolPrivacy.context(mainEl.value || mainEl.textContent || '').slice(0, 200);
       const outEl = runner.outputSelector && document.querySelector(runner.outputSelector);
-      if (outEl) output = (outEl.value || outEl.textContent || '').slice(0, 200);
+      if (outEl) output = window.ToolPrivacy.context(outEl.value || outEl.textContent || '').slice(0, 200);
     }
     return { toolInput: input || '', toolOutput: output || '' };
   }

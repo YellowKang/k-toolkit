@@ -4,8 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const context = vm.createContext({ console });
+const context = vm.createContext({ console, URL });
 context.window = context;
+vm.runInContext(fs.readFileSync(path.resolve(__dirname, '..', 'public/tool-privacy.js'), 'utf8'), context);
 vm.runInContext(fs.readFileSync(path.resolve(__dirname, '..', 'public/compute/backup.js'), 'utf8'), context);
 const { backup } = context.KCompute;
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -94,4 +95,48 @@ test('conversation restore rolls back the group if a write fails', () => {
   const write = target.setItem; let count = 0; target.setItem = (...args) => { if (++count === 2) throw new Error('quota'); return write(...args); };
   const result = backup.apply(target, [{ key: 'dtb_chat_history', value: '["new"]', group: 'chat' }, { key: 'dtb_chat_sessions', value: '{"new":true}', group: 'chat' }]);
   assert.equal(result.failed.length, 2); assert.deepEqual(target.dump(), before);
+});
+
+
+test('backup rejects structurally invalid data before planning writes', () => {
+  const values = { dtb_favorites: {}, dtb_recent: [null], dtb_todo: {}, dtb_otp_vault: null, dtb_chat_sessions: { version: 1, activeId: 'missing', items: [] }, dtb_saved_regex: [{}], dtb_typing_scores: [null] };
+  const data = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, JSON.stringify(value)]));
+  const parsed = backup.parse(JSON.stringify({ format: 'k-toolkit-backup', version: 1, data }));
+  assert.equal(Object.keys(parsed.data).length, 0);
+  assert.equal(parsed.rejected.length, Object.keys(data).length);
+  assert.ok(parsed.rejected.every(item => item.reason === 'structure'));
+});
+
+test('HTTP credentials appear only in the encrypted selection and restore only to tab memory', () => {
+  const request = { method: 'POST', url: 'https://user:credential@example.test/path?token=private#private', headers: 'Authorization: Bearer private', body: 'private' };
+  const raw = JSON.stringify([request]), target = storage({ dtb_http_history: raw });
+  const plainBackup = backup.collect(target, backup.DEFAULT_GROUPS).backup;
+  assert.doesNotMatch(JSON.stringify(plainBackup), /private|credential|Bearer/);
+  const encrypted = backup.collect(target, ['tools', 'http']);
+  assert.equal(encrypted.backup.data.dtb_http_history, undefined);
+  assert.equal(backup.parseSecret(JSON.stringify(encrypted.secret)).data.dtb_http_history, raw);
+  let memory;
+  context.RequestSession = { restoreHistory: values => { memory = values; } };
+  const writes = backup.plan(target, encrypted.secret, { mode: 'overwrite', groups: ['http'] }).writes;
+  // A fresh browser has no matching plaintext data to skip.
+  const fresh = storage(); backup.apply(fresh, backup.plan(fresh, encrypted.secret, { groups: ['http'] }).writes);
+  assert.equal(memory[0].headers, request.headers);
+  assert.doesNotMatch(fresh.getItem('dtb_http_history'), /private|credential|Bearer/);
+  delete context.RequestSession;
+});
+
+test('restoring chat messages changes the revision even when the active ID is unchanged', () => {
+  const index = { version: 1, activeId: 'chat-a', items: [{ id: 'chat-a', title: 'A' }], revision: 'old' };
+  const target = storage({ dtb_chat_sessions: JSON.stringify(index) });
+  backup.apply(target, [{ key: 'dtb_chat_history', value: '[{"role":"user","content":"restored"}]', group: 'chat' }]);
+  const restored = JSON.parse(target.getItem('dtb_chat_sessions'));
+  assert.equal(restored.activeId, index.activeId); assert.notEqual(restored.revision, index.revision);
+});
+
+
+test('language backups accept the actual raw storage format and normalize old JSON strings', () => {
+  for (const value of ['en', '"en"']) {
+    const parsed = backup.parse(JSON.stringify({ format: 'k-toolkit-backup', version: 1, data: { dtb_lang: value } }));
+    assert.equal(parsed.rejected.length, 0); assert.equal(parsed.data.dtb_lang, 'en');
+  }
 });

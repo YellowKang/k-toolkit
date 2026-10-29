@@ -1,4 +1,4 @@
-const {chromium, firefox}=require('playwright');
+const { launchBrowser } = require('./browser-launch.cjs');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
@@ -10,13 +10,14 @@ async function run(kind){
  const options={headless:true};
  if(process.env.TEST_BROWSER_CHANNEL) options.channel=process.env.TEST_BROWSER_CHANNEL;
  if(process.env.TEST_BROWSER_EXECUTABLE) options.executablePath=process.env.TEST_BROWSER_EXECUTABLE;
- const browser=await (kind==='firefox'?firefox:chromium).launch(options);
+ const browser=await launchBrowser(options);
  try {
   const page=await browser.newPage({serviceWorkers:'block',acceptDownloads:true});page.setDefaultTimeout(8000);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(`${baseUrl}/dashboard.html#img-compress`,{waitUntil:'domcontentloaded'});
   await page.locator('#imgFileInput').waitFor({state:'attached'});
   const base64=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=96;c.height=64;const ctx=c.getContext('2d');ctx.fillStyle='#6655cc';ctx.fillRect(0,0,96,64);return c.toDataURL('image/png').split(',')[1]});
+  const supportsWebP = await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1; return canvas.toDataURL('image/webp').startsWith('data:image/webp'); });
   const fixture={name:'sample.png',mimeType:'image/png',buffer:Buffer.from(base64,'base64')};
   const route=async(id,selector)=>{await page.evaluate(id=>window.navigateTo(id),id);await page.locator(selector).waitFor({state:'attached'})};
   const compress=async()=>{await page.locator('#imgCompressRun').click();await page.locator('#imgCompressResult [data-download]').waitFor()};
@@ -61,10 +62,15 @@ async function run(kind){
   await route('img-webp','#iwFile');
   const [batchChooser]=await Promise.all([page.waitForEvent('filechooser'),page.locator('#iwDrop').click()]);
   await batchChooser.setFiles([fixture,{...fixture,name:'second.png'}]);await page.locator('#imgCompressRun').click();
+  if (supportsWebP) {
   await page.waitForFunction(()=>document.querySelectorAll('#iwList button[data-download]:not([hidden])').length===2);
   assert.equal(await page.locator('#iwList > div').count(),2);
   const webp=await getDownload('#iwList > div:first-child button[data-download]');assert.equal(webp.subarray(8,12).toString(),'WEBP');
   assert.equal((await getDownload('#iwList > div:first-child button[data-download]')).subarray(8,12).toString(),'WEBP');
+  } else {
+    await page.waitForFunction(() => [...document.querySelectorAll('#iwList [data-info]')].filter(el => el.textContent.includes('无法生成所选图片格式')).length === 2);
+    assert.equal(await page.locator('#iwList [data-download]').count(), 0, 'unsupported encoding must not publish mislabeled PNG bytes');
+  }
   await page.locator('#imgFormat').selectOption('image/png');
   assert.equal(await page.locator('#iwQuality').isDisabled(),true);
   await page.locator('#imgCompressRun').click();
@@ -88,7 +94,7 @@ async function run(kind){
   assert.match(await page.locator('[data-reuse]').textContent(),/第一张/);
   await page.locator('[data-reuse]').click(); await page.locator('#imgResultPanel').waitFor();
   assert.equal((await page.locator('#imgB64Output').inputValue()).split(',')[1],base64);
-  await route('img-webp','#iwFile'); await page.locator('[data-reuse]').click();await page.locator('#imgCompressRun').click();
+  await route('img-webp','#iwFile'); await page.locator('[data-reuse]').click(); if (!supportsWebP) await page.locator('#imgFormat').selectOption('image/png'); await page.locator('#imgCompressRun').click();
   await page.waitForFunction(()=>document.querySelectorAll('#iwList button[data-download]:not([hidden])').length===2);
   await route('img-base64','#imgFile');await page.locator('#imgFile').setInputFiles(fixture);await page.locator('#imgResultPanel').waitFor();
   await route('img-compress','#imgFileInput');await page.locator('#imgFileInput').setInputFiles(fixture);await compress();
@@ -108,7 +114,7 @@ async function run(kind){
   await page.reload(); await page.locator('#imgFile').waitFor({state:'attached'});
   assert.equal(await page.evaluate(()=>ImageSession.metadata().length),0,'refresh must clear in-memory files');
   assert.deepEqual(errors,[]);
-  console.log(kind+': PASS chooser, keyboard, shared batch, JPEG/PNG/WebP, direct Base64 handoff, limits, repeat download, invalid files, safe preview, 375/768 layouts, English, cancel, disposal');
+  console.log(kind+': PASS chooser, keyboard, shared batch, JPEG/PNG/WebP or explicit unsupported-format error, direct Base64 handoff, limits, repeat download, invalid files, safe preview, 375/768 layouts, English, cancel, disposal');
  }finally{await browser.close()}
 }
 (async()=>{
@@ -120,7 +126,7 @@ async function run(kind){
    temp=fs.mkdtempSync(path.join(os.tmpdir(),'k-toolkit-image-test-'));
    fs.cpSync(source,path.join(temp,'public'),{recursive:true});
    fs.cpSync(path.join(root,'scripts'),path.join(temp,'scripts'),{recursive:true});
-   execFileSync(process.execPath,['scripts/build.js'],{cwd:temp,stdio:'pipe'});
+   execFileSync(process.execPath,['scripts/build.js'],{cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') }});
    source=path.join(temp,'dist');
   }
   const app=express();app.use('/k-toolkit',express.static(source));

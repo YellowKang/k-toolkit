@@ -287,7 +287,8 @@ class AgentSession {
 
       for (const r of results) {
         if(r.name==='search_tools')for(const item of r.result.data?.actions||[]){const registered=window._AGENT_ALL_ACTIONS?.get(item.id||item.schema?.name);if(registered){this._discovered.delete(registered.name);this._discovered=new Map([[registered.name,{name:registered.name,description:registered.description,parameters:registered.parameters}],...this._discovered]);if(this._discovered.size>20)this._discovered.delete([...this._discovered.keys()].at(-1));}}
-        const historyResult=['search_tools','read_result','read_file'].includes(r.name)?r.result:window.AgentResultStore?.compact(r.result)||r.result;
+        const safeResult = window.ToolPrivacy?.modelResult(r.name, r.result) || r.result;
+        const historyResult=['search_tools','read_result','read_file'].includes(r.name)?safeResult:window.AgentResultStore?.compact(safeResult)||safeResult;
         if(historyResult.resultId)r.resultId=historyResult.resultId;
         this.messages.push({
           role: 'tool',

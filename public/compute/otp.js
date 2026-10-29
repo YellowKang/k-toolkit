@@ -328,14 +328,21 @@
   /** Derive display groups without changing, merging or exposing secrets to search. */
   function groupAccounts(entries, { query = '', issuer = '', locale = 'zh-CN' } = {}) {
     const fold = value => String(value ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
-    const names = new Map([['google', 'Google'], ['openai', 'OpenAI'], ['github', 'GitHub'], ['microsoft', 'Microsoft'], ['meta', 'Meta'], ['amazon', 'Amazon'], ['binance', 'Binance']]);
     const words = fold(query).split(' ').filter(Boolean), groups = new Map();
     for (const entry of entries) {
       const name = fold(entry.issuer), key = name ? 'issuer:' + name : 'unclassified';
-      if (!groups.has(key)) groups.set(key, { key, label: names.get(name) || String(entry.issuer || '').trim(), count: 0, entries: [] });
-      const group = groups.get(key); group.count++;
+      if (!groups.has(key)) groups.set(key, { key, label: '', count: 0, entries: [], spellings: new Map() });
+      const group = groups.get(key), spelling = String(entry.issuer || '').trim().replace(/\s+/g, ' ');
+      group.count++;
+      if (spelling) group.spellings.set(spelling, (group.spellings.get(spelling) || 0) + 1);
       const text = fold([entry.issuer, entry.account, entry.note].join(' '));
       if ((!issuer || issuer === key) && words.every(word => text.includes(word))) group.entries.push(entry);
+    }
+    // The label must not depend on import order: most used spelling, then more capitals ("GitHub" over "github").
+    const capitals = text => text.replace(/[^\p{Lu}]/gu, '').length;
+    for (const group of groups.values()) {
+      group.label = [...group.spellings].sort(([a, m], [b, n]) => n - m || capitals(b) - capitals(a) || (a < b ? -1 : a > b ? 1 : 0))[0]?.[0] || '';
+      delete group.spellings;
     }
     const collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true });
     const sorted = [...groups.values()].sort((a, b) => Number(a.key === 'unclassified') - Number(b.key === 'unclassified') || collator.compare(a.label, b.label));

@@ -2,8 +2,8 @@
 
 // One active modal: retain focus even when its backdrop receives a pointer click.
 window.AgentDialog = {
-  trap(overlay, box, onClose) {
-    const previous = document.activeElement;
+  trap(overlay, box, onClose, returnFocus = document.activeElement) {
+    const previous = returnFocus;
     const visible = () => [...box.querySelectorAll('button,input,textarea,select,summary,a[href],[tabindex="0"]')].filter(el => !el.disabled && el.getClientRects().length);
     box.tabIndex = -1;
     const focus = () => (visible()[0] || box).focus();

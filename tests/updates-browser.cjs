@@ -1,4 +1,4 @@
-const { chromium, firefox } = require('playwright');
+const { launchBrowser } = require('./browser-launch.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -16,7 +16,7 @@ const express = require('express');
     const versions = {}, manifests = {};
     for (const release of ['A', 'B', 'C']) {
       fs.writeFileSync(gradient, original + '\nwindow.__releaseTool = ' + JSON.stringify(release) + ';\n');
-      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' });
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') } });
       fs.renameSync(path.join(temp, 'dist'), path.join(temp, release));
       versions[release] = JSON.parse(fs.readFileSync(path.join(temp, release, 'version.json'))).version;
       const precache = JSON.parse(fs.readFileSync(path.join(temp, release, 'sw.js'), 'utf8').match(/PRECACHE\s*=\s*(\[.*?\]);/)[1]);
@@ -28,8 +28,10 @@ const express = require('express');
     const requests = [];
     // Once pages are controlled, only a release's installer requests its ?v= URLs from the network.
     const fetched = version => requests.filter(request => request.version === version).map(request => request.path).sort();
+    let serverOffline = false;
     const app = express();
     app.use('/k-toolkit', (req, res) => {
+      if (serverOffline) { req.socket.destroy(); return; }
       requests.push({ path: '/k-toolkit' + req.path, version: req.query.v });
       res.set('Cache-Control', 'public, max-age=600');
       if (failure && req.path === '/tools/gradient.js') {
@@ -42,7 +44,7 @@ const express = require('express');
     const options = { headless: true };
     if (process.env.TEST_BROWSER_CHANNEL) options.channel = process.env.TEST_BROWSER_CHANNEL;
     if (process.env.TEST_BROWSER_EXECUTABLE) options.executablePath = process.env.TEST_BROWSER_EXECUTABLE;
-    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch(options);
+    browser = await launchBrowser(options);
     const context = await browser.newContext({ serviceWorkers: 'allow' });
     const page = await context.newPage(); page.setDefaultTimeout(15000);
     const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -91,7 +93,10 @@ const express = require('express');
     assert.equal(await second.evaluate(() => window.__releaseTool), 'A', 'old tabs must still receive old lazy scripts');
     assert.ok(await page.evaluate(async () => (await caches.keys()).includes('dtb-release:/other-project/:keep')));
 
-    await context.setOffline(true);
+    // WebKit's offline emulation rejects SW navigation before dispatch (Playwright #42775).
+    // Cut the fixture network instead so cached navigation must still work.
+    if (process.env.TEST_BROWSER === 'webkit') serverOffline = true;
+    else await context.setOffline(true);
     await page.reload();
     assert.equal(await current(page), versions.B);
     await page.locator('#appUpdateButton').click();
@@ -100,6 +105,7 @@ const express = require('express');
     await page.evaluate(async () => { await loadTool('gradient'); });
     assert.equal(await page.evaluate(() => window.__releaseTool), 'B');
     deployed = 'C'; failure = 'missing';
+    serverOffline = false;
     await context.setOffline(false);
     for (const mode of ['missing', 'mismatch']) {
       failure = mode;

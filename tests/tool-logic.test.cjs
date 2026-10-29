@@ -225,3 +225,22 @@ test('unit conversions use exact definitions without floating-point noise', () =
   assert.equal(c('volume', 1, 'usgal', 'l'), 3.785411784);
   assert.equal(c('time', 1, 'wk', 'h'), 168);
 });
+
+
+test('template substitution is a single literal pass independent of property order', () => {
+  const { ToolCompute: C } = load('tool-compute.js');
+  for (const values of [{ a: '{{b}}', b: '$&' }, { b: '$&', a: '{{b}}' }]) {
+    assert.equal(C.fillTemplate('{{a}} | {{ b }} | {{missing}}', values), '{{b}} | $& | {{missing}}');
+  }
+  assert.equal(C.fillTemplate('{{toString}}', {}), '{{toString}}');
+});
+
+test('password randomness rejects the biased tail instead of taking modulo directly', () => {
+  const context = load('tool-compute.js'), samples = [0xffffffff, 0xfffffffc, 61, 0, 1, 2];
+  let draws = 0;
+  context.crypto = { getRandomValues: values => { values[0] = samples[draws++]; return values; } };
+  assert.equal(context.ToolCompute.randomIndex(62), 61);
+  assert.equal(draws, 3, 'both values outside the largest multiple of 62 must be rejected');
+  assert.equal(context.ToolCompute.randomString(3, 'abc'), 'abc');
+  assert.throws(() => context.ToolCompute.randomIndex(0));
+});

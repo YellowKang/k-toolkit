@@ -4,7 +4,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const express = require('express');
-const { chromium, firefox } = require('playwright');
+const { launchBrowser } = require('./browser-launch.cjs');
 (async () => {
   let browser, server, temp;
   try {
@@ -12,11 +12,11 @@ const { chromium, firefox } = require('playwright');
     if (process.env.TEST_BUILD === '1') {
       temp = fs.mkdtempSync(path.join(os.tmpdir(), 'k-toolkit-interaction-'));
       for (const dir of ['public', 'scripts']) fs.cpSync(path.join(root, dir), path.join(temp, dir), { recursive: true });
-      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' }); source = path.join(temp, 'dist');
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') } }); source = path.join(temp, 'dist');
     }
     const app = express(); app.use('/k-toolkit', express.static(source));
     server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
-    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch({ headless: true });
+    browser = await launchBrowser();
     const page = await browser.newPage({ serviceWorkers: 'block', viewport: { width: 1440, height: 1000 } });
     page.setDefaultTimeout(10000); const errors = []; let remoteRequests = 0;
     page.on('pageerror', e => errors.push(e.message)); page.on('dialog', dialog => dialog.accept());
@@ -89,20 +89,22 @@ const { chromium, firefox } = require('playwright');
       AgentAdapters.getAdapter('custom').chatStream = async function* () { yield { type: 'delta', text: '消息内 needle <img data-search-probe src=x onerror=alert(1)> end' }; };
     });
     await page.locator('#_chatInput').fill('独立会话'); await page.locator('#_chatSendBtn').click();
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history')).at(-1)?.role === 'assistant');
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history') || '[]').at(-1)?.role === 'assistant');
     const first = await page.evaluate(() => ChatConversations.ensure().activeId);
     await page.locator('#_chatInput').fill('待发送草稿'); await page.locator('#_chatNewBtn').click();
+    await page.waitForFunction(() => document.querySelector('#_chatInput').value === '');
     assert.equal(await page.locator('#_chatInput').inputValue(), ''); assert.equal(await page.locator('._chat-row').count(), 0);
     await page.locator('#_chatSessionsBtn').click(); await page.locator('#_chatSessionSearch').fill('needle');
     await page.waitForFunction(() => document.querySelectorAll('._chat-session-row').length === 1);
     assert.equal(await page.locator('._chat-session-preview mark').textContent(), 'needle'); assert.equal(await page.locator('[data-search-probe]').count(), 0);
     assert.match(await page.locator('._chat-session-time').textContent(), /更新于/);
-    await page.locator(`[data-session-open="${first}"]`).click(); assert.equal(await page.locator('#_chatInput').inputValue(), '待发送草稿');
+    await page.locator(`[data-session-open="${first}"]`).click(); await page.locator('#_chatSessions').waitFor({ state: 'detached' }); assert.equal(await page.locator('#_chatInput').inputValue(), '待发送草稿');
     await page.evaluate(() => { AgentAdapters.getAdapter('custom').chatStream = async function* () { yield { type: 'delta', text: '生成中' }; await new Promise(resolve => { window.__releaseReply = resolve; }); }; });
     await page.locator('#_chatSendBtn').click(); await page.locator('#_chatStopBtn').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#_chatNewBtn').isEnabled(), false);
     await page.evaluate(() => _chatNewChat()); assert.equal(await page.evaluate(() => ChatConversations.ensure().activeId), first);
     await page.locator('#_chatStopBtn').click(); await page.evaluate(() => window.__releaseReply?.());
+    await page.waitForFunction(() => !document.querySelector('#_chatNewBtn').disabled);
     assert.equal(await page.locator('#_chatNewBtn').isEnabled(), true);
 
     await page.setViewportSize({ width: 390, height: 844 });

@@ -1,5 +1,5 @@
+const { launchBrowser } = require('./browser-launch.cjs');
 // Backup & restore end to end: export (API keys encrypted) → wipe storage → import with merge → reload → data is back.
-const { chromium, firefox } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -15,7 +15,7 @@ const express = require('express');
     if (process.env.TEST_BUILD === '1') {
       temp = fs.mkdtempSync(path.join(os.tmpdir(), 'k-toolkit-backup-test-'));
       for (const dir of ['public', 'scripts']) fs.cpSync(path.join(root, dir), path.join(temp, dir), { recursive: true });
-      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' });
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') } });
       source = path.join(temp, 'dist');
     }
     const app = express(); app.use('/k-toolkit', express.static(source));
@@ -23,7 +23,7 @@ const express = require('express');
     const options = { headless: true };
     if (process.env.TEST_BROWSER_CHANNEL) options.channel = process.env.TEST_BROWSER_CHANNEL;
     if (process.env.TEST_BROWSER_EXECUTABLE) options.executablePath = process.env.TEST_BROWSER_EXECUTABLE;
-    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch(options);
+    browser = await launchBrowser(options);
     const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: true });
     const page = await context.newPage();
     page.setDefaultTimeout(15000);

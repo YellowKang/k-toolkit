@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const express = require('express');
-const { chromium, firefox } = require('playwright');
+const { launchBrowser } = require('./browser-launch.cjs');
 
 (async () => {
   let browser, server, temp;
@@ -14,12 +14,12 @@ const { chromium, firefox } = require('playwright');
     if (process.env.TEST_BUILD === '1') {
       temp = fs.mkdtempSync(path.join(os.tmpdir(), 'k-toolkit-perf-test-'));
       for (const dir of ['public','scripts']) fs.cpSync(path.join(root, dir),path.join(temp,dir),{recursive:true});
-      execFileSync(process.execPath,['scripts/build.js'],{cwd:temp,stdio:'pipe'});
+      execFileSync(process.execPath,['scripts/build.js'],{cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') }});
       source = path.join(temp,'dist');
     }
     const app = express(); app.use('/k-toolkit',express.static(source));
     server = await new Promise(resolve => { const s=app.listen(0,'127.0.0.1',()=>resolve(s)); });
-    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch({headless:true});
+    browser = await launchBrowser();
     const page = await browser.newPage({serviceWorkers:'block',viewport:{width:1440,height:1000}});
     const errors=[]; page.on('pageerror',e=>errors.push(e.message));
     await page.route(/^https:\/\//,route=>route.abort());

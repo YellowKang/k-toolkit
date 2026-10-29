@@ -1,6 +1,6 @@
+const { launchBrowser } = require('./browser-launch.cjs');
 // English mode must not leak Chinese UI text from any tool: labels, placeholders, titles, samples, results,
 // toasts and dialogs. Chinese data (lunar dates, financial numerals, language endonyms) is tagged lang="zh".
-const { chromium, firefox } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -23,7 +23,7 @@ const CJK = '[\\u3000-\\u303f\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uff0
     if (process.env.TEST_BUILD === '1') {
       temp = fs.mkdtempSync(path.join(os.tmpdir(), 'k-toolkit-i18n-test-'));
       for (const dir of ['public', 'scripts']) fs.cpSync(path.join(root, dir), path.join(temp, dir), { recursive: true });
-      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' });
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') } });
       source = path.join(temp, 'dist');
     }
     const app = express(); app.use('/k-toolkit', express.static(source));
@@ -31,7 +31,7 @@ const CJK = '[\\u3000-\\u303f\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\uff0
     const options = { headless: true };
     if (process.env.TEST_BROWSER_CHANNEL) options.channel = process.env.TEST_BROWSER_CHANNEL;
     if (process.env.TEST_BROWSER_EXECUTABLE) options.executablePath = process.env.TEST_BROWSER_EXECUTABLE;
-    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch(options);
+    browser = await launchBrowser(options);
     const page = await browser.newPage({ serviceWorkers: 'block' });
     page.setDefaultTimeout(8000);
     const errors = [], dialogs = [];

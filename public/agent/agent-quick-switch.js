@@ -32,7 +32,7 @@ window._agOpenQuickSwitch = function (anchor, initialMode = 'models') {
     box.style.top = Math.max(12, Math.min(top, innerHeight - height - 12)) + 'px';
   }
   function close() { overlay.remove(); release(); window.removeEventListener('resize', position); window.removeEventListener('hashchange', close); }
-  const release = window.AgentDialog.trap(overlay, box, close);
+  const release = window.AgentDialog.trap(overlay, box, close, anchor);
   function manage(id) { close(); window._agOpenConfig({ modelsOnly: mode === 'models', initialConnectionId: id }); }
   function apply(config) {
     try { AG.save(config); close(); window.showToast?.(say('已切换，下次发送生效。', 'Switched. Applies to your next message.')); }
@@ -77,7 +77,18 @@ window._agOpenQuickSwitch = function (anchor, initialMode = 'models') {
   for (const [id, next] of [['agQuickConnections', 'connections'], ['agQuickModels', 'models']]) field(id).onclick = () => { mode = next; limit = 30; field('agQuickSearch').value = ''; render(); field('agQuickSearch').focus(); };
   field('agQuickSearch').oninput = () => { limit = 30; render(); };
   field('agQuickSearch').onkeydown = event => {
-    if (event.key === 'ArrowDown') { event.preventDefault(); field('agQuickList').querySelector('button')?.focus(); }
+    const first = field('agQuickList').querySelector('button');
+    if (event.key === 'ArrowDown') { event.preventDefault(); first?.focus(); }
+    else if (event.key === 'Enter' && first && !event.isComposing) { event.preventDefault(); first.click(); }
+  };
+  // Arrow keys walk the result list; leaving the top returns to the search field.
+  field('agQuickList').onkeydown = event => {
+    const buttons = [...field('agQuickList').querySelectorAll('button')], at = buttons.indexOf(document.activeElement);
+    if (at < 0) return;
+    const target = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: buttons.length - 1 }[event.key];
+    if (target === undefined) return;
+    event.preventDefault();
+    if (target < 0) field('agQuickSearch').focus(); else buttons[Math.min(target, buttons.length - 1)].focus();
   };
   field('agQuickClose').onclick = close; field('agQuickManage').onclick = () => manage(cfg.connectionId);
   overlay.onclick = event => { if (event.target === overlay) close(); };

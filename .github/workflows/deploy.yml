@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        browser: [chromium, firefox]
+        browser: [chromium, firefox, webkit]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,6 +52,7 @@ jobs:
         with:
           node-version: '24'
       - uses: actions/configure-pages@v5
+      - run: npm ci
       - name: Build
         run: node scripts/build.js
       - uses: actions/upload-pages-artifact@v4

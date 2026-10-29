@@ -121,8 +121,7 @@ const DevActions = [
       if (digit)  chars += '0123456789';
       if (symbol) chars += '!@#$%^&*()-_=+[]{}|;:,.<>?';
       if (!chars) chars = 'abcdefghijklmnopqrstuvwxyz';
-      const arr = crypto.getRandomValues(new Uint8Array(length));
-      const password = Array.from(arr).map(b => chars[b % chars.length]).join('');
+      const password = ToolCompute.randomString(length, chars);
       const entropy = Math.floor(length * Math.log2(chars.length));
       const strength = entropy < 40 ? 'weak' : entropy < 60 ? 'medium' : entropy < 80 ? 'strong' : 'very strong';
       return { success: true, data: { password, strength }, display: `密码已生成（强度: ${strength}）` };

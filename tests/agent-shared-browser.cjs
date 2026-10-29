@@ -1,4 +1,4 @@
-const { chromium, firefox } = require('playwright');
+const { launchBrowser } = require('./browser-launch.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
@@ -10,11 +10,11 @@ const express = require('express');
     if (process.env.TEST_BUILD === '1') {
       temp = fs.mkdtempSync(path.join(os.tmpdir(), 'toolkit-shared-'));
       for (const dir of ['public', 'scripts']) fs.cpSync(path.join(root, dir), path.join(temp, dir), { recursive: true });
-      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' }); source = path.join(temp, 'dist');
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') } }); source = path.join(temp, 'dist');
     }
     const app = express(); app.use('/k-toolkit', express.static(source));
     server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
-    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch({ headless: true });
+    browser = await launchBrowser();
     const page = await browser.newPage({ serviceWorkers: 'block', acceptDownloads: true, viewport: { width: 1440, height: 1000 } }); page.setDefaultTimeout(10000);
     const errors = [], external = []; page.on('pageerror', e => errors.push(e.message));
     await page.route(/^https?:\/\//, route => {
@@ -52,6 +52,8 @@ const express = require('express');
     assert.equal((await run('regex_test', { pattern: '^', flags: 'g', text: 'abc' })).data.count, 1);
     assert.equal((await run('regex_test', { pattern: '(?<first>a)(b)', flags: 'g', text: 'ab ab', mode: 'replace', replacement: '$2:$<first>' })).data.result, 'b:a b:a');
     await page.evaluate(() => { window.__ticks = 0; window.__ticker = setInterval(() => window.__ticks++, 20); });
+    // JSC bounds regex backtracking internally. Force a stalled Worker to verify our own timeout/cancel path.
+    if (process.env.TEST_BROWSER === 'webkit') await page.route('**/tools/regex-worker.js*', route => route.fulfill({ contentType: 'text/javascript', body: 'self.onmessage = () => { while (true) {} };' }));
     const timed = await run('regex_test', { pattern: '(a+)+$', flags: '', text: 'a'.repeat(40) + '!' });
     assert.equal(timed.success, false); assert.equal(timed.error, 'timeout'); assert.ok(await page.evaluate(() => window.__ticks > 10));
     const cancelled = await page.evaluate(async () => {
@@ -60,6 +62,7 @@ const express = require('express');
       catch (error) { return error.name === 'AbortError'; }
       finally { clearInterval(window.__ticker); }
     }); assert.equal(cancelled, true);
+    if (process.env.TEST_BROWSER === 'webkit') await page.unroute('**/tools/regex-worker.js*');
     console.log('PASS manual/Agent parity: escapes, SQL, duplicate lines, scalar JSON, real regex Worker timeout/cancel');
 
     const input = JSON.stringify({ payload: '<img src=x onerror=alert(1)>' + 'x'.repeat(5000) });
@@ -106,10 +109,13 @@ const express = require('express');
     ]);
     const listed = (await run('list_image_files', {})).data.files, first = listed[0].id;
     assert.equal(listed.length, 2); assert.equal(JSON.stringify(listed).includes(fixture), false);
-    const converted = await run('image_convert', { fileIds: listed.map(file => file.id), format: 'image/webp', quality: 90 });
+    const supportsWebP = await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1; return canvas.toDataURL('image/webp').startsWith('data:image/webp'); });
+    const converted = await run('image_convert', { fileIds: listed.map(file => file.id), format: supportsWebP ? 'image/webp' : 'image/png', quality: 90 });
     assert.equal(converted.success, false); assert.equal(converted.data.files.length, 1); assert.equal(converted.data.errors.length, 1);
     const resultId = converted.data.files[0].id;
-    const output = await download(card().locator('[data-file-download]')); assert.equal(output.subarray(8, 12).toString(), 'WEBP');
+    const output = await download(card().locator('[data-file-download]'));
+    if (supportsWebP) assert.equal(output.subarray(8, 12).toString(), 'WEBP');
+    else assert.equal(output.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
     assert.deepEqual(await download(card().locator('[data-file-download]')), output);
     assert.equal(converted.data.files[0].width, 256);
     await card().locator('.ag-result-file select').selectOption('qrcode-decode'); await card().locator('[data-file-send]').click();

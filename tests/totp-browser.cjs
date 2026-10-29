@@ -1,5 +1,5 @@
+const { launchBrowser } = require('./browser-launch.cjs');
 // 2FA tool end to end: encrypted board, codes matching an independent TOTP, lock/unlock, imports, exports, quick check, generator.
-const { chromium, firefox } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -34,7 +34,7 @@ const around = secret => [totp(secret, Date.now() - 30000), totp(secret), totp(s
     if (process.env.TEST_BUILD === '1') {
       temp = fs.mkdtempSync(path.join(os.tmpdir(), 'k-toolkit-totp-test-'));
       for (const dir of ['public', 'scripts']) fs.cpSync(path.join(root, dir), path.join(temp, dir), { recursive: true });
-      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' });
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') } });
       source = path.join(temp, 'dist');
     }
     const app = express(); app.use('/k-toolkit', express.static(source));
@@ -42,9 +42,9 @@ const around = secret => [totp(secret, Date.now() - 30000), totp(secret), totp(s
     const options = { headless: true };
     if (process.env.TEST_BROWSER_CHANNEL) options.channel = process.env.TEST_BROWSER_CHANNEL;
     if (process.env.TEST_BROWSER_EXECUTABLE) options.executablePath = process.env.TEST_BROWSER_EXECUTABLE;
-    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch(options);
+    browser = await launchBrowser(options);
     const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: true });
-    if (process.env.TEST_BROWSER !== 'firefox') await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    if ((!process.env.TEST_BROWSER || process.env.TEST_BROWSER === 'chromium')) await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
     const errors = []; page.on('pageerror', e => { errors.push(e.message); console.error('Browser error:', e.stack); });

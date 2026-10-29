@@ -1,5 +1,15 @@
 (function () {
   let draft = null;
+  let history = [];
+  // Upgrade old plaintext history once, retaining the full requests in this tab.
+  try {
+    const raw = localStorage.getItem('dtb_http_history');
+    const entries = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(entries) && window.ToolPrivacy) {
+      history = entries.filter(entry => entry && typeof entry.url === 'string').slice(0, 20);
+      localStorage.setItem('dtb_http_history', JSON.stringify(ToolPrivacy.httpHistory(history)));
+    }
+  } catch { /* The in-memory requests remain available if browser storage is unavailable. */ }
   function mount(el, mode) {
     const get = id => el.querySelector('#' + id);
     function capture() {
@@ -42,5 +52,10 @@
     };
     return { capture, restore };
   }
-  window.RequestSession = { mount, get: () => draft ? { ...draft } : null, set: value => { draft = { ...value }; } };
+  window.RequestSession = { mount, get: () => draft ? { ...draft } : null, set: value => { draft = { ...value }; },
+    history: () => history.map(entry => ({ ...entry })),
+    remember: entry => { history = [entry, ...history].slice(0, 20); },
+    restoreHistory: entries => { history = entries.slice(0, 20).map(entry => ({ ...entry })); },
+    deleteHistory: index => { history.splice(index, 1); }, clearHistory: () => { history = []; },
+  };
 })();

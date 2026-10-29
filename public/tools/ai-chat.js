@@ -70,16 +70,16 @@ function _chatLoadHistory(source) {
     }));
   } catch { return []; }
 }
-function _chatSaveHistory() {
+async function _chatSaveHistory() {
   try {
     const save=[];let characters=0;
     for(let i=_chatMessages.length-1;i>=0;i--){const m=_chatMessages[i],value={role:m.role,content:m.content,_images:m._images||null,ts:m.ts,status:m.status},size=JSON.stringify(value).length;if(save.length>=500||characters+size>1500000)break;save.unshift(value);characters+=size;}
     while(save.length&&save[0].role!=='user')save.shift();
     const omitted=_chatMessages.length-save.length;
     if (window.ChatConversations) {
-      const index = window.ChatConversations.save({ ..._chatSnapshot(), messages: save, meta: { omitted } }, _chatSessionId);
+      const index = await window.ChatConversations.save({ ..._chatSnapshot(), messages: save, meta: { omitted } }, _chatSessionId);
       _chatSessionId = index.activeId; _chatSessionTitle();
-    } else { localStorage.setItem(_CHAT_LS_KEY,JSON.stringify(save)); localStorage.setItem('dtb_chat_history_meta',JSON.stringify({omitted})); }
+    } else { throw new Error(_chatTl('no_adapter')); }
     const status=document.getElementById('_chatStorageStatus');if(status)status.textContent=omitted?_chatSay(`刷新后仅恢复最近 ${save.length} 条；请导出以保留完整对话。`,`Only the latest ${save.length} messages will survive refresh; export to keep the full conversation.`):'';
     return true;
   } catch (error) {
@@ -110,11 +110,12 @@ function _chatSessionTitle() {
     if (button) { const title = index.items.find(item => item.id === index.activeId).title; button.textContent = _chatSay('会话 · ', 'Chats · ') + title + ' ▾'; button.title = title; }
   } catch (e) { window.showToast?.(e.message, 'error'); }
 }
-function _chatSaveDraft() {
+async function _chatSaveDraft() {
   clearTimeout(_chatDraftTimer);
+  const draft = _chatDraft, expected = _chatSessionId;
   try {
-    window.ChatConversations?.assertActive(_chatSessionId);
-    localStorage.setItem('dtb_chat_draft', JSON.stringify(_chatDraft));
+    if (!window.ChatConversations) await window._agEnsureLoaded();
+    await window.ChatConversations.patch({ draft }, expected);
   } catch (e) { window.showToast?.(e.message || _chatSay('草稿保存失败。', 'Could not save draft.'), 'error'); }
 }
 function _chatRestoreSession(value) {
@@ -128,13 +129,16 @@ function _chatRequireIdle() {
   if (_chatBusy || _chatPreparing) throw new Error(_chatSay('请先停止当前回复再切换或删除会话。', 'Stop the current reply before switching or deleting a conversation.'));
   clearTimeout(_chatDraftTimer);
 }
-function _chatSwitchSession(id, create = false) {
+async function _chatSwitchSession(id, create = false) {
   _chatRequireIdle();
-  _chatRestoreSession(window.ChatConversations.switchTo(id, _chatSnapshot(), _chatSessionId, create));
-  document.getElementById('_chatInput')?.focus();
+  _chatPreparing = true; _chatUpdateButtons();
+  try {
+    _chatRestoreSession(await window.ChatConversations.switchTo(id, _chatSnapshot(), _chatSessionId, create));
+    document.getElementById('_chatInput')?.focus();
+  } finally { _chatPreparing = false; _chatUpdateButtons(); }
 }
 async function _chatNewChat() {
-  try { await window._agEnsureLoaded(); if (document.getElementById('_chatInput')) _chatSwitchSession(null, true); }
+  try { await window._agEnsureLoaded(); if (document.getElementById('_chatInput')) await _chatSwitchSession(null, true); }
   catch (e) { window.showToast?.(e.message, 'error'); }
 }
 async function _chatOpenSessions() {
@@ -153,8 +157,8 @@ async function _chatOpenSessions() {
   _chatDialogClose = close;
   const release = window.AgentDialog.trap(overlay, box, close);
   box.querySelector('#_chatSessionsClose').onclick = close;
-  const guard = fn => { try { fn(); } catch (e) { status(e.message); } };
-  const switchTo = (id, create = false) => guard(() => { _chatSwitchSession(id, create); close(); document.getElementById('_chatInput')?.focus(); });
+  const guard = async fn => { try { await fn(); } catch (e) { status(e.message); } };
+  const switchTo = (id, create = false) => guard(async () => { await _chatSwitchSession(id, create); close(); document.getElementById('_chatInput')?.focus(); });
   box.querySelector('#_chatSessionNew').onclick = () => switchTo(null, true);
   _chatUpdateButtons();
   function render() {
@@ -184,12 +188,12 @@ async function _chatOpenSessions() {
       action(_chatSay('改名', 'Rename'), 'rename', () => {
         select.hidden = true; const input = document.createElement('input'); input.value = item.title; input.maxLength = 60; input.setAttribute('aria-label', _chatSay('会话名称', 'Conversation title')); row.prepend(input);
         const save = document.createElement('button'); save.className = '_chat-btn-primary'; save.textContent = _chatSay('保存', 'Save'); row.prepend(save);
-        save.onclick = () => guard(() => { store.edit(item.id, { title: input.value }); render(); _chatSessionTitle(); box.querySelector('#_chatSessionSearch').focus(); });
+        save.onclick = () => guard(async () => { await store.edit(item.id, { title: input.value }); render(); _chatSessionTitle(); box.querySelector('#_chatSessionSearch').focus(); });
         input.onkeydown = event => { if (event.key === 'Enter' && !event.isComposing) save.click(); }; input.focus(); input.select();
       });
-      action(item.pinned ? _chatSay('取消置顶', 'Unpin') : _chatSay('置顶', 'Pin'), 'pin', () => { store.edit(item.id, { pinned: !item.pinned }); render(); });
+      action(item.pinned ? _chatSay('取消置顶', 'Unpin') : _chatSay('置顶', 'Pin'), 'pin', async () => { await store.edit(item.id, { pinned: !item.pinned }); render(); });
       action(_chatSay('导出', 'Export'), 'export', () => _chatExportMd(get().messages, item.title));
-      action(_chatSay('删除', 'Delete'), 'delete', () => { _chatRequireIdle(); if (!confirm(_chatSay('删除此会话？建议先导出保存。', 'Delete this conversation? Export it first if needed.'))) return; const value = store.remove(item.id, _chatSessionId); if (value.record) _chatRestoreSession(value); render(); });
+      action(_chatSay('删除', 'Delete'), 'delete', async () => { _chatRequireIdle(); if (!confirm(_chatSay('删除此会话？建议先导出保存。', 'Delete this conversation? Export it first if needed.'))) return; const value = await store.remove(item.id, _chatSessionId); if (value.record) _chatRestoreSession(value); render(); });
       list.append(row);
     }
     if (!list.children.length) { const empty = document.createElement('p'); empty.textContent = _chatSay('没有匹配的会话。', 'No matching conversations.'); list.append(empty); }
@@ -476,38 +480,42 @@ async function _chatSend() {
 
   if (_chatPreparing) return;
   _chatPreparing = true; _chatUpdateButtons();
-  try { if (!window.AgentAdapters && !await window._agEnsureLoaded()) return; }
-  catch { _chatShowError(_chatTl('no_adapter')); return; }
-  finally { _chatPreparing = false; _chatUpdateButtons(); }
-  if (!input?.isConnected || _chatBusy) return;
-  _chatSyncConfig();
-  const cfg = window.AgentConfig.AG.load();
-  try { window.ChatConversations?.assertActive(_chatSessionId); } catch (e) { _chatShowError(e.message); return; }
-  if (!cfg.apiKey && cfg.adapter !== 'custom') { _chatShowNoKey(); return; }
-  _chatUndo = null; document.getElementById('_chatUndoBar')?.remove();
+  try {
+    try { if (!window.AgentAdapters && !await window._agEnsureLoaded()) return; }
+    catch { _chatShowError(_chatTl('no_adapter')); return; }
 
-  // Build user message
-  const userMsg = {
-    role: 'user',
-    content: text,
-    _images: _chatImages.length > 0 ? [..._chatImages] : null,
-    ts: Date.now(),
-  };
-  _chatMessages.push(userMsg);
-  _chatSaveHistory();
-  _chatImages = []; _chatImageEpoch++;
-  _chatDraft = "";
-  _chatUpdateImgPreview();
+    if (!input?.isConnected || _chatBusy) return;
+    _chatSyncConfig();
+    const cfg = window.AgentConfig.AG.load();
+    try { window.ChatConversations?.assertActive(_chatSessionId); } catch (e) { _chatShowError(e.message); return; }
+    if (!cfg.apiKey && cfg.adapter !== 'custom') { _chatShowNoKey(); return; }
+    _chatUndo = null; document.getElementById('_chatUndoBar')?.remove();
 
-  // Render user bubble
-  const msgList = _chatGetMsgContainer();
-  _chatRenderMsg(userMsg, msgList);_chatLimitRows(msgList);
-  input.value = ''; _chatSaveDraft();
-  input.style.height = 'auto';
-  _chatScrollBottom(true);
+    // Build user message
+    const userMsg = {
+      role: 'user',
+      content: text,
+      _images: _chatImages.length > 0 ? [..._chatImages] : null,
+      ts: Date.now(),
+    };
+    _chatMessages.push(userMsg);
+    if (!await _chatSaveHistory()) { _chatMessages.pop(); return; }
+    if (!input.isConnected) return;
+    _chatImages = []; _chatImageEpoch++;
+    _chatDraft = "";
+    _chatUpdateImgPreview();
 
-  // Delegate to core send
-  await _chatDoSend(text, userMsg._images || []);
+    // Render user bubble
+    const msgList = _chatGetMsgContainer();
+    _chatRenderMsg(userMsg, msgList);_chatLimitRows(msgList);
+    input.value = ''; await _chatSaveDraft();
+    if (!input.isConnected) return;
+    input.style.height = 'auto';
+    _chatScrollBottom(true);
+
+    // Delegate to core send
+    await _chatDoSend(text, userMsg._images || []);
+  } finally { _chatPreparing = false; _chatUpdateButtons(); }
 }
 
 function _chatStop() {
@@ -570,7 +578,10 @@ function _chatUpdateButtons() {
   const input = document.getElementById('_chatInput');
   if (sendBtn) sendBtn.style.display = _chatBusy ? 'none' : '';
   if (stopBtn) stopBtn.style.display = _chatBusy ? '' : 'none';
-  if (input) input.setAttribute('aria-busy', String(_chatBusy));
+  if (input) { input.setAttribute('aria-busy', String(_chatBusy || _chatPreparing)); input.readOnly = _chatPreparing && !_chatBusy; }
+  if (sendBtn) sendBtn.disabled = _chatPreparing;
+  const attach = document.getElementById('_chatAttachBtn'); if (attach) attach.disabled = _chatPreparing && !_chatBusy;
+  const clear = document.getElementById('_chatClearBtn'); if (clear) clear.disabled = _chatPreparing && !_chatBusy;
   for (const id of ['_chatNewBtn', '_chatSessionNew']) {
     const button = document.getElementById(id); if (!button) continue;
     button.disabled = _chatBusy || _chatPreparing;
@@ -624,6 +635,7 @@ function _chatUpdateImgPreview() {
 
 // ── Clear chat ──
 function _chatClear() {
+  if (_chatPreparing && !_chatBusy) return;
   _chatStop();
   _chatUndo = { messages: _chatMessages, images: _chatImages, draft: document.getElementById('_chatInput')?.value || _chatDraft };
   _chatMessages = []; _chatImages = []; _chatDraft = ''; _chatImageEpoch++;
@@ -712,8 +724,8 @@ async function _chatEditSystemPrompt() {
   dialog.querySelector('#_chatSysReset').onclick = () => {
     dialog.querySelector('#_chatSysInput').value = _chatTl('system_default');
   };
-  dialog.querySelector('#_chatSysSave').onclick = () => {
-    try { window.ChatConversations?.assertActive(_chatSessionId); const value = dialog.querySelector('#_chatSysInput').value.trim(); localStorage.setItem(_CHAT_SYS_KEY, value); _chatSystemPrompt = value; close(); } catch (e) { window.showToast?.(e.message, 'error'); }
+  dialog.querySelector('#_chatSysSave').onclick = async () => {
+    try { const value = dialog.querySelector('#_chatSysInput').value.trim(); await window.ChatConversations.patch({ systemPrompt: value }, _chatSessionId); _chatSystemPrompt = value; close(); } catch (e) { window.showToast?.(e.message, 'error'); }
   };
 }
 

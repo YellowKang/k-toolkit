@@ -10,6 +10,7 @@
     { id: 'chat', keys: ['dtb_chat_history', 'dtb_chat_system', 'dtb_chat_config', 'dtb_chat_history_meta', 'dtb_context_preferences', 'dtb_chat_sessions', 'dtb_chat_draft', 'dtb_chat_draft_images'], prefix: 'dtb_chat_session_' },
     { id: 'agent', prefix: 'ag_', exclude: key => key.startsWith('ag_key_') || key === 'ag_fab_pos' },
     { id: 'apikeys', prefix: 'ag_key_', sensitive: true },
+    { id: 'http', keys: [], sensitive: true },
     { id: 'otp', keys: ['dtb_otp_vault'] },
   ];
   const DEFAULT_GROUPS = ['prefs', 'history', 'tools', 'chat', 'agent', 'otp'];
@@ -54,6 +55,8 @@
       const group = groupOf(key);
       if (group) out[group].push({ key, items: itemCount(key, storage.getItem(key)) });
     }
+    const requests = window.RequestSession?.history() || [];
+    if (requests.length || storage.getItem('dtb_http_history')) out.http.push({ key: 'dtb_http_history', items: requests.length || itemCount('dtb_http_history', storage.getItem('dtb_http_history')) });
     return out;
   }
 
@@ -65,7 +68,14 @@
       if (!group || !groups.includes(group)) continue;
       const raw = storage.getItem(key);
       if (raw === null) continue;
-      if (group === 'apikeys') secret[key] = raw; else data[key] = raw;
+      if (group === 'apikeys') secret[key] = raw;
+      else if (key === 'dtb_http_history') { try { data[key] = JSON.stringify(window.ToolPrivacy.httpHistory(JSON.parse(raw))); } catch { data[key] = '[]'; } }
+      else data[key] = raw;
+    }
+    if (groups.includes('http')) {
+      const requests = window.RequestSession?.history() || [];
+      const raw = requests.length ? JSON.stringify(requests) : storage.getItem('dtb_http_history');
+      if (raw && !validateEntry('dtb_http_history', raw, true)) { secret.dtb_http_history = raw; delete data.dtb_http_history; }
     }
     return { backup: { format: 'k-toolkit-backup', version: 1, appVersion, exportedAt: now.toISOString(), groups: groups.slice(), data }, secret };
   }
@@ -82,17 +92,55 @@
     const accepted = {}, rejected = [];
     for (const [key, value] of Object.entries(json.data && typeof json.data === 'object' ? json.data : {})) {
       const reason = validateEntry(key, value, false);
-      if (reason) rejected.push({ key, reason }); else accepted[key] = value;
+      if (reason) rejected.push({ key, reason });
+      else if (key === 'dtb_http_history') accepted[key] = JSON.stringify(window.ToolPrivacy.httpHistory(JSON.parse(value)));
+      else if (key === 'dtb_lang') accepted[key] = ['zh', 'en'].includes(value) ? value : JSON.parse(value);
+      else accepted[key] = value;
     }
     return { exportedAt: String(json.exportedAt || ''), appVersion: String(json.appVersion || ''), data: accepted, rejected, secret: json.secret || null };
   }
 
   function validateEntry(key, value, fromSecret) {
     const group = groupOf(key);
-    if (!group || (group === 'apikeys') !== fromSecret) return 'unknown';
+    if (!group || ((group === 'apikeys') !== fromSecret && !(fromSecret && key === 'dtb_http_history'))) return 'unknown';
     if (typeof value !== 'string') return 'type';
-    if (!TEXT_KEYS.has(key)) { try { JSON.parse(value); } catch { return 'json'; } }
-    return null;
+    if (TEXT_KEYS.has(key) || (key === 'dtb_lang' && ['zh', 'en'].includes(value))) return null;
+    let data; try { data = JSON.parse(value); } catch { return 'json'; }
+    return validValue(key, data) ? null : 'structure';
+  }
+
+  const object = value => !!value && typeof value === 'object' && !Array.isArray(value);
+  const strings = value => Array.isArray(value) && value.every(item => typeof item === 'string');
+  const messages = value => Array.isArray(value) && value.every(item => object(item) && ['user', 'assistant', 'system', 'tool'].includes(item.role) && typeof item.content === 'string');
+  const chatId = value => typeof value === 'string' && /^chat-[a-zA-Z0-9-]{1,80}$/.test(value);
+  function validValue(key, value) {
+    if (key.startsWith('ag_key_')) return typeof value === 'string';
+    if (['dtb_favorites', 'dtb_recent', 'dtb_search_history'].includes(key)) return strings(value);
+    if (key === 'dtb_usage') return object(value) && Object.values(value).every(v => Number.isFinite(v) && v >= 0);
+    if (key === 'dtb_todo') return Array.isArray(value) && value.every(v => object(v) && typeof v.text === 'string' && (v.done === undefined || typeof v.done === 'boolean'));
+    if (key === 'dtb_countdowns') return Array.isArray(value) && value.every(v => object(v) && typeof v.name === 'string' && typeof v.target === 'string' && Number.isFinite(Date.parse(v.target)));
+    if (key === 'dtb_saved_regex') return Array.isArray(value) && value.every(v => object(v) && ['name', 'pattern', 'flags'].every(k => typeof v[k] === 'string'));
+    if (key === 'dtb_mc_history') return Array.isArray(value) && value.every(v => object(v) && ['time', 'duration', 'cost'].every(k => typeof v[k] === 'string'));
+    if (key === 'dtb_typing_scores') return Array.isArray(value) && value.every(v => object(v) && Number.isFinite(v.wpm) && Number.isFinite(v.accuracy) && typeof v.date === 'string');
+    if (key === 'dtb_http_history') return Array.isArray(value) && value.length <= 20 && value.every(v => object(v) && typeof v.url === 'string' && typeof v.method === 'string' && ['headers', 'body'].every(k => v[k] === undefined || typeof v[k] === 'string'));
+    if (key === 'dtb_chat_history') return messages(value) || (object(value) && messages(value.messages));
+    if (key === 'dtb_chat_sessions') return object(value) && value.version === 1 && chatId(value.activeId) && Array.isArray(value.items) && value.items.length > 0 && value.items.length <= 50
+      && value.items.every(v => object(v) && chatId(v.id) && typeof v.title === 'string') && new Set(value.items.map(v => v.id)).size === value.items.length && value.items.some(v => v.id === value.activeId);
+    if (key.startsWith('dtb_chat_session_')) return chatId(key.slice('dtb_chat_session_'.length)) && object(value) && messages(value.messages) && (value.draft === undefined || typeof value.draft === 'string') && (value.systemPrompt === undefined || typeof value.systemPrompt === 'string');
+    if (key === 'dtb_chat_draft') return typeof value === 'string';
+    if (key === 'dtb_chat_draft_images') return Array.isArray(value) && value.length <= 4 && value.every(v => object(v) && typeof v.base64 === 'string' && /^image\/(png|jpeg|webp|gif)$/.test(v.mime));
+    if (key === 'dtb_workflow_draft') return object(value) && value.version === 1 && object(value.value);
+    if (key === 'dtb_otp_vault') return object(value) && value.v === 1 && value.kdf?.name === 'PBKDF2' && value.kdf.hash === 'SHA-256'
+      && Number.isInteger(value.kdf.iterations) && value.kdf.iterations >= 1000 && value.kdf.iterations <= 10000000 && typeof value.kdf.salt === 'string'
+      && /^[A-Za-z0-9+/]{22}==$/.test(value.kdf.salt) && value.cipher?.name === 'AES-GCM' && /^[A-Za-z0-9+/]{16}$/.test(value.cipher.iv)
+      && typeof value.data === 'string' && value.data.length >= 24 && value.data.length % 4 === 0 && /^[A-Za-z0-9+/]+={0,2}$/.test(value.data);
+    if (key === 'dtb_lang') return ['zh', 'en'].includes(value);
+    if (key === 'dtb_theme') return ['dark', 'light', 'tech-blue', 'sakura', 'orange', 'green'].includes(value);
+    if (key === 'dtb_sidebar_collapsed') return typeof value === 'boolean';
+    if (key === 'ag_connections') return Array.isArray(value) && value.length <= 20 && value.every(v => object(v) && /^connection-[a-zA-Z0-9-]{1,80}$/.test(v.id) && typeof v.name === 'string' && typeof v.adapter === 'string');
+    if (key === 'ag_custom_workflows') return Array.isArray(value) && value.length <= 20 && value.every(v => object(v) && typeof v.id === 'string');
+    if (key.startsWith('ag_')) return value !== null && (['string', 'number', 'boolean'].includes(typeof value) || object(value));
+    return object(value);
   }
 
   /** Keys/values decrypted from a backup's `secret` section, validated like the plain section. */
@@ -167,7 +215,7 @@
       }
     }
     for (const [key, value] of Object.entries(incoming)) {
-      const group = groupOf(key);
+      const group = key === 'dtb_http_history' && groups?.includes('http') ? 'http' : groupOf(key);
       if (!group || (groups && !groups.includes(group))) continue;
       const current = storage.getItem(key);
       if (mode === 'overwrite' || key === 'dtb_chat_sessions' || current === null || current === '' || current === '[]' || current === '{}') {
@@ -182,6 +230,18 @@
   }
 
   function apply(storage, writes) {
+    writes = writes.map(item => ({ ...item }));
+    if (writes.some(item => item.group === 'chat')) {
+      const entry = writes.find(item => item.key === 'dtb_chat_sessions');
+      const raw = entry?.value || storage.getItem('dtb_chat_sessions');
+      if (raw) {
+        const index = JSON.parse(raw);
+        index.revision = globalThis.crypto?.randomUUID?.() || Date.now() + '-' + Math.random().toString(36).slice(2);
+        const value = JSON.stringify(index);
+        if (entry) entry.value = value;
+        else writes.push({ key: 'dtb_chat_sessions', value, group: 'chat' });
+      }
+    }
     const failed = [], chat = writes.filter(item => item.group === 'chat'), other = writes.filter(item => item.group !== 'chat');
     if (chat.length) {
       const before = new Map(chat.map(({ key }) => [key, storage.getItem(key)]));
@@ -192,7 +252,12 @@
         failed.push(...chat.map(({ key }) => ({ key, reason: e?.name === 'QuotaExceededError' ? 'quota' : 'storage' })));
       }
     }
-    for (const { key, value } of other) { try { storage.setItem(key, value); } catch (e) { failed.push({ key, reason: e?.name === 'QuotaExceededError' ? 'quota' : 'storage' }); } }
+    for (const { key, value } of other) {
+      try {
+        storage.setItem(key, key === 'dtb_http_history' ? JSON.stringify(window.ToolPrivacy.httpHistory(JSON.parse(value))) : value);
+        if (key === 'dtb_http_history') window.RequestSession?.restoreHistory(JSON.parse(value));
+      } catch (e) { failed.push({ key, reason: e?.name === 'QuotaExceededError' ? 'quota' : 'storage' }); }
+    }
     return { written: writes.length - failed.length, failed };
   }
 

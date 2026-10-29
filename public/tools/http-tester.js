@@ -17,7 +17,7 @@ const _htI18nDict = {
     cors_footer:      '受浏览器同源策略限制，跨域请求可能失败。可配合本地代理或测试允许跨域的接口。',
     net_error:        '网络错误',
     request_fail:     '请求失败：',
-    history_title:    '请求历史',
+    history_title:    '请求历史', history_privacy: '完整请求仅保留在本标签页内存中。关闭后仅保留去除认证、查询参数和正文的摘要；完整历史可通过加密备份迁移。',
     clear_history:    '清空历史',
     history_empty:    '暂无请求历史',
     curl_copied:      '已复制 cURL',
@@ -40,7 +40,7 @@ const _htI18nDict = {
     cors_footer:      'Cross-origin requests may fail due to browser same-origin policy. Use a local proxy or test CORS-enabled APIs.',
     net_error:        'Network Error',
     request_fail:     'Request failed: ',
-    history_title:    'Request History',
+    history_title:    'Request History', history_privacy: 'Full requests stay in this tab’s memory. Only summaries without credentials, query parameters or bodies persist after closing. Use an encrypted backup to transfer full history.',
     clear_history:    'Clear History',
     history_empty:    'No request history',
     curl_copied:      'cURL copied',
@@ -56,27 +56,32 @@ const _HT_HISTORY_KEY = 'dtb_http_history';
 const _HT_HISTORY_MAX = 20;
 
 function _htLoadHistory() {
-  try { const list = JSON.parse(localStorage.getItem(_HT_HISTORY_KEY)); return Array.isArray(list) ? list : []; } catch(_) { return []; }
+  const memory = window.RequestSession?.history();
+  if (memory?.length) return memory;
+  try { return ToolPrivacy.httpHistory(JSON.parse(localStorage.getItem(_HT_HISTORY_KEY))); } catch(_) { return []; }
 }
 
 function _htSaveHistory(list) {
-  try { localStorage.setItem(_HT_HISTORY_KEY, JSON.stringify(list.slice(0, _HT_HISTORY_MAX))); } catch {}
+  try { localStorage.setItem(_HT_HISTORY_KEY, JSON.stringify(ToolPrivacy.httpHistory(list.slice(0, _HT_HISTORY_MAX)))); } catch {}
 }
 
 function _htAddHistory(entry) {
   const list = _htLoadHistory();
   list.unshift(entry);
+  window.RequestSession?.restoreHistory(list);
   _htSaveHistory(list);
 }
 
 function _htDeleteHistory(index) {
   const list = _htLoadHistory();
   list.splice(index, 1);
+  window.RequestSession?.restoreHistory(list);
   _htSaveHistory(list);
   _htRenderHistory();
 }
 
 function _htClearHistory() {
+  window.RequestSession?.clearHistory();
   localStorage.removeItem(_HT_HISTORY_KEY);
   _htRenderHistory();
 }
@@ -206,7 +211,7 @@ function renderHttpTester(el) {
         <div class="panel-label" style="margin-bottom:0">${_htT('history_title')}</div>
         <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="_htClearHistory()">${_htT('clear_history')}</button>
       </div>
-      <div id="htHistoryList"></div>
+      <p class="workspace-notice">${_htT('history_privacy')}</p><div id="htHistoryList"></div>
     </div>
     <div class="tool-card-panel" style="font-size:12px;color:var(--text-muted)">
       ⚠️ ${_htT('cors_footer')}

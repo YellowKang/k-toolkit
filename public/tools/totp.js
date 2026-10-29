@@ -129,10 +129,15 @@ const _TF_VAULT_KEY = 'dtb_otp_vault';
 const _TF_SETTINGS_KEY = 'dtb_otp_settings';
 const _TF_LOCK_CHOICES = [1, 5, 15, 30, 60];
 const _tf = {
+  vaultRaw: null, epoch: 0,
   tab: 'vault', key: null, kdf: null, entries: null, codes: new Map(), timer: null, lastActive: 0, hiddenAt: 0, pendingLock: null,
   search: '', panel: null, importState: null, pendingSave: null, quick: null, generated: null, migration: null, busy: false,
-  issuerFilter: '', collapsed: new Set(), searchTimer: null, quickRevision: 0,
+  issuerFilter: '', collapsed: new Set(), searchTimer: null, quickRevision: 0, codesRun: null, codesAgain: false, quickShown: null,
 };
+// Display-only capitalisation for issuers that are often typed in lower case.
+const _TF_BRANDS = new Map([['google', 'Google'], ['openai', 'OpenAI'], ['github', 'GitHub'], ['gitlab', 'GitLab'], ['microsoft', 'Microsoft'],
+  ['meta', 'Meta'], ['facebook', 'Facebook'], ['amazon', 'Amazon'], ['aws', 'AWS'], ['apple', 'Apple'], ['binance', 'Binance'], ['cloudflare', 'Cloudflare']]);
+const _tfIssuerLabel = group => _TF_BRANDS.get(group.key.replace(/^issuer:/, '')) || group.label || _tfT('unclassified');
 
 const _tfT = (key, ...args) => makeToolI18n(_tfDict)(key, ...args);
 function _tfError(error) {
@@ -183,7 +188,15 @@ function _tfInjectStyles() {
     .tf-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .tf-toolbar input{flex:1;min-width:180px}
     .tf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:4px}
-    .tf-groups{display:flex;flex-direction:column;gap:16px}.tf-account-group{min-width:0}.tf-account-group>summary{cursor:pointer;padding:10px 2px;color:var(--text);font-size:15px;font-weight:600;overflow-wrap:anywhere}.tf-group-count{font-size:12px;font-weight:400;color:var(--text-muted);margin-left:10px}.tf-account-group>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    .tf-groups{display:flex;flex-direction:column;gap:18px}.tf-account-group{min-width:0}
+    .tf-account-group>summary{list-style:none;display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 4px 10px;margin-bottom:12px;border-bottom:1px solid var(--glass-border);color:var(--text);font-size:15px;font-weight:600;overflow-wrap:anywhere;border-radius:6px 6px 0 0}
+    .tf-account-group>summary::-webkit-details-marker{display:none}
+    .tf-account-group>summary::before{content:'';flex-shrink:0;width:6px;height:6px;margin:0 2px;border-right:2px solid var(--text-muted);border-bottom:2px solid var(--text-muted);transform:rotate(-45deg);transition:transform .15s}
+    .tf-account-group[open]>summary::before{transform:rotate(45deg)}.tf-account-group:not([open])>summary{margin-bottom:0}
+    .tf-account-group>summary:hover::before{border-color:var(--accent)}
+    .tf-group-count{flex-shrink:0;font-size:12px;font-weight:500;color:var(--text-muted);padding:1px 9px;border-radius:999px;background:color-mix(in srgb,var(--text-muted) 14%,transparent)}
+    .tf-account-group>summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    @media (prefers-reduced-motion:reduce){.tf-account-group>summary::before{transition:none}}
     .tf-filter-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}.tf-filter-row select{min-width:0;max-width:100%;flex:1}.tf-filter-row button{flex-shrink:0}.tf-group-hint{font-size:12px;color:var(--text-muted);line-height:1.6;margin:10px 0 0}.tf-big:disabled{cursor:wait;opacity:.5}
     .tf-card{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--glass-border);border-radius:14px;background:rgba(255,255,255,0.04);transition:border-color .2s,box-shadow .2s;min-width:0}
     .tf-card.tf-copied{border-color:var(--accent);box-shadow:0 0 0 2px rgba(99,102,241,.25)}
@@ -252,6 +265,7 @@ function renderTotp(el) {
   _tf.lastActive = Date.now();
   _tf.timer = setInterval(_tfTick, 1000);
   window._activeCleanup = () => {
+    _tf.epoch++;
     clearInterval(_tf.timer); _tf.timer = null;
     document.removeEventListener('pointerdown', activity, true);
     document.removeEventListener('keydown', activity, true);
@@ -360,12 +374,16 @@ async function tfCreateVault() {
   if (pw !== pw2) return _tfMsg('tfMsg', _tfT('pw_mismatch'), 'err');
   if (_tf.busy) return;
   _tf.busy = true;
+  const epoch = _tf.epoch;
   _tfMsg('tfMsg', _tfT('creating'));
   try {
     const [, box] = await _tfModules();
     const { key, kdf, envelope } = await box.create(pw, JSON.stringify({ version: 1, entries: [] }));
-    localStorage.setItem(_TF_VAULT_KEY, JSON.stringify(envelope));
-    Object.assign(_tf, { key, kdf, entries: [], search: '', panel: null, lastActive: Date.now() });
+    await ToolRuntime.exclusive('otp-vault', () => {
+      if (epoch !== _tf.epoch || localStorage.getItem(_TF_VAULT_KEY) !== null) throw _tfConflict();
+      const raw = JSON.stringify(envelope); localStorage.setItem(_TF_VAULT_KEY, raw);
+      Object.assign(_tf, { key, kdf, vaultRaw: raw, entries: [], search: '', panel: null, lastActive: Date.now() });
+    });
     await _tfFlushPendingSave();
     _tfRenderVault();
   } catch (e) { _tfMsg('tfMsg', e.name === 'QuotaExceededError' ? _tfT('save_failed') : _tfError(e), 'err'); }
@@ -374,7 +392,9 @@ async function tfCreateVault() {
 
 async function tfUnlock() {
   const input = document.getElementById('tfUnlockPw');
-  const envelope = _tfStoredVault();
+  let raw, envelope; const epoch = _tf.epoch;
+  try { raw = localStorage.getItem(_TF_VAULT_KEY); envelope = raw ? JSON.parse(raw) : null; }
+  catch (e) { _tfMsg('tfMsg', _tfError(e), 'err'); return; }
   if (!input || !envelope || _tf.busy) return;
   if (!input.value) return _tfMsg('tfMsg', _tfError({ code: 'password-empty' }), 'err');
   _tf.busy = true;
@@ -382,10 +402,11 @@ async function tfUnlock() {
   try {
     const [otp, box] = await _tfModules();
     const { key, kdf, text } = await box.unlock(envelope, input.value);
+    if (epoch !== _tf.epoch || !input.isConnected || localStorage.getItem(_TF_VAULT_KEY) !== raw) throw _tfConflict();
     const data = JSON.parse(text);
     const entries = [];
     for (const item of Array.isArray(data.entries) ? data.entries : []) { try { entries.push(otp.normalize(item)); } catch {} }
-    Object.assign(_tf, { key, kdf, entries, search: '', panel: null, lastActive: Date.now() });
+    Object.assign(_tf, { key, kdf, entries, vaultRaw: raw, search: '', panel: null, lastActive: Date.now() });
     input.value = '';
     await _tfFlushPendingSave();
     _tfRenderVault();
@@ -396,6 +417,7 @@ async function tfUnlock() {
 }
 
 function tfLock(silent = false) {
+  _tf.epoch++;
   const wasOpen = !!_tf.entries;
   Object.assign(_tf, { key: null, kdf: null, entries: null, panel: null, importState: null, migration: null, search: '' });
   _tf.issuerFilter = ''; _tf.collapsed.clear(); clearTimeout(_tf.searchTimer);
@@ -405,33 +427,45 @@ function tfLock(silent = false) {
   if (_tf.tab === 'vault' && document.getElementById('tfPane')) _tfRenderVault();
 }
 
-function tfResetVault() {
+async function tfResetVault() {
   if (!confirm(_tfT('reset_confirm'))) return;
-  try { localStorage.removeItem(_TF_VAULT_KEY); } catch {}
-  tfLock(true);
-  _tfRenderVault();
+  const expected = _tf.key ? _tf.vaultRaw : localStorage.getItem(_TF_VAULT_KEY);
+  try {
+    await ToolRuntime.exclusive('otp-vault', () => { if (localStorage.getItem(_TF_VAULT_KEY) !== expected) throw _tfConflict(); localStorage.removeItem(_TF_VAULT_KEY); });
+    tfLock(true); _tfRenderVault();
+  } catch (e) { window.showToast?.(e.message, 'error'); }
 }
 
-async function _tfPersist() {
-  const [, box] = await _tfModules();
-  const envelope = await box.seal(_tf.key, _tf.kdf, JSON.stringify({ version: 1, entries: _tf.entries }));
-  try { localStorage.setItem(_TF_VAULT_KEY, JSON.stringify(envelope)); }
-  catch { if (typeof showToast === 'function') showToast(_tfT('save_failed'), 'error'); throw new Error('save failed'); }
+function _tfConflict() { return new Error(window.getCurrentLang?.() === 'en' ? 'The board changed in another tab or was locked. Export this tab if needed, then lock and unlock again.' : '看板已被另一标签页修改或已锁定。可先导出本页数据，再锁定并重新解锁。'); }
+async function _tfPersist(change = entries => entries, newPassword) {
+  const epoch = _tf.epoch;
+  try {
+    return await ToolRuntime.exclusive('otp-vault', async () => {
+      if (epoch !== _tf.epoch || !_tf.key || localStorage.getItem(_TF_VAULT_KEY) !== _tf.vaultRaw) throw _tfConflict();
+      const raw = _tf.vaultRaw, [, box] = await _tfModules();
+      const entries = change(_tf.entries.map(entry => ({ ...entry })));
+      const replacement = newPassword ? await box.create(newPassword, JSON.stringify({ version: 1, entries })) : null;
+      const envelope = replacement?.envelope || await box.seal(_tf.key, _tf.kdf, JSON.stringify({ version: 1, entries }));
+      if (epoch !== _tf.epoch || !_tf.key || localStorage.getItem(_TF_VAULT_KEY) !== raw) throw _tfConflict();
+      const next = JSON.stringify(envelope); localStorage.setItem(_TF_VAULT_KEY, next);
+      Object.assign(_tf, { entries, vaultRaw: next }, replacement ? { key: replacement.key, kdf: replacement.kdf } : {});
+    });
+  } catch (e) { window.showToast?.(e.name === 'QuotaExceededError' ? _tfT('save_failed') : e.message, 'error'); throw e; }
 }
 
 /** Add entries to the unlocked board; returns { added, duplicates }. */
 async function _tfAddEntries(list) {
   const [otp] = await _tfModules();
-  const { added, duplicates } = otp.merge(_tf.entries, list);
-  if (added.length) { _tf.entries.push(...added); await _tfPersist(); }
-  return { added, duplicates };
+  let result;
+  await _tfPersist(entries => { result = otp.merge(entries, list); return entries.concat(result.added); });
+  return result;
 }
 
 async function _tfFlushPendingSave() {
   if (!_tf.pendingSave || !_tf.entries) return;
   const entry = _tf.pendingSave;
-  _tf.pendingSave = null;
   const { added } = await _tfAddEntries([entry]);
+  _tf.pendingSave = null;
   if (typeof showToast === 'function') showToast(added.length ? _tfT('added', 1) : _tfT('duplicate'), added.length ? 'success' : 'info');
 }
 
@@ -455,7 +489,7 @@ function _tfRenderCards() {
   if (_tf.issuerFilter && !view.issuers.some(group => group.key === _tf.issuerFilter)) { _tf.issuerFilter = ''; view = otp.groupAccounts(_tf.entries, options()); }
   const select = document.getElementById('tfIssuerFilter');
   select.replaceChildren(_tfEl('option', { value: '' }, _tfT('all_issuers', view.total)));
-  for (const group of view.issuers) select.append(_tfEl('option', { value: group.key }, `${group.label || _tfT('unclassified')} (${group.count})`));
+  for (const group of view.issuers) select.append(_tfEl('option', { value: group.key }, `${_tfIssuerLabel(group)} (${group.count})`));
   select.value = _tf.issuerFilter;
   document.getElementById('tfClearFilters').disabled = !_tf.search && !_tf.issuerFilter;
   _tfMsg('tfCount', _tfT('matched_count', view.matched, view.total));
@@ -467,11 +501,16 @@ function _tfRenderCards() {
   const hide = _tfSettings().hideCodes;
   for (const group of view.groups) {
     const details = _tfEl('details', { class: 'tf-account-group', open: !_tf.collapsed.has(group.key), dataset: { issuer: group.key } });
-    const heading = _tfEl('summary', {}, group.label || _tfT('unclassified'), _tfEl('span', { class: 'tf-group-count' }, _tfT('count', group.entries.length)));
+    const heading = _tfEl('summary', {}, _tfIssuerLabel(group), _tfEl('span', { class: 'tf-group-count' }, _tfT('count', group.entries.length)));
     const cards = _tfEl('div', { class: 'tf-grid' }, ...group.entries.map(entry => _tfCard(entry, hide)));
     details.append(heading, cards); grid.append(details);
     let open = details.open;
-    details.addEventListener('toggle', () => { if (!details.isConnected || details.open === open) return; open = details.open; if (open) { _tf.collapsed.delete(group.key); _tfUpdateCodes(); } else _tf.collapsed.add(group.key); });
+    // Setting `open` while building fires a late toggle event; only react to real changes.
+    details.addEventListener('toggle', () => {
+      if (!details.isConnected || details.open === open) return;
+      open = details.open;
+      if (open) { _tf.collapsed.delete(group.key); _tfUpdateCodes(); } else _tf.collapsed.add(group.key);
+    });
   }
   _tfUpdateCodes();
 }
@@ -488,7 +527,8 @@ function _tfCard(entry, hide) {
   })() : _tfEl('button', { type: 'button', class: 'btn btn-secondary', style: 'font-size:12px;padding:3px 10px', onclick: () => tfNextHotp(entry.id) }, _tfT('next_code'));
   const card = _tfEl('div', { class: 'tf-card', dataset: { id: entry.id } },
     _tfEl('div', { class: 'tf-head' },
-      _tfEl('div', { class: 'tf-avatar', style: `background:hsl(${_tfHue(title)} 55% 45%)`, 'aria-hidden': 'true' }, [...title][0].toUpperCase()),
+      // Colour follows the folded name so "github" and "GitHub" in one group look alike.
+      _tfEl('div', { class: 'tf-avatar', style: `background:hsl(${_tfHue(title.trim().toLocaleLowerCase())} 55% 45%)`, 'aria-hidden': 'true' }, [...title][0].toUpperCase()),
       _tfEl('div', { class: 'tf-names' },
         _tfEl('div', { class: 'tf-issuer', title }, title),
         entry.issuer && entry.account ? _tfEl('div', { class: 'tf-account', title: entry.account }, entry.account) : null)),
@@ -499,26 +539,47 @@ function _tfCard(entry, hide) {
   return card;
 }
 
-async function _tfUpdateCodes() {
+// The timer, focus, group toggles and copies all ask for a refresh. Overlapping requests share
+// one pass and trigger at most one follow-up pass, so codes are never computed twice at once.
+function _tfUpdateCodes() {
+  if (_tf.codesRun) { _tf.codesAgain = true; return _tf.codesRun; }
+  _tf.codesRun = (async () => {
+    try { do { _tf.codesAgain = false; await _tfRefreshCodes(); } while (_tf.codesAgain); }
+    finally { _tf.codesRun = null; }
+  })();
+  return _tf.codesRun;
+}
+
+async function _tfRefreshCodes() {
   const grid = document.getElementById('tfGrid');
   if (!grid || !_tf.entries) return;
   const entries = _tf.entries, byId = new Map(entries.map(entry => [entry.id, entry]));
-  for (const card of grid.querySelectorAll('.tf-card')) {
-    if (card.closest('.tf-account-group')?.open === false) continue;
+  const cards = [...grid.querySelectorAll('.tf-card')]
+    .filter(card => card.closest('.tf-account-group')?.open !== false && byId.has(card.dataset.id));
+  const valid = entry => {
+    const cached = _tf.codes.get(entry.id);
+    return cached && cached.step === _tfStep(entry) && cached.signature === _tfCodeSignature(entry) ? cached : null;
+  };
+  let failed = false;
+  // Compute stale codes together so every card switches to the new time step at the same moment.
+  await Promise.all(cards.map(async card => {
     const entry = byId.get(card.dataset.id);
-    if (!entry) continue;
-    const step = _tfStep(entry), signature = _tfCodeSignature(entry);
-    let cached = _tf.codes.get(entry.id);
-    if (!cached || cached.step !== step || cached.signature !== signature) {
-      let result;
-      try { result = await _tfFreshCode(entry); } catch { if (grid.isConnected) _tfMsg('tfCount', _tfT('code_refresh_failed'), 'err'); continue; }
-      if (!grid.isConnected || _tf.entries !== entries || signature !== _tfCodeSignature(entry) || result.counter !== _tfStep(entry)) continue;
-      cached = { step: result.counter, signature, code: result.code };
-      _tf.codes.set(entry.id, cached);
-    }
+    if (valid(entry)) return;
+    const signature = _tfCodeSignature(entry);
+    try {
+      const result = await _tfFreshCode(entry);
+      if (_tf.entries === entries && signature === _tfCodeSignature(entry) && result.counter === _tfStep(entry)) {
+        _tf.codes.set(entry.id, { step: result.counter, signature, code: result.code });
+      }
+    } catch { failed = true; }
+  }));
+  if (!grid.isConnected || _tf.entries !== entries) return;
+  if (failed) _tfMsg('tfCount', _tfT('code_refresh_failed'), 'err');
+  for (const card of cards) {
     if (!card.isConnected) continue;
+    const entry = byId.get(card.dataset.id), cached = valid(entry);
     const codeEl = card.querySelector('.tf-code');
-    if (codeEl && codeEl.dataset.code !== cached.code) { codeEl.dataset.code = cached.code; codeEl.textContent = _tfGroup(cached.code); }
+    if (cached && codeEl && codeEl.dataset.code !== cached.code) { codeEl.dataset.code = cached.code; codeEl.textContent = _tfGroup(cached.code); }
     const ring = card.querySelector('.tf-ring');
     if (ring) {
       const remaining = entry.period - (Math.floor(Date.now() / 1000) % entry.period);
@@ -578,9 +639,7 @@ async function _tfCopyCode(entry, card) {
 async function tfNextHotp(id) {
   const entry = _tf.entries?.find(e => e.id === id);
   if (!entry) return;
-  entry.counter += 1;
-  await _tfPersist();
-  await _tfUpdateCodes();
+  try { await _tfPersist(entries => entries.map(item => item.id === id ? { ...item, counter: item.counter + 1 } : item)); _tfRenderCards(); } catch { /* The commit boundary reports the error. */ }
 }
 
 // ── Toolbar panels ──
@@ -812,7 +871,8 @@ function _tfImportCount() {
 async function tfImportCommit() {
   const picked = [...document.querySelectorAll('#tfImportPreview input[data-index]:checked')].map(i => _tf.importState?.added[+i.dataset.index]).filter(Boolean);
   if (!picked.length || !_tf.entries) return;
-  const { added, duplicates } = await _tfAddEntries(picked);
+  let added, duplicates;
+  try { ({ added, duplicates } = await _tfAddEntries(picked)); } catch { return; }
   _tf.panel = null;
   _tf.importState = null;
   _tfRenderPanel();
@@ -948,9 +1008,7 @@ async function tfChangePassword() {
   try {
     _tfMsg('tfPanelMsg', _tfT('unlocking'));
     await box.unlock(_tfStoredVault(), old);
-    const { key, kdf, envelope } = await box.create(pw, JSON.stringify({ version: 1, entries: _tf.entries }));
-    localStorage.setItem(_TF_VAULT_KEY, JSON.stringify(envelope));
-    Object.assign(_tf, { key, kdf });
+    await _tfPersist(entries => entries, pw);
     for (const id of ['tfOldPw', 'tfChangePw1', 'tfChangePw2']) document.getElementById(id).value = '';
     _tfMsg('tfPanelMsg', _tfT('changed'), 'ok');
   } catch (e) { _tfMsg('tfPanelMsg', e.code === 'password' ? _tfT('wrong_pw') : _tfError(e), 'err'); }
@@ -967,16 +1025,15 @@ function _tfPanelEdit(panel, id) {
     return _tfEl('label', { class: 'tf-field' }, label, input);
   };
   const save = async () => {
-    for (const input of panel.querySelectorAll('input[data-key]')) entry[input.dataset.key] = input.value.trim().slice(0, input.dataset.key === 'note' ? 1000 : 200);
-    await _tfPersist();
+    const changes = Object.fromEntries([...panel.querySelectorAll('input[data-key]')].map(input => [input.dataset.key, input.value.trim().slice(0, input.dataset.key === 'note' ? 1000 : 200)]));
+    try { await _tfPersist(entries => entries.map(item => item.id === id ? { ...item, ...changes } : item)); } catch { return; }
     _tf.panel = null; _tfRenderPanel(); _tfRenderCards();
     if (typeof showToast === 'function') showToast(T('saved'), 'success');
   };
   const remove = async () => {
     if (!confirm(T('delete_confirm', _tfLabel(entry)))) return;
-    _tf.entries = _tf.entries.filter(e => e.id !== id);
+    try { await _tfPersist(entries => entries.filter(e => e.id !== id)); } catch { return; }
     _tf.codes.delete(id);
-    await _tfPersist();
     _tf.panel = null; _tfRenderPanel(); _tfRenderCards();
     if (typeof showToast === 'function') showToast(T('deleted'), 'success');
   };
@@ -1008,7 +1065,8 @@ async function _tfPanelQr(panel, id) {
 /** Quick check / generator: hand an entry to the board, unlocking or creating it first if needed. */
 async function _tfSaveToVault(entry) {
   if (_tf.entries) {
-    const { added } = await _tfAddEntries([entry]);
+    let added;
+    try { ({ added } = await _tfAddEntries([entry])); } catch { return; }
     if (typeof showToast === 'function') showToast(added.length ? _tfT('added', 1) : _tfT('duplicate'), added.length ? 'success' : 'info');
     return;
   }
@@ -1070,6 +1128,13 @@ async function _tfUpdateQuick() {
   const entry = _tf.quick, codeEl = document.getElementById('tfQuickCode');
   if (!entry || !codeEl) return;
   const live = () => _tf.quick === entry && codeEl.isConnected && _tf.tab === 'quick';
+  const shown = _tf.quickShown;
+  // Within one time step only the countdown changes; skip the three HMAC computations.
+  if (shown?.entry === entry && shown.codeEl === codeEl && shown.counter === _tfStep(entry) && codeEl.dataset.code) {
+    if (entry.type === 'totp') document.getElementById('tfQuickRemain').textContent = _tfT('remaining', entry.period - (Math.floor(Date.now() / 1000) % entry.period));
+    return;
+  }
+  _tf.quickShown = null;
   let current;
   try { current = await _tfFreshCode(entry); }
   catch { if (live()) { codeEl.disabled = true; _tfMsg('tfQuickMsg', _tfT('code_refresh_failed'), 'err'); } return; }
@@ -1080,6 +1145,7 @@ async function _tfUpdateQuick() {
   const [prev, next] = await Promise.all([at(-1), at(1)]);
   if (!live() || current.counter !== _tfStep(entry)) return;
   document.getElementById('tfQuickNeighbours').textContent = `${_tfT('previous')} ${_tfGroup(prev.code)} · ${_tfT('following')} ${_tfGroup(next.code)}`;
+  _tf.quickShown = { entry, codeEl, counter: current.counter };
 }
 
 function _tfDisplayQuick(entry, current) {

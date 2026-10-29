@@ -5,7 +5,7 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const express = require('express');
-const { chromium, firefox } = require('playwright');
+const { launchBrowser } = require('./browser-launch.cjs');
 (async () => {
   let browser, server, temp;
   try {
@@ -13,11 +13,11 @@ const { chromium, firefox } = require('playwright');
     if (process.env.TEST_BUILD === '1') {
       temp = fs.mkdtempSync(path.join(os.tmpdir(), 'k-toolkit-library-'));
       for (const dir of ['public', 'scripts']) fs.cpSync(path.join(root, dir), path.join(temp, dir), { recursive: true });
-      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' }); source = path.join(temp, 'dist');
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') } }); source = path.join(temp, 'dist');
     }
     const app = express(); app.use('/k-toolkit', express.static(source));
     server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
-    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch({ headless: true });
+    browser = await launchBrowser();
     const page = await browser.newPage({ serviceWorkers: 'block', viewport: { width: 1440, height: 1000 } });
     page.setDefaultTimeout(10000); const errors = [], requests = [], auth = []; page.on('pageerror', e => errors.push(e.message));
     page.on('dialog', dialog => dialog.accept());
@@ -49,15 +49,15 @@ const { chromium, firefox } = require('playwright');
     assert.equal(await page.evaluate(() => AgentConfig.AG.load().model), 'model-a');
     // Real UI sends to a controlled streaming service; session changes preserve separate drafts and prompts.
     await page.locator('#_chatInput').fill('话题 Alpha'); await page.locator('#_chatSendBtn').click();
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history')).at(-1)?.role === 'assistant');
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history') || '[]').at(-1)?.role === 'assistant');
     await page.locator('#_chatInput').fill('甲草稿');
     await page.evaluate(() => _chatEditSystemPrompt()); await page.locator('#_chatSysInput').fill('甲系统提示'); await page.locator('#_chatSysSave').click();
     const first = await page.evaluate(() => ChatConversations.ensure().activeId);
     await page.locator('#_chatSessionsBtn').click(); await page.locator('#_chatSessionNew').click();
-    if (await page.locator('#_chatSessions').count()) assert.fail(await page.locator('#_chatSessionStatus').textContent());
+    await page.locator('#_chatSessions').waitFor({ state: 'detached' });
     assert.equal(await page.locator('#_chatInput').inputValue(), ''); assert.equal(await page.locator('._chat-row').count(), 0);
     await page.locator('#_chatInput').fill('话题 Beta'); await page.locator('#_chatSendBtn').click();
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history')).at(-1)?.role === 'assistant');
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('dtb_chat_history') || '[]').at(-1)?.role === 'assistant');
     assert.equal(requests.at(-1).messages.filter(m => m.content?.includes?.('话题 Alpha')).length, 0);
     const second = await page.evaluate(() => ChatConversations.ensure().activeId);
     await page.locator('#_chatSessionsBtn').click(); await page.locator('#_chatSessionSearch').fill('Alpha');
@@ -66,11 +66,12 @@ const { chromium, firefox } = require('playwright');
     await row.locator('[data-session-action="pin"]').click(); await row.locator('[data-session-action="rename"]').click();
     await row.getByRole('textbox').fill('专题 A'); await row.getByRole('button', { name: '保存', exact: true }).click();
     const download = page.waitForEvent('download'); await row.locator('[data-session-action="export"]').click(); assert.match((await download).suggestedFilename(), /专题 A/);
-    await row.locator('[data-session-open]').click(); assert.equal(await page.locator('#_chatInput').inputValue(), '甲草稿');
+    await row.locator('[data-session-open]').click(); await page.locator('#_chatSessions').waitFor({ state: 'detached' }); assert.equal(await page.locator('#_chatInput').inputValue(), '甲草稿');
     assert.equal(await page.evaluate(() => localStorage.getItem('dtb_chat_system')), '甲系统提示');
     await page.reload(); await page.evaluate(() => _agEnsureLoaded()); assert.equal(await page.locator('#_chatInput').inputValue(), '甲草稿');
     assert.match(await page.locator('#_chatSessionsBtn').textContent(), /专题 A/);
     await page.locator('#_chatSessionsBtn').click(); await page.locator(`[data-session-id="${second}"] [data-session-action="delete"]`).click();
+    await page.waitForFunction(() => document.querySelectorAll('._chat-session-row').length === 1);
     assert.equal(await page.locator('._chat-session-row').count(), 1); await page.keyboard.press('Escape');
     await page.evaluate(() => navigateTo('home')); await page.locator('#agentFab').click();
     await page.locator('#agInput').fill('Check named connection'); await page.locator('#agSendBtn').click();

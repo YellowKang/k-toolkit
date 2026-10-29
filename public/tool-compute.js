@@ -1,5 +1,18 @@
 /* Shared, DOM-free text operations used by pages and Agent actions. */
 (function () {
+  function randomIndex(size) {
+    if (!Number.isInteger(size) || size < 1 || size > 0x100000000) throw new Error('Invalid random range');
+    const limit = 0x100000000 - (0x100000000 % size), sample = new Uint32Array(1);
+    do { crypto.getRandomValues(sample); } while (sample[0] >= limit);
+    return sample[0] % size;
+  }
+  function randomString(length, chars) {
+    if (!Number.isInteger(length) || length < 0 || length > 10000 || !chars.length) throw new Error('Invalid password parameters');
+    return Array.from({ length }, () => chars[randomIndex(chars.length)]).join('');
+  }
+  function fillTemplate(template, values) {
+    return String(template).replace(/\{\{([^{}]+)\}\}/g, (placeholder, name) => Object.hasOwn(values, name.trim()) ? String(values[name.trim()]) : placeholder);
+  }
   const words = text => text.replace(/([a-z\d])([A-Z])/g, '$1 $2')
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/[-_./\\]+/g, ' ')
     .trim().split(/\s+/).filter(Boolean);
@@ -128,7 +141,7 @@
     return vendorLoads.get(name);
   }
 
-  window.ToolCompute = Object.freeze({ words, formatWords, base64Encode, base64Decode, processLines,
+  window.ToolCompute = Object.freeze({ randomIndex, randomString, fillTemplate, words, formatWords, base64Encode, base64Decode, processLines,
     caseConvert: (text, style) => style === 'upper' ? text.toUpperCase() : style === 'lower' ? text.toLowerCase() : formatWords(words(text), style),
     localDate, parseLocalDate, addMonths, calendarDiff, weekdaysBetween, zonedParts, zonedTimeToUtc, load, loadVendor,
   });

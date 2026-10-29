@@ -1,10 +1,10 @@
+const { launchBrowser } = require('./browser-launch.cjs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const express = require('express');
-const { chromium, firefox } = require('playwright');
 
 (async () => {
   let browser, server, temp;
@@ -14,14 +14,14 @@ const { chromium, firefox } = require('playwright');
     if (process.env.TEST_BUILD === '1') {
       temp = fs.mkdtempSync(path.join(os.tmpdir(), 'k-toolkit-ux-test-'));
       for (const dir of ['public','scripts']) fs.cpSync(path.join(root, dir), path.join(temp, dir), { recursive: true });
-      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' });
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') } });
       source = path.join(temp, 'dist');
     }
     const app = express(); app.use('/k-toolkit', express.static(source));
     server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
     const options = { headless: true };
     if (process.env.TEST_BROWSER_CHANNEL) options.channel = process.env.TEST_BROWSER_CHANNEL;
-    browser = await (process.env.TEST_BROWSER === 'firefox' ? firefox : chromium).launch(options);
+    browser = await launchBrowser(options);
     const page = await browser.newPage({ serviceWorkers: 'block', viewport: { width: 1440, height: 900 } });
     page.setDefaultTimeout(8000);
     const errors = [], requests = [];

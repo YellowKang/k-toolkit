@@ -74,6 +74,14 @@ test('account grouping folds issuer case, intersects search terms and never sear
   assert.equal(JSON.stringify(entries), before, 'grouping must not change or merge imported accounts');
 });
 
+test('group labels do not depend on import order', () => {
+  const spellings = ['github', 'GitHub', 'github', 'GitHub', 'GITHUB'];
+  const labels = [spellings, [...spellings].reverse()].map(list =>
+    otp.groupAccounts(list.map((issuer, i) => ({ id: String(i), issuer, account: 'a' + i, note: '' }))).issuers[0].label);
+  assert.deepEqual(labels, ['GitHub', 'GitHub'], 'ties prefer the spelling with more capitals');
+  assert.equal(otp.groupAccounts([{ id: '1', issuer: '  Acme   Co ', account: 'x', note: '' }]).issuers[0].label, 'Acme Co');
+});
+
 test('otpauth links parse and build in the Google key URI format', () => {
   const e = otp.parseUri('otpauth://totp/ACME%20Co:john.doe@email.com?secret=HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ&issuer=ACME%20Co&algorithm=SHA256&digits=8&period=60');
   assert.deepEqual([e.issuer, e.account, e.algorithm, e.digits, e.period, e.type], ['ACME Co', 'john.doe@email.com', 'SHA256', 8, 60, 'totp']);

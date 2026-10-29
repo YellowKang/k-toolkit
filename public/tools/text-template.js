@@ -82,16 +82,14 @@ window.renderTextTemplate = function(el) {
   window._ttParse = _ttRender;
 
   window._ttUpdate = function() {
-    let tpl = document.getElementById('ttTpl').value;
-    document.getElementById('ttVars').querySelectorAll('input[data-var]').forEach(inp => {
-      tpl = tpl.split('{{' + inp.dataset.var + '}}').join(inp.value || ('{{' + inp.dataset.var + '}}'));
-    });
-    document.getElementById('ttOutput').textContent = tpl;
+    const tpl = document.getElementById('ttTpl').value;
+    const values = Object.fromEntries([...document.getElementById('ttVars').querySelectorAll('input[data-var]')].filter(input => input.value !== '').map(input => [input.dataset.var, input.value]));
+    document.getElementById('ttOutput').textContent = ToolCompute.fillTemplate(tpl, values);
   };
 
   window._ttCopy = function() {
     const text = document.getElementById('ttOutput').textContent;
-    navigator.clipboard.writeText(text).catch(() => {});
+    copyText(text);
   };
 
   window._ttBatch = function() {
@@ -101,15 +99,9 @@ window.renderTextTemplate = function(el) {
     let dataArr;
     try {
       dataArr = JSON.parse(batchRaw);
-      if (!Array.isArray(dataArr)) { if (typeof showToast === 'function') showToast(T('batch_not_array'), 'error'); return; }
+      if (!Array.isArray(dataArr) || dataArr.some(item => !item || typeof item !== 'object' || Array.isArray(item))) { if (typeof showToast === 'function') showToast(T('batch_not_array'), 'error'); return; }
     } catch(e) { if (typeof showToast === 'function') showToast(T('batch_parse', e.message), 'error'); return; }
-    const results = dataArr.map(item => {
-      let result = tpl;
-      for (const [key, val] of Object.entries(item)) {
-        result = result.split('{{' + key + '}}').join(String(val));
-      }
-      return result;
-    });
+    const results = dataArr.map(item => ToolCompute.fillTemplate(tpl, item));
     document.getElementById('ttOutput').textContent = results.join('\n---\n');
     if (typeof showToast === 'function') showToast(T('batch_done', results.length), 'success');
   };

@@ -74,9 +74,9 @@ function loadScript(src) {
 }
 
 async function loadAgentScripts() {
-  for (const group of AG_SCRIPT_GROUPS) {
-    await Promise.all(group.map(loadScript));
-  }
+  const version = document.querySelector('meta[name="toolkit-version"]')?.content || 'dev';
+  if (version !== 'dev') await loadScript('agent/agent-bundle.js');
+  else for (const group of AG_SCRIPT_GROUPS) await Promise.all(group.map(loadScript));
   window.AgentAdapters.registerAdapters();
   window.AgentActions.registerActions();
   window._agNotifyReady && window._agNotifyReady();

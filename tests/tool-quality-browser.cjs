@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const {execFileSync}=require('node:child_process');
 const express=require('express');
-const {chromium,firefox}=require('playwright');
+const { launchBrowser } = require('./browser-launch.cjs');
 (async()=>{
   let browser,server,temp;
   try {
@@ -12,11 +12,11 @@ const {chromium,firefox}=require('playwright');
     if(process.env.TEST_BUILD==='1') {
       temp=fs.mkdtempSync(path.join(os.tmpdir(),'k-toolkit-quality-test-'));
       for(const dir of ['public','scripts'])fs.cpSync(path.join(root,dir),path.join(temp,dir),{recursive:true});
-      execFileSync(process.execPath,['scripts/build.js'],{cwd:temp,stdio:'pipe'});source=path.join(temp,'dist');
+      execFileSync(process.execPath,['scripts/build.js'],{cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') }});source=path.join(temp,'dist');
     }
     const app=express();app.use('/k-toolkit',express.static(source));
     server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
-    browser=await(process.env.TEST_BROWSER==='firefox'?firefox:chromium).launch({headless:true});
+    browser=await launchBrowser();
     const page=await browser.newPage({serviceWorkers:'block',viewport:{width:1440,height:1000},acceptDownloads:true});
     page.setDefaultTimeout(8000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.route(/^https:\/\//,r=>r.abort());
@@ -77,20 +77,25 @@ const {chromium,firefox}=require('playwright');
     await page.locator('#regexReplaceStr').fill('-');
     await page.waitForFunction(()=>document.querySelector('#regexReplaceResult').textContent==='-🙂-中-');
     await page.getByRole('button',{name:'匹配模式',exact:true}).click();
+    // Exercise the timeout boundary even on engines that cap backtracking themselves.
+    if (process.env.TEST_BROWSER === 'webkit') await page.route('**/tools/regex-worker.js*', route => route.fulfill({ contentType: 'text/javascript', body: 'self.onmessage = () => { while (true) {} };' }));
     await page.locator('#regexPattern').fill('(a+)+$');await page.locator('#regexFlags').fill('');await page.locator('#regexText').fill('a'.repeat(40)+'!');
     await page.evaluate(()=>{window.__beats=0;window.__beatTimer=setInterval(()=>window.__beats++,25);});
     await page.waitForFunction(()=>document.querySelector('#regexStatus').textContent.includes('超时'));
     assert.ok(await page.evaluate(()=>window.__beats)>10,'UI thread stays responsive during expensive regex');
     await page.evaluate(()=>clearInterval(window.__beatTimer));
+    if (process.env.TEST_BROWSER === 'webkit') await page.unroute('**/tools/regex-worker.js*');
     await page.locator('#regexPattern').fill('a+');
     await page.waitForFunction(()=>document.querySelector('#regexStatus').textContent.includes('1 个匹配'));
-    await page.addScriptTag({url:`http://127.0.0.1:${server.address().port}/k-toolkit/agent/actions/nav.js`});
+    await page.evaluate(() => _agEnsureLoaded());
     const agentResult=await page.evaluate(()=>NavActions.find(a=>a.name==='fill_and_run_tool').execute({toolId:'regex',inputs:{text:'b12',pattern:'([a-z]+)(\\d+)',flags:'g'}}));
     assert.equal(agentResult.success,true);assert.match(agentResult.data.result,/12/);
+    if (process.env.TEST_BROWSER === 'webkit') await page.route('**/tools/regex-worker.js*', route => route.fulfill({ contentType: 'text/javascript', body: 'self.onmessage = () => { while (true) {} };' }));
     const agentTimeout=await page.evaluate(()=>NavActions.find(a=>a.name==='fill_and_run_tool').execute({toolId:'regex',inputs:{text:'a'.repeat(40)+'!',pattern:'(a+)+$',flags:''}}));
     assert.equal(agentTimeout.success,false);assert.match(agentTimeout.display,/超时/);
     await page.locator('#regexPattern').fill('(a+)+$');await page.waitForTimeout(250);await go('json');
     assert.equal(await page.evaluate(()=>_regexWorker),null,'leaving terminates the worker');
+    if (process.env.TEST_BROWSER === 'webkit') await page.unroute('**/tools/regex-worker.js*');
     await page.waitForTimeout(1600);assert.equal(await page.evaluate(()=>currentPage),'json');
     assert.deepEqual(errors,[]);
     console.log('PASS: SQL literals/dialects/comments/cleanup; exact large diff, pagination/full copy/download/live debounce; regex groups/Unicode/replace/timeout/responsiveness/cleanup');

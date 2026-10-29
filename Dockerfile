@@ -1,6 +1,8 @@
 # ── Stage 1: Build ──
 FROM node:24-alpine AS builder
 WORKDIR /app
+COPY package*.json ./
+RUN npm ci --include=dev
 COPY public/ ./public/
 COPY scripts/build.js ./scripts/build.js
 RUN node scripts/build.js

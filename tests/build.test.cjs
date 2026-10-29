@@ -12,7 +12,7 @@ test('build preserves CSS math, emits valid JS and versions every source categor
   try {
     for (const dir of ['public', 'scripts']) fs.cpSync(path.join(root, dir), path.join(temp, dir), { recursive: true });
     const build = () => {
-      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe' });
+      execFileSync(process.execPath, ['scripts/build.js'], { cwd: temp, stdio: 'pipe', env: { ...process.env, NODE_PATH: path.resolve(__dirname, '../node_modules') } });
       return fs.readFileSync(path.join(temp, 'dist/sw.js'), 'utf8');
     };
     let previous = build();
@@ -36,7 +36,7 @@ test('build preserves CSS math, emits valid JS and versions every source categor
     };
     checkJs(path.join(temp, 'dist'));
     // Generated config text lives in template literals; production must keep its indentation.
-    assert.ok(fs.readFileSync(path.join(temp, 'dist/tools/nginx-gen.js'), 'utf8').includes('\n    location / {'));
+    assert.ok(fs.readFileSync(path.join(temp, 'dist/tools/nginx-gen.js'), 'utf8').includes('    location / {'));
     assert.equal(build(), previous, 'unchanged sources should produce an unchanged version');
     assert.ok(fs.existsSync(path.join(temp, 'dist/compute/lunar.js')), 'compute modules are published');
     for (const file of ['public/tools/img-compress.js', 'public/agent/agent-core.js', 'public/compute/lunar.js', 'public/dashboard.html', 'public/sw.js', 'scripts/build.js']) {

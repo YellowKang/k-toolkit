@@ -35,7 +35,7 @@ const LANG_ZH = {
   toast_offline: '已离线，本地工具仍可使用',
   toast_sw_update:'已更新，点击刷新',
   search_placeholder:'搜索工具... (/ 或 ⌘K)',
-  search_history:'最近搜索',
+  search_history:'最近搜索', search_popular:'热门工具', search_clear:'清除', search_suggestions:'搜索建议',
   search_results:(n) => `${n} 个结果`,
   search_view_all:(n) => `查看全部 ${n} 个结果 →`,
   search_no_result:(q) => `未找到「${q}」相关工具`,
@@ -118,7 +118,7 @@ const LANG_EN = {
   toast_offline: 'Offline — local tools still available',
   toast_sw_update:'Updated, click to refresh',
   search_placeholder:'Search tools... (/ or ⌘K)',
-  search_history:'Recent searches',
+  search_history:'Recent searches', search_popular:'Popular tools', search_clear:'Clear', search_suggestions:'Search suggestions',
   search_results:(n) => `${n} result${n===1?'':'s'}`,
   search_view_all:(n) => `View all ${n} results →`,
   search_no_result:(q) => `No results for "${q}"`,
@@ -333,6 +333,7 @@ function setLang(lang) {
   if (btn) btn.textContent = t('lang_btn');
   // 更新搜索框 placeholder
   const inp = document.getElementById('searchInput');
+  inp?.setAttribute('aria-label', t('search_placeholder'));
   if (inp) inp.placeholder = t('search_placeholder');
   // 重渲染当前页
   if (typeof renderHomePage === 'function' && ['home','favorites','recent','ai-chat'].includes(window.currentPage || 'home')) renderHomePage(window.currentPage || 'home');

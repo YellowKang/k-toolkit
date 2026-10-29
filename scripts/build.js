@@ -12,109 +12,13 @@ function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-function minifyCSS(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, '')   // strip comments
-    .replace(/\s*([{};:,>~])\s*/g, '$1') // preserve whitespace around + in calc()
-    .replace(/\s+/g, ' ')                 // collapse whitespace
-    .trim();
-}
-
-// Tokens after which a '/' starts a regex literal (not division)
-const REGEX_BEFORE = new Set([
-  '(', '[', '{', ',', ';', '=', '!', '&', '|', '?', ':',
-  '~', '^', '+', '-', '*', '%', '<', '>', 'return', 'typeof',
-  'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw',
-  'case', 'yield', 'await',
-]);
-
-function lastToken(s) {
-  // Get the last non-whitespace token from output so far (a number before '/' means division)
-  const m = s.match(/([a-zA-Z_$][\w$]*|\d[\w.]*|[^\s\w$])\s*$/);
-  return m ? m[1] : '';
-}
-
-// Index just past the string/template literal starting at `start`.
-// Template substitutions are scanned by brace depth so nested literals stay intact.
-function literalEnd(src, start) {
-  const q = src[start];
-  let i = start + 1;
-  while (i < src.length) {
-    if (src[i] === '\\') { i += 2; continue; }
-    if (src[i] === q) return i + 1;
-    if (q === '`' && src[i] === '$' && src[i+1] === '{') {
-      i += 2;
-      let depth = 1;
-      while (i < src.length && depth > 0) {
-        if (src[i] === '"' || src[i] === "'" || src[i] === '`') { i = literalEnd(src, i); continue; }
-        if (src[i] === '{') depth++;
-        else if (src[i] === '}') depth--;
-        i++;
-      }
-      continue;
-    }
-    i++;
-  }
-  return i;
-}
-
+// Parse JS/CSS before reducing whitespace; comments can separate meaningful tokens.
+const { transformSync, version: minifierVersion } = require('esbuild');
 function minifyJS(src) {
-  let out = '';
-  let i = 0;
-  while (i < src.length) {
-    // String/template literals are copied verbatim: their whitespace is runtime data
-    if (src[i] === '"' || src[i] === "'" || src[i] === '`') {
-      const end = literalEnd(src, i);
-      out += src.slice(i, end);
-      i = end;
-      continue;
-    }
-    // Drop indentation, blank lines and CRs in code only
-    if (src[i] === '\r' || (/\s/.test(src[i]) && (out === '' || out.endsWith('\n')))) {
-      i++;
-      continue;
-    }
-    // Block comment
-    if (src[i] === '/' && src[i+1] === '*') {
-      i += 2;
-      while (i < src.length && !(src[i] === '*' && src[i+1] === '/')) i++;
-      i += 2;
-      continue;
-    }
-    // Single-line comment
-    if (src[i] === '/' && src[i+1] === '/') {
-      while (i < src.length && src[i] !== '\n') i++;
-      continue;
-    }
-    // Regex literal: '/' not followed by '/' or '*', preceded by operator/keyword
-    if (src[i] === '/' && src[i+1] !== '/' && src[i+1] !== '*') {
-      const prev = lastToken(out);
-      if (prev === '' || REGEX_BEFORE.has(prev)) {
-        // Copy entire regex literal verbatim
-        out += src[i++]; // opening /
-        while (i < src.length && src[i] !== '\n') {
-          if (src[i] === '\\') { out += src[i] + src[i+1]; i += 2; continue; }
-          if (src[i] === '[') {
-            // character class — slashes inside are not terminators
-            out += src[i++];
-            while (i < src.length && src[i] !== ']') {
-              if (src[i] === '\\') { out += src[i] + src[i+1]; i += 2; continue; }
-              out += src[i++];
-            }
-            if (i < src.length) out += src[i++]; // ]
-            continue;
-          }
-          if (src[i] === '/') { out += src[i++]; break; } // closing /
-          out += src[i++];
-        }
-        // regex flags (g, i, m, s, u, y, d)
-        while (i < src.length && /[gimsuy]/.test(src[i])) out += src[i++];
-        continue;
-      }
-    }
-    out += src[i++];
-  }
-  return out.trim();
+  return transformSync(src, { loader: 'js', target: 'es2022', charset: 'utf8', legalComments: 'inline', minifyWhitespace: true }).code.trim();
+}
+function minifyCSS(src) {
+  return transformSync(src, { loader: 'css', target: ['chrome109', 'firefox115', 'safari16'], charset: 'utf8', legalComments: 'inline', minifyWhitespace: true }).code.trim();
 }
 
 function fmtKB(bytes) {
@@ -167,6 +71,7 @@ ensureDir(DIST);
 // ── Version the whole release, including HTML, tools, Agent and build transforms ──
 const hashSrc = crypto.createHash('md5');
 hashSrc.update(fs.readFileSync(__filename));
+hashSrc.update(minifierVersion);
 function hashDirectory(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) {
     const file = path.join(dir, entry.name);
@@ -202,7 +107,7 @@ for (const name of cssFiles) {
 }
 
 // ── Minify core JS ──
-const jsFiles = ['tool-compute.js', 'app-updates.js', 'image-session.js', 'file-session.js', 'tool-workspace.js', 'request-session.js', 'tool-catalog.js', 'dashboard.js', 'dashboard-cmd.js', 'i18n.js'];
+const jsFiles = ['tool-runtime.js', 'tool-privacy.js', 'tool-compute.js', 'app-updates.js', 'image-session.js', 'file-session.js', 'tool-workspace.js', 'request-session.js', 'tool-catalog.js', 'dashboard.js', 'dashboard-cmd.js', 'i18n.js'];
 console.log('\nJS Minification:');
 let totalSavedJS = 0;
 for (const name of jsFiles) {
@@ -251,6 +156,17 @@ for (const dir of ['agent', 'compute']) {
   });
   console.log(`  ${count} files`);
 }
+
+// Classic scripts share globals, so preserve their dependency order and lexical scope.
+// Development keeps individual files; the release fetches one lazy bundle.
+const agentLoader = fs.readFileSync(path.join(PUB, 'agent/agent-loader.js'), 'utf8');
+const manifest = agentLoader.slice(0, agentLoader.indexOf('const agentScriptPromises'));
+const agentFiles = require('node:vm').runInNewContext(manifest + '\nAG_SCRIPT_GROUPS.flat()');
+const agentSource = agentFiles.map(file => fs.readFileSync(path.join(PUB, file), 'utf8')).join('\n;\n');
+fs.writeFileSync(path.join(DIST, 'agent/agent-bundle.js'), minifyJS(agentSource));
+// Exclude superseded modules from the release/offline cache, avoiding duplicate bytes.
+for (const file of agentFiles) fs.unlinkSync(path.join(DIST, file));
+console.log(`  Agent: ${agentFiles.length} modules → one lazy bundle`);
 
 // ── Copy pinned third-party libraries verbatim (digests are checked by tests) ──
 console.log('\nCopying vendor/:');
