@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const context = vm.createContext({ console, URL });
 context.window = context;
 vm.runInContext(fs.readFileSync(path.resolve(__dirname, '..', 'public/tool-privacy.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.resolve(__dirname, '..', 'public/compute/workflow-history.js'), 'utf8'), context);
 vm.runInContext(fs.readFileSync(path.resolve(__dirname, '..', 'public/compute/backup.js'), 'utf8'), context);
 const { backup } = context.KCompute;
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -28,6 +29,7 @@ test('keys are grouped by allow-list and API keys stay out of the plain section'
   assert.equal(backup.groupOf('ag_model'), 'agent');
   assert.equal(backup.groupOf('unrelated_key'), null);
   assert.equal(backup.groupOf('dtb_workflow_draft'), 'tools');
+  assert.equal(backup.groupOf('dtb_workflow_runs'), 'tools');
   assert.equal(backup.groupOf('dtb_connection_drafts'), null, 'temporary connection credentials must never be exported');
   const inv = backup.inventory(seed());
   assert.deepEqual(plain(inv.history.map(x => [x.key, x.items])), [['dtb_favorites', 2], ['dtb_recent', 2], ['dtb_usage', 1]]);

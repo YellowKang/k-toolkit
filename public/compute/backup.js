@@ -6,7 +6,7 @@
   const GROUPS = [
     { id: 'prefs', keys: ['dtb_lang', 'dtb_theme', 'dtb_sidebar_collapsed', 'dtb_collapsed_cats', 'ag_fab_pos', 'dtb_otp_settings'] },
     { id: 'history', keys: ['dtb_favorites', 'dtb_recent', 'dtb_usage', 'dtb_search_history'] },
-    { id: 'tools', keys: ['dtb_note', 'dtb_todo', 'dtb_countdowns', 'dtb_saved_regex', 'dtb_mc_history', 'dtb_typing_scores', 'dtb_http_history', 'dtb_workflow_draft'] },
+    { id: 'tools', keys: ['dtb_note', 'dtb_todo', 'dtb_countdowns', 'dtb_saved_regex', 'dtb_mc_history', 'dtb_typing_scores', 'dtb_http_history', 'dtb_workflow_draft', 'dtb_workflow_runs'] },
     { id: 'chat', keys: ['dtb_chat_history', 'dtb_chat_system', 'dtb_chat_config', 'dtb_chat_history_meta', 'dtb_context_preferences', 'dtb_chat_sessions', 'dtb_chat_draft', 'dtb_chat_draft_images'], prefix: 'dtb_chat_session_' },
     { id: 'agent', prefix: 'ag_', exclude: key => key.startsWith('ag_key_') || key === 'ag_fab_pos' },
     { id: 'apikeys', prefix: 'ag_key_', sensitive: true },
@@ -69,6 +69,9 @@
       const raw = storage.getItem(key);
       if (raw === null) continue;
       if (group === 'apikeys') secret[key] = raw;
+      else if (key === 'dtb_workflow_runs') {
+        try { const parsed=JSON.parse(raw),items=Array.isArray(parsed.items)?parsed.items.filter(window.KCompute['workflow-history'].valid).slice(0,30):[];data[key]=JSON.stringify({version:1,items}); } catch { data[key]='{"version":1,"items":[]}'; }
+      }
       else if (key === 'dtb_http_history') { try { data[key] = JSON.stringify(window.ToolPrivacy.httpHistory(JSON.parse(raw))); } catch { data[key] = '[]'; } }
       else data[key] = raw;
     }
@@ -130,6 +133,7 @@
     if (key === 'dtb_chat_draft') return typeof value === 'string';
     if (key === 'dtb_chat_draft_images') return Array.isArray(value) && value.length <= 4 && value.every(v => object(v) && typeof v.base64 === 'string' && /^image\/(png|jpeg|webp|gif)$/.test(v.mime));
     if (key === 'dtb_workflow_draft') return object(value) && value.version === 1 && object(value.value);
+    if (key === 'dtb_workflow_runs') return !!window.KCompute?.['workflow-history']?.validEnvelope(value) && JSON.stringify(value).length<=512*1024;
     if (key === 'dtb_otp_vault') return object(value) && value.v === 1 && value.kdf?.name === 'PBKDF2' && value.kdf.hash === 'SHA-256'
       && Number.isInteger(value.kdf.iterations) && value.kdf.iterations >= 1000 && value.kdf.iterations <= 10000000 && typeof value.kdf.salt === 'string'
       && /^[A-Za-z0-9+/]{22}==$/.test(value.kdf.salt) && value.cipher?.name === 'AES-GCM' && /^[A-Za-z0-9+/]{16}$/.test(value.cipher.iv)
@@ -165,6 +169,13 @@
     if (TEXT_KEYS.has(key)) return { value: current.includes(incoming) ? current : `${current}\n\n---\n${incoming}` };
     let a, b;
     try { a = JSON.parse(current); b = JSON.parse(incoming); } catch { return { value: current }; }
+    if (key === 'dtb_workflow_runs') {
+      const history=window.KCompute['workflow-history'];
+      if(!history.validEnvelope(a)||!history.validEnvelope(b))throw new BackupError('structure','Invalid workflow run history');
+      const ids=new Set(a.items.map(item=>item.id)),items=[...a.items,...b.items.filter(item=>!ids.has(item.id))];
+      items.sort((x,y)=>Number(y.status==='running')-Number(x.status==='running')||y.updatedAt-x.updatedAt);
+      return {value:JSON.stringify({version:1,items:items.slice(0,30)})};
+    }
     if (['ag_connections', 'ag_custom_workflows'].includes(key) && Array.isArray(a) && Array.isArray(b)) {
       const ids = new Set(a.map(item => item.id)); const combined = [...a, ...b.filter(item => !ids.has(item.id))];
       if (combined.length > 20) throw new BackupError('limit', 'Too many saved connections or workflows (maximum 20)');

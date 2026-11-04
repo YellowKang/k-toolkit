@@ -140,3 +140,11 @@ CSV 与文件 JSON 格式化复用 `json-text`；精确数字在 CSV 中是普�
 `compute/http-response.js` 按实际流字节限制响应为 5 MiB，拒绝无效 UTF-8。HTTP 工具保留原文与格式化文本，仅裁剪 64k 字符的显示，完整复制/下载不读取预览 DOM。JSON Pointer 与 Agent `json_extract` 共用实现。响应快照绑定请求修订号；请求输入变更中止网络并使输出操作失效，错误响应可查看，传输失败没有可复用的旧响应。响应不纳入存储或自动模型上下文，跨工具交接必须由用户触发。
 
 `compute/schema-mock.js` 提供种子生成器，`schema.mock` 通过现有 Schema Worker 调用，3 秒超时和 AbortSignal 都销毁 Worker。Worker 先拒绝无法安全表示的 Schema 数值，再编译原 Schema，生成候选并逐条校验；有界重试失败不返回部分结果。原 `schema.validate` 仍使用 2 秒校验边界。新增 action `json_schema_mock` 和工作流输出契约，页面与 Agent 不维护第二份算法。支持的生成规则、TypeScript 语义及资源上限见 [能力边界](response-schema-mock.md)。
+
+## 工作流运行记录与恢复
+
+`AgentWorkflow` 在执行前复制计划和动作契约，每步使用独立 AbortController 和最多 15 秒的可取消等待；纯计算白名单及原 65,536 字符数据限制继续生效。成功结果在校验后提交到内存检查点，取消/超时的迟到结果不能提交。恢复检查前缀参数的规范化签名、已完成动作的函数与 schema、当前版本及来源，再复用原结果；允许修改失败及后续步骤。每页最多 4 个活跃流程，检查点最多 10 条 / 4 MiB 序列化字符，最多 20 次尝试。
+
+`compute/workflow-history.js` 按需加载，`dtb_workflow_runs` 仅保留最多 30 条 / 512 KiB 的受限元数据。每个运行持有独立 Web Lock，摘要写入使用共享锁；锁已消失的 running 记录显示为 interrupted。存储失败或不可用不撤销计算结果，返回 historySaved:false 并在界面提示。摘要备份使用同一结构校验，拒绝参数/输出/错误正文等额外字段；导入写入加入 workflow-history 锁。备份合并按 ID 去重，恢复数据不参与持久化或备份。
+
+`agent-workflow-panel.js` 提供只读计划和摘要时间线；“我的流程”使用它预览实际将执行的快照，并能载入本标签页的手动运行检查点为固定参数草稿。助手通过 preview_workflow / list_workflow_runs / resume_workflow 使用同一执行器，来源强制为 assistant，不能使用手动任务的运行 ID 访问其数据。详细语义见 [工作流运行与恢复](workflow-runs.md)。

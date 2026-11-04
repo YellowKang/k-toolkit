@@ -68,6 +68,8 @@ test('workflow returns requested intermediate outputs once, within its combined 
  action('base64_encode').execute=()=>({success:true,data:{result:'x'.repeat(33000)}});
  const large=await window.AgentWorkflow.run({steps:[{id:'one',action:'base64_encode',params:{text:'x'}}],returnSteps:['one']});
  assert.equal(large.success,false);assert.match(large.error,/65536/);
+ const assembled=await window.AgentWorkflow.resume(large.runId,{steps:[{id:'one',action:'base64_encode',params:{text:'x'}}],returnSteps:[]});
+ assert.equal(assembled.success,true);assert.equal(assembled.data.result.result.length,33000);assert.equal(assembled.data.steps[0].reused,true,'output-only failures can resume without rerunning completed work');
 });
 test('invalid plans are rejected before executing anything',async()=>{
  const {window,action}=setup();let executed=0;const original=action('base64_encode').execute;action('base64_encode').execute=p=>{executed++;return original(p)};

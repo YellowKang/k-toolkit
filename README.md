@@ -63,7 +63,7 @@ AI 对话支持停止并保留部分回复、失败重试、最后回复重新�
 
 Agent 与页面共用字符串转义、SQL、文本/JSON Diff、正则和图片处理能力。结果卡片可选择中间步骤、完整复制、下载、带入工具和修改参数重跑。先在图片工具选好文件，Agent 就能按文件 ID 压缩/转格式、读取 EXIF、识别二维码，结果继续下载或复用。图片字节留在本地，文件信息与识别结果随 Agent 对话发送给模型；引用在刷新/清除后失效。
 
-日期差、时间戳/时区、颜色/对比度/调色板和 IPv4 也已统一手动与 Agent 算法，覆盖月末、DST、透明度和严格 CIDR 校验。Agent 共 89 个 action；普通文件可从附件、Base64 或 Hash 选择，通过文件 ID 读取 UTF-8 片段、计算摘要、Base64 往返、JSON/CSV 转换并下载。文件字节留在当前标签页，读取片段与元数据会随对话发给模型；大文件内容建议通过附件处理。
+日期差、时间戳/时区、颜色/对比度/调色板和 IPv4 也已统一手动与 Agent 算法，覆盖月末、DST、透明度和严格 CIDR 校验。Agent 共 92 个 action；普通文件可从附件、Base64 或 Hash 选择，通过文件 ID 读取 UTF-8 片段、计算摘要、Base64 往返、JSON/CSV 转换并下载。文件字节留在当前标签页，读取片段与元数据会随对话发给模型；大文件内容建议通过附件处理。
 
 AI 对话和 Agent 共用上下文预算与固定备注，按完整轮次控制发送内容并显示估算。大工具结果用本地引用继续计算，聊天初次只渲染最近 40 条、可向前加载和完整导出。刷新可恢复历史最多 500 条 / 1,500,000 字符，超出部分会明确提示。模型达到输出上限后，可调整设置并重试，保留已完成的工具结果。详见 [第三轮能力与边界](docs/tool-capabilities-round3.md)。
 
@@ -81,9 +81,12 @@ AI 对话和 Agent 共用上下文预算与固定备注，按完整轮次控制�
 - 2FA 与 AI 会话写入使用跨标签页锁和版本检查；冲突会阻止覆盖并提示先导出，再重新解锁或刷新。请在 HTTPS 或 localhost 使用支持 Web Locks 的浏览器；更新后重新打开旧标签页，旧版本页面不具备此保护。便签保存失败保留内存草稿、提供下载并在离开页面时提醒。
 - GitHub Pages 提供静态站点。需要隐藏服务端密钥或统一鉴权时，应单独配置后端代理。
 
-工具脚本按需加载，同一页面会话内只执行一次。生产构建使用 esbuild 解析并压缩 JS/CSS，将 Agent 的 39 个依赖脚本合并为一个延迟加载包；开发模式保留分组源码。构建前需 `npm ci`。Agent 对工具参数做校验，按顺序执行操作，支持任务取消、工具超时和迭代上限。取消会阻止后续步骤；已完成的页面操作不会被撤销，执行中的工具需要配合取消信号才能中止。
+工具脚本按需加载，同一页面会话内只执行一次。生产构建使用 esbuild 解析并压缩 JS/CSS，将 Agent 的 40 个依赖脚本合并为一个延迟加载包；开发模式保留分组源码。构建前需 `npm ci`。Agent 对工具参数做校验，按顺序执行操作，支持任务取消、工具超时和迭代上限。取消会阻止后续步骤；已完成的页面操作不会被撤销，执行中的工具需要配合取消信号才能中止。
 
 无需模型也能串联工具：打开助手点“本地工作流”，或输入 `/workflows` 查看模板。支持 Base64 解码后格式化 JSON、行清洗后编码、JSON 压缩后 SHA-256。自然语言模式可用 `run_workflow` 引用前一步结果，失败即停止；新增 JSON 字段提取、行清洗和 HMAC 调用。详见[工作流使用与后续规划](docs/agent-workflows.md)。
+
+「我的流程」现可预览动作、输入依赖和参数摘要；运行记录展示每步状态、耗时与尝试次数，可导出或清除。失败/取消后，可以修正尚未完成的步骤并继续运行，已经完成的前缀直接复用；修改前序步骤或原始输入则要求重新运行。本机最多保存 30 条不含输入、结果、密钥及原始错误正文的摘要，真实恢复数据只在当前标签页保留，刷新或淘汰后不可恢复。助手可用 `preview_workflow`、`list_workflow_runs` 和 `resume_workflow`，不能恢复手动运行的私有任务。详见 [工作流运行与恢复](docs/workflow-runs.md)。
+
 
 ## 本地开发与验证
 
@@ -127,6 +130,8 @@ WebKit 测试按浏览器实际能力验证 WebP 编码（不支持时必须明�
 首次成功安装会缓存站点自有静态文件，工具代码仍按需执行。之后的版本只下载内容有变化的文件，其余文件从保留的旧版本缓存复制；复制前重新计算 SHA-256 并与新版本清单比对，旧缓存损坏或被篡改的文件会重新下载，任一文件失败则放弃整个新版本、继续使用当前版本。缓存按项目路径隔离，并保留当前及前两个版本；其他打开的标签页不会被强制刷新。模型服务与网络类工具仍需要网络。从旧机制首次迁移时，若仍显示旧页面，请关闭此站点的所有标签页后重新打开，让等待中的新 Worker 接管；之后即可使用新的更新按钮。直接运行 `public/` 显示开发版；完整更新测试需 `npm run build` 后托管 `dist/`。
 
 `npm run test:updates` 使用真实 Service Worker 模拟三个发布版本，验证手动更新、增量安装（只请求变化的文件）、旧缓存被篡改后重新下载、多标签页、离线、缺失/错版资源与缓存隔离。
+
+`TEST_BUILD=1 npm run test:browser -- workflow-resume` 验证预览不执行、失败恢复不重做前序步骤、编辑前缀拒绝恢复、取消/迟到结果、刷新与跨标签记录、存储失败、摘要导出，以及双语手机布局。支持 `TEST_BROWSER=firefox` / `webkit`。
 
 `TEST_BUILD=1 npm run test:browser -- response-mock` 验证 HTTP 保真、完整导出、提取/交接、超限/取消，以及真实 Worker 中的 Schema Mock、固定种子、类型导出、Agent/工作流共用和手机双语界面；可选 `TEST_BROWSER=firefox` 或 `TEST_BROWSER=webkit`。
 
@@ -186,7 +191,7 @@ JSON supports one-layer unescaping, explicit nested object/array expansion, form
 
 Agent, quick assistant and AI Chat share provider-specific connection settings, endpoint preview and an explicit connection test. Chat keeps partial replies when stopped, preserves the previous reply if regeneration fails, remembers in-tab drafts, supports undoing a clear and respects scroll position. Hash verification follows the current text or file results; file batches run sequentially in terminable Workers (up to 10 files, 32 MiB each).
 
-Date/time, colors/palettes and IPv4 use the same computation in manual pages and Agent. The 89 actions include local file references for UTF-8 excerpts, hashes, Base64 and JSON/CSV conversion. AI Chat and Agent share estimated context budgets and pinned notes; large results can be reused by ID. Chat renders 40 messages initially and supports loading older messages and full export. Refresh restores up to 500 messages / 1,500,000 serialized characters, with an explicit notice when earlier messages remain only in this session.
+Date/time, colors/palettes and IPv4 use the same computation in manual pages and Agent. The 92 actions include local file references for UTF-8 excerpts, hashes, Base64 and JSON/CSV conversion. AI Chat and Agent share estimated context budgets and pinned notes; large results can be reused by ID. Chat renders 40 messages initially and supports loading older messages and full export. Refresh restores up to 500 messages / 1,500,000 serialized characters, with an explicit notice when earlier messages remain only in this session.
 
 Fetch models from the configured API or enter a model name manually. A listed model may still have no available gateway route; verify it with the connection test. Chat and Responses can reuse portable conversation/tool history. Responses accepts both JSON and SSE replies.
 

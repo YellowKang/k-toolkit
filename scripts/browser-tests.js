@@ -11,6 +11,7 @@ const SUITES = [
   ['reliability', 'reliability-browser.cjs'],
   ['optimization', 'optimization-browser.cjs'],
   ['response-mock', 'response-mock-browser.cjs'],
+  ['workflow-resume', 'workflow-resume-browser.cjs'],
   ['images', 'image-tools.cjs'], ['catalog', 'catalog-browser.cjs'], ['workflows', 'workflow-browser.cjs'],
   ['updates', 'updates-browser.cjs'], ['xss', 'xss-browser.cjs'], ['i18n', 'i18n-browser.cjs'],
   ['totp', 'totp-browser.cjs'], ['totp-state', 'totp-state-browser.cjs'], ['backup', 'backup-browser.cjs'],

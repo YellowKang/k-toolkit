@@ -56,6 +56,7 @@ const AG_SCRIPT_GROUPS = [
     'agent/agent-model-picker.js',
     'agent/agent-quick-switch.js',
     'agent/agent-results.js',
+    'agent/agent-workflow-panel.js',
   ],
 ];
 

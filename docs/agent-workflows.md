@@ -80,7 +80,7 @@ SQL、文本 Diff、JSON Diff、字符串转义和正则由页面与 Agent 调�
 
 ## 预算和验证边界
 
-普通文件使用 `list_files`、`read_file`、`file_hash`、`file_convert`；在 Agent 附件或 Base64 / Hash 页面选择后获得真实 ID。文件卡片可下载并带入手动工具。大文本结果通过 `resultId`、`read_result`、`transform_result` 跨轮继续处理，避免模型复述预览。当前共 89 个 action，新增动作的容量与语义见 [第三轮能力说明](tool-capabilities-round3.md)。
+普通文件使用 `list_files`、`read_file`、`file_hash`、`file_convert`；在 Agent 附件或 Base64 / Hash 页面选择后获得真实 ID。文件卡片可下载并带入手动工具。大文本结果通过 `resultId`、`read_result`、`transform_result` 跨轮继续处理，避免模型复述预览。当前共 92 个 action，新增动作的容量与语义见 [第三轮能力说明](tool-capabilities-round3.md)。
 
 每次 Agent 任务最多 8 轮模型请求、32 次顶层动作调用；每条工作流最多 12 步。动作参数序列化不超过 65,536 字符，工作流的参数、单步结果与最终合并输出也受该上限约束；一般动作输出上限为 131,072 字符。单次动作等待超时 15 秒。执行器在内存中运行，不持久保存结果；「我的流程」编辑器会另行保存用户编辑的草稿，规则见下文。
 
@@ -107,7 +107,7 @@ SQL、文本 Diff、JSON Diff、字符串转义和正则由页面与 Agent 调�
 保存后可在 Agent 的 `/workflows` 列表中找到；页面的「复制 Agent 指令」生成 `/workflow <user-id>` 与本次输入。自然语言 Agent 也可通过 `list_workflows` 发现，再调用 `run_workflow_template`。手动、斜杠命令和模型调用复用同一白名单执行器，失败或取消立即停止后续步骤。
 
 - 最多保存 20 条自定义流程、每条 12 步，总存储 512 KiB；单次输入和执行数据沿用 65,536 字符上限。
-- 模板使用 `{"$input":true}` 引用本次输入，用 `{"$ref":"previous.data.result"}` 引用前面步骤；不保存运行输入和结果。
+- 模板使用 `{"$input":true}` 引用本次输入，用 `{"$ref":"previous.data.result"}` 引用前面步骤；占位符不保存当次输入，固定文本则作为参数随模板保存。模板不保存运行结果。
 - 保存时校验名称、动作、静态参数、必填项、引用方向和输出字段。不允许在可复用模板中保存 HMAC 密钥；HMAC 单次动作仍可正常使用。
 - 模板保存在 `ag_custom_workflows`，纳入「数据备份与迁移」的 Agent 分组。浏览器会话之间共享模板，同步到其他设备需要导出/导入。
 
@@ -120,3 +120,9 @@ SQL、文本 Diff、JSON Diff、字符串转义和正则由页面与 Agent 调�
 ## Schema Mock
 
 新增 `json_schema_mock`，参数为 `schema`（Schema JSON 文本）、`seed`（默认 `"42"`）、`count`（默认 3，1–100）和 `includeOptional`（默认 true）。返回 `data.result`（样本数组 JSON）、`data.typescript`（原 Schema 的结构类型）和 `data.count`，可加入「我的流程」。例如 Schema → Mock → `json_extract` 提取 `/0` → JSON 格式化。样本逐条经过真实 Ajv 校验，支持范围与限额见 [能力边界](response-schema-mock.md)。流程自身 65,536 字符和 Agent 输出预算仍适用，大量样本请减少条数或使用手动页面。
+
+## 执行计划、运行摘要与恢复
+
+`preview_workflow` 校验并返回计划摘要，不执行动作。`run_workflow` / `run_workflow_template` 返回 `runId`、`resumable` 和 `historySaved`；`list_workflow_runs` 只列助手来源的摘要，`resume_workflow` 可继续同一标签页的失败/取消任务。恢复可提供修正后的完整步骤，但已完成的前缀及输入必须保持不变；真正复用的是执行器保留的中间结果。手动任务不会被模型工具读取或恢复。
+
+「我的流程」提供预览、恢复、记录查看、导出与清除，以及固定输入编辑。运行摘要持久保存，检查点仅在当前标签页内存。状态、跨标签锁、资源限制、备份与验证见 [工作流运行与恢复](workflow-runs.md)。

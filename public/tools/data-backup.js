@@ -234,10 +234,10 @@ async function dbImportCommit() {
   const backup = await ToolCompute.load('backup');
   let skipped, written, failed;
   try {
-    await ToolRuntime.exclusive('chat-conversations', () => ToolRuntime.exclusive('otp-vault', () => {
+    await ToolRuntime.exclusive('chat-conversations', () => ToolRuntime.exclusive('otp-vault', () => ToolRuntime.exclusive('workflow-history', () => {
       const plan = backup.plan(localStorage, { ..._db.parsed.data, ...(_db.secret || {}) }, { mode, groups });
       skipped = plan.skipped; ({ written, failed } = backup.apply(localStorage, plan.writes));
-    }));
+    })));
   } catch (e) { return _dbMsg('dbImportMsg', _dbErr(e), '#ef4444'); }
   const preview = document.getElementById('dbPreview');
   const lines = [written || skipped.length ? T('done', written, skipped.length) : T('nothing')];
