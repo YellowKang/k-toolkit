@@ -1,6 +1,7 @@
 /* Bounded CSV parser/writer shared by manual tools, Agent and workflows. */
 (function () {
   const CANDIDATES=[',',';','\t','|'],MAX=1000000,ROWS=20000,CELLS=200000;
+  const json=()=>window.KCompute['json-text'];
   const fail=(zh,en)=>{throw new Error(window.getCurrentLang?.()==='zh'?zh:en);};
   function delimiterCheck(d){if(typeof d!=='string'||d.length!==1||/["\r\n]/.test(d))fail('分隔符必须是单个字符（引号和换行除外）','Delimiter must be one character, excluding quotes/newlines');}
   function detectDelimiter(text) {
@@ -41,7 +42,9 @@
   function inferValue(value) {
     if(/^(true|false)$/i.test(value))return value.toLowerCase()==='true';
     if(/^null$/i.test(value))return null;
-    if(/^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/.test(value)&&Number.isFinite(+value)&&(!Number.isInteger(+value)||Number.isSafeInteger(+value)))return +value;
+    if(/^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/.test(value)&&Number.isFinite(+value)&&(!Number.isInteger(+value)||Number.isSafeInteger(+value))) {
+      try { if (!Object.is(+value,-0) && (String(+value)===value || json().compareNumbers(json().parse(value),+value)===0)) return +value; } catch {}
+    }
     return value;
   }
   function toObjects(rows,{header=true,infer=false}={}) {
@@ -55,10 +58,10 @@
   }
   function flatten(value) {
     const out=Object.create(null);let count=0;
-    function visit(object,prefix,depth){if(depth>64||++count>CELLS)fail('嵌套结构过深或过大','Nested structure is too deep or large');for(const [k,v] of Object.entries(object)){const key=prefix===null?k:prefix+'.'+k;if(v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).length)visit(v,key,depth+1);else{if(Object.prototype.hasOwnProperty.call(out,key))fail('展开路径重复：'+key,'Flattened path collision: '+key);out[key]=v;}}}
+    function visit(object,prefix,depth){if(depth>64||++count>CELLS)fail('嵌套结构过深或过大','Nested structure is too deep or large');for(const [k,v] of Object.entries(object)){const key=prefix===null?k:prefix+'.'+k;if(v&&typeof v==='object'&&!json().isNumber(v)&&!Array.isArray(v)&&Object.keys(v).length)visit(v,key,depth+1);else{if(Object.prototype.hasOwnProperty.call(out,key))fail('展开路径重复：'+key,'Flattened path collision: '+key);out[key]=v;}}}
     visit(value,null,0);return out;
   }
-  const cellText=v=>v===null||v===undefined?'':typeof v==='object'?JSON.stringify(v):String(v);
+  const cellText=v=>v===null||v===undefined?'':typeof v==='object'?json().stringify(v):String(v);
   function serialize(records,{delimiter=',',flat=true,newline='\n'}={}) {
     delimiterCheck(delimiter);
     if(!['\n','\r\n','\r'].includes(newline))fail('未知换行格式','Invalid newline format');
@@ -67,7 +70,7 @@
     const cell=v=>{const s=cellText(v);return s.includes(delimiter)||/["\r\n]/.test(s)||/^\s|\s$/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;};
     let lines;
     if(list.every(Array.isArray))lines=list;
-    else{const objects=list.map(r=>r&&typeof r==='object'&&!Array.isArray(r)?(flat?flatten(r):r):{value:r}),set=new Set();for(const o of objects)for(const k of Object.keys(o)){set.add(k);if(set.size>1000)fail('CSV 最多 1,000 列','CSV limit: 1,000 columns');}const keys=[...set];if((objects.length+1)*keys.length>CELLS)fail('CSV 最多 200,000 个单元格','CSV limit: 200,000 cells');lines=[keys,...objects.map(o=>keys.map(k=>Object.prototype.hasOwnProperty.call(o,k)?o[k]:''))];}
+    else{const objects=list.map(r=>r&&typeof r==='object'&&!json().isNumber(r)&&!Array.isArray(r)?(flat?flatten(r):r):{value:r}),set=new Set();for(const o of objects)for(const k of Object.keys(o)){set.add(k);if(set.size>1000)fail('CSV 最多 1,000 列','CSV limit: 1,000 columns');}const keys=[...set];if((objects.length+1)*keys.length>CELLS)fail('CSV 最多 200,000 个单元格','CSV limit: 200,000 cells');lines=[keys,...objects.map(o=>keys.map(k=>Object.prototype.hasOwnProperty.call(o,k)?o[k]:''))];}
     let length=0,total=0;const output=[];
     for(const row of lines){total+=row.length;if(row.length>1000||total>CELLS)fail('CSV 超出行列限制','CSV exceeds the cell limit');const line=row.map(cell).join(delimiter);length+=line.length+newline.length;if(length>MAX*2)fail('CSV 输出最多 2,000,000 个字符','CSV output limit: 2,000,000 characters');output.push(line);}
     return {result:output.join(newline),columns:lines[0]?.length||0};
@@ -76,7 +79,7 @@
   function convert(input,{direction,delimiter='auto',header=true,infer=false,flat=true}={}) {
     if(typeof input!=='string'||input.length>MAX)fail('输入最多 1,000,000 个字符','Input limit: 1,000,000 characters');
     if(direction==='json2csv') {
-      const data=JSON.parse(input);if(data===null||typeof data!=='object')fail('需要 JSON 数组或对象','Expected a JSON array or object');
+      const data=json().parse(input,{maxTokens:600000});if(data===null||typeof data!=='object'||json().isNumber(data))fail('需要 JSON 数组或对象','Expected a JSON array or object');
       const records=Array.isArray(data)?data:[data],d=delimiter==='auto'?',':delimiter;
       const {result,columns}=serialize(records,{delimiter:d,flat});
       return {result,rows:records.length,columns,delimiter:d,extension:'csv'};

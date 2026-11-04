@@ -4,6 +4,12 @@
 const _htI18nDict = {
   zh: {
     panel_title:      'HTTP 请求测试',
+    raw: '原文', formatted: '格式化 JSON', download_response: '下载原始响应',
+    response_note: (n,cut) => `${n.toLocaleString()} 字节 · ${cut?'仅预览前 64,000 字符；复制和下载包含完整内容。':'响应仅保留在当前页面。'}`,
+    pointer: '提取 JSON 字段（JSON Pointer，空白为根值）', extract: '提取', copy_field: '复制完整字段',
+    continue: '继续处理响应', handoff: '带入工具', json: 'JSON 格式化与查询', schema: 'JSON Schema 校验', diff: 'JSON 对比（作为 A）',
+    processing_limit: 'JSON 操作最多 100 万字符；较大响应可完整复制或下载。',
+    field_note: '字段预览最多 8,000 字符，复制保留完整内容。',
     cancel: '取消请求', cancelled: '请求已取消', timeout: '请求超时，请检查接口后重试', code: '生成 cURL / fetch / axios', import: '导入 cURL', import_run: '解析并填入', bad_url: '请输入有效的 HTTP 或 HTTPS 地址',
     cors_warn:        '浏览器安全限制：跨域请求可能因 CORS 策略被拦截。建议测试同域或已配置 CORS 的接口，或使用后端代理。',
     send:             '发送',
@@ -27,6 +33,12 @@ const _htI18nDict = {
   },
   en: {
     panel_title:      'HTTP Request Tester',
+    raw: 'Raw text', formatted: 'Formatted JSON', download_response: 'Download original response',
+    response_note: (n,cut) => `${n.toLocaleString()} bytes · ${cut?'Preview limited to 64,000 characters; copy and download include all content.':'Response stays on this page only.'}`,
+    pointer: 'Extract JSON field (JSON Pointer; empty selects the root)', extract: 'Extract', copy_field: 'Copy full field',
+    continue: 'Continue processing response', handoff: 'Open with input', json: 'JSON formatting and queries', schema: 'JSON Schema validation', diff: 'JSON comparison (as A)',
+    processing_limit: 'JSON operations accept up to 1,000,000 characters. Larger responses can be copied or downloaded in full.',
+    field_note: 'Field preview is limited to 8,000 characters; copy includes the full value.',
     cancel: 'Cancel request', cancelled: 'Request cancelled', timeout: 'Request timed out. Check the endpoint and retry.', code: 'Generate cURL / fetch / axios', import: 'Import cURL', import_run: 'Parse and fill', bad_url: 'Enter a valid HTTP or HTTPS URL',
     cors_warn:        'Browser security: Cross-origin requests may be blocked by CORS policy. Test same-origin or CORS-enabled APIs, or use a backend proxy.',
     send:             'Send',
@@ -87,6 +99,7 @@ function _htClearHistory() {
 }
 
 function _htRestoreFromHistory(index) {
+  htInvalidateResponse();
   const list = _htLoadHistory();
   const item = list[index];
   if (!item) return;
@@ -198,13 +211,22 @@ function renderHttpTester(el) {
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-secondary" onclick="_htExportCurl(this)">${_htT('export_curl')}</button>
-          <button class="btn btn-secondary" onclick="copyText(document.getElementById('htResBody').textContent,this)">${_htT('copy_response')}</button>
+          <button class="btn btn-secondary" id="htCopyResponse" onclick="htCopyResponse(this)" disabled>${_htT('copy_response')}</button>
+          <button class="btn btn-secondary" id="htDownloadResponse" onclick="htDownloadResponse()" disabled>${_htT('download_response')}</button>
         </div>
       </div>
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${_htT('res_headers')}</div>
       <pre id="htResHeaders" class="result-box" style="max-height:120px;overflow-y:auto;margin-bottom:10px;font-size:11px"></pre>
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${_htT('res_body')}</div>
+      <div class="tool-actions"><label>${_htT('res_body')} <select id="htResponseView" class="tool-input" style="width:auto" onchange="htRenderResponse()"><option value="formatted">${_htT('formatted')}</option><option value="raw">${_htT('raw')}</option></select></label></div>
+      <p id="htResponseNote" class="workspace-notice" role="status"></p>
       <pre id="htResBody" class="result-box" style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"></pre>
+      <section id="htJsonActions" hidden>
+        <label for="htPointer">${_htT('pointer')}</label>
+        <div class="tool-actions"><input id="htPointer" class="tool-input" placeholder="/data/items/0/id" style="flex:1;min-width:120px"><button class="btn btn-secondary" onclick="htExtractField()">${_htT('extract')}</button><button id="htCopyField" class="btn btn-secondary" onclick="htCopyField(this)" disabled>${_htT('copy_field')}</button></div>
+        <pre id="htFieldOutput" class="result-box" style="max-height:160px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere"></pre><p class="workspace-notice">${_htT('field_note')}</p>
+        <div class="tool-actions"><label for="htResponseTarget">${_htT('continue')}</label><select id="htResponseTarget" class="tool-input" style="width:auto;max-width:100%"><option value="json">${_htT('json')}</option><option value="json-schema">${_htT('schema')}</option><option value="diff-json">${_htT('diff')}</option></select><button class="btn btn-secondary" onclick="htHandoffResponse()">${_htT('handoff')}</button></div>
+      </section><p class="workspace-notice">${_htT('processing_limit')}</p>
     </div>
     <div class="tool-card-panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -217,6 +239,12 @@ function renderHttpTester(el) {
       ⚠️ ${_htT('cors_footer')}
     </div>`;
   _htRenderHistory();
+  el._htRevision = 0; el._htResponse = null;
+  el.addEventListener('input', event => {
+    if (['htUrl','htMethod','htHeaders','htBody'].includes(event.target.id)) htInvalidateResponse();
+    if (event.target.id === 'htPointer') { if(el._htResponse)delete el._htResponse.field;el.querySelector('#htFieldOutput').textContent='';el.querySelector('#htCopyField').disabled=true; }
+  });
+  el.querySelector('#htMethod').addEventListener('change', () => htInvalidateResponse());
   window._htSession = RequestSession.mount(el, 'http');
 }
 
@@ -229,6 +257,7 @@ async function htImportCurl() {
     const data = parseCurlCommand(text);
     RequestSession.set({ ...data, headers: Object.entries(data.headers).map(([k,v]) => k + ': ' + v).join('\n'), bodyType: 'raw' });
     window._htSession.restore();
+    htInvalidateResponse();
   } catch (error) { if (body.isConnected) showToast(error.message, 'error'); }
 }
 
@@ -240,11 +269,13 @@ async function doHttpTest() {
   try { if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error(); }
   catch { showToast(_htT('bad_url'), 'error'); return; }
   const method = find('htMethod').value, headersRaw = find('htHeaders').value, bodyRaw = find('htBody').value;
+  htInvalidateResponse(); const revision = root._htRevision;
   const button = find('htSendBtn'), cancel = find('htCancelBtn');
   const controller = new AbortController(); _htController = controller;
   let timedOut = false;
   const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 30000);
-  const current = () => root.isConnected && _htController === controller;
+  const owns = () => root.isConnected && _htController === controller;
+  const current = () => owns() && root._htRevision === revision;
   button.textContent = _htT('sending'); button.disabled = true; cancel.hidden = false;
   const headers = Object.create(null);
   headersRaw.split('\n').forEach(line => { const colon = line.indexOf(':'); if (colon > 0) headers[line.slice(0, colon).trim()] = line.slice(colon + 1).trim(); });
@@ -252,16 +283,22 @@ async function doHttpTest() {
   if (bodyRaw && !['GET', 'HEAD'].includes(method)) options.body = bodyRaw;
   const start = Date.now();
   try {
-    const response = await fetch(url, options);
-    const raw = await response.text();
+    const compute = await ToolCompute.load('http-response');
     if (!current()) return;
-    let output = raw; try { output = JSON.stringify(JSON.parse(raw), null, 2); } catch {}
+    if (controller.signal.aborted) throw new DOMException('Cancelled','AbortError');
+    const response = await fetch(url, options);
+    const snapshot = await compute.read(response, {signal:controller.signal});
+    if (!current()) return;
+    root._htResponse = snapshot;
     const badge = find('htStatusBadge');
     badge.textContent = response.status + ' ' + response.statusText;
     badge.style.color = response.ok ? '#10b981' : '#ef4444';
     find('htTime').textContent = (Date.now() - start) + 'ms';
     find('htResHeaders').textContent = [...response.headers].map(([key, value]) => key + ': ' + value).join('\n');
-    find('htResBody').textContent = output;
+    find('htCopyResponse').disabled = find('htDownloadResponse').disabled = false;
+    find('htResponseView').querySelector('[value=formatted]').disabled = !snapshot.isJson;
+    find('htResponseView').value = snapshot.isJson ? 'formatted' : 'raw';
+    find('htJsonActions').hidden = !snapshot.isJson; htRenderResponse();
     _htAddHistory({ method, url, headers: headersRaw, body: bodyRaw, status: response.status, time: new Date().toLocaleTimeString() });
     _htRenderHistory();
   } catch (error) {
@@ -271,6 +308,40 @@ async function doHttpTest() {
     find('htResHeaders').textContent = ''; find('htTime').textContent = '';
   } finally {
     clearTimeout(timeout);
-    if (current()) { find('htResult').style.display = ''; button.disabled = false; button.textContent = _htT('send'); cancel.hidden = true; _htController = null; }
+    if (current()) find('htResult').style.display = '';
+    if (owns()) { button.disabled = false; button.textContent = _htT('send'); cancel.hidden = true; _htController = null; }
   }
 }
+
+function htInvalidateResponse() {
+  const root=document.getElementById('toolBody');if(!root?.querySelector('#htResult'))return;
+  root._htRevision=(root._htRevision||0)+1;root._htResponse=null;_htController?.abort();
+  root.querySelector('#htResult').style.display='none';
+  for(const id of ['htCopyResponse','htDownloadResponse','htCopyField'])root.querySelector('#'+id).disabled=true;
+  root.querySelector('#htJsonActions').hidden=true;
+  for(const id of ['htResBody','htResponseNote','htFieldOutput'])root.querySelector('#'+id).textContent='';
+}
+function htResponse() { return document.getElementById('toolBody')?._htResponse; }
+function htResponseText() { const state=htResponse();return state ? document.getElementById('htResponseView').value==='raw'?state.raw:state.formatted : null; }
+function htRenderResponse() {
+  const state=htResponse(),text=htResponseText();if(!state)return;
+  document.getElementById('htResBody').textContent=text.slice(0,64000);
+  document.getElementById('htResponseNote').textContent=_htT('response_note',state.bytes,text.length>64000);
+}
+function htCopyResponse(button) { const text=htResponseText();if(text!==null)return copyText(text,button); }
+function htDownloadResponse() {
+  const state=htResponse();if(!state)return;
+  const url=URL.createObjectURL(new Blob([state.raw],{type:state.isJson?'application/json':'text/plain;charset=utf-8'}));
+  const link=document.createElement('a');link.href=url;link.download=state.isJson?'response.json':'response.txt';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+async function htExtractField() {
+  const state=htResponse(),input=document.getElementById('htPointer'),pointer=input.value,output=document.getElementById('htFieldOutput');if(!state?.isJson)return;
+  delete state.field;document.getElementById('htCopyField').disabled=true;
+  try {
+    const json=await ToolCompute.load('json-text');if(htResponse()!==state||input.value!==pointer)return;
+    const value=json.pointer(json.parse(state.raw),pointer);state.field=typeof value==='string'?value:json.stringify(value,2);
+    output.textContent=state.field.slice(0,8000);document.getElementById('htCopyField').disabled=false;
+  } catch(error){if(htResponse()===state&&input.value===pointer)output.textContent=error.message;}
+}
+function htCopyField(button) { const text=htResponse()?.field;if(typeof text==='string')return copyText(text,button); }
+function htHandoffResponse() { const state=htResponse();if(state?.isJson)return ToolWorkspace.handoff(document.getElementById('htResponseTarget').value,state.raw); }

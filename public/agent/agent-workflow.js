@@ -13,6 +13,7 @@ window.AgentWorkflow = (() => {
     url_encode: ['data.result'], url_decode: ['data.result'], url_parse: ['data.entries','data.params','data.result'], url_build: ['data.result'],
     json_to_csv: ['data.result','data.rows'], csv_to_json: ['data.result','data.rows'],
     json_schema_generate: ['data.result'], json_schema_validate: ['data.valid','data.errors'],
+    json_schema_mock: ['data.result','data.typescript','data.count'],
     yaml_to_json: ['data.result'], json_to_yaml: ['data.result'], toml_to_json: ['data.result'], json_to_toml: ['data.result','data.dropped'],
     xml_format: ['data.result'], xml_to_json: ['data.result'], calculate: ['data.result'], unit_convert: ['data.result'],
   };

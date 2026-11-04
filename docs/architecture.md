@@ -132,3 +132,11 @@ ImageSession 只保留最近一组 File 引用，最多 20 个、共 100 MiB，�
 构建使用固定版本 esbuild 的语法解析及空白压缩，保留经典脚本名称和共享全局作用域。生产 Agent 按现有依赖顺序合成 `agent/agent-bundle.js`，不再发布被替代的单独模块，避免离线缓存双份代码。版本哈希覆盖源码、构建脚本和压缩器版本。Docker 和 CI 构建阶段均先安装锁定依赖。
 
 测试入口统一支持 Chromium、Firefox、WebKit，网络只用模拟响应。WebKit 的图片编码检查覆盖“不支持”的正确错误提示，超时检查使用可控阻塞 Worker；离线缓存验证通过关闭测试服务器网络完成。新增失败路径集中在 `tests/reliability-browser.cjs`。
+
+## HTTP 响应和 Schema Mock
+
+CSV 与文件 JSON 格式化复用 `json-text`；精确数字在 CSV 中是普通数字字面量，不展开其内部表示，嵌套对象/数组单元格也通过无损序列化输出。CSV 数值推断仅转换无精度损失的安全值，默认继续保持字符串。
+
+`compute/http-response.js` 按实际流字节限制响应为 5 MiB，拒绝无效 UTF-8。HTTP 工具保留原文与格式化文本，仅裁剪 64k 字符的显示，完整复制/下载不读取预览 DOM。JSON Pointer 与 Agent `json_extract` 共用实现。响应快照绑定请求修订号；请求输入变更中止网络并使输出操作失效，错误响应可查看，传输失败没有可复用的旧响应。响应不纳入存储或自动模型上下文，跨工具交接必须由用户触发。
+
+`compute/schema-mock.js` 提供种子生成器，`schema.mock` 通过现有 Schema Worker 调用，3 秒超时和 AbortSignal 都销毁 Worker。Worker 先拒绝无法安全表示的 Schema 数值，再编译原 Schema，生成候选并逐条校验；有界重试失败不返回部分结果。原 `schema.validate` 仍使用 2 秒校验边界。新增 action `json_schema_mock` 和工作流输出契约，页面与 Agent 不维护第二份算法。支持的生成规则、TypeScript 语义及资源上限见 [能力边界](response-schema-mock.md)。

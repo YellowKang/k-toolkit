@@ -61,7 +61,7 @@
   { id: 'spinner', render: 'renderSpinner',        icon: '🎡', color: '#8b5cf6', name: '随机抽签',       desc: '自定义名单随机抽取，转盘动效', category: '时间效率', file: 'spinner.js', tags: ['random','抽签','抽奖','转盘','随机','pick','lottery'] },
   // 网络工具
   { id: 'user-agent', render: 'renderUserAgent',     icon: '🖥️', color: '#475569', name: 'UA 解析',        desc: '解析浏览器 User-Agent，识别系统/浏览器/设备', category: '网络工具', file: 'user-agent.js', tags: ['ua','user-agent','浏览器','browser','设备','device','useragent'] },
-  { id: 'http-tester', render: 'renderHttpTester',    icon: '🛰️', color: '#be185d', name: 'HTTP 请求测试',  desc: '可视化发送 GET/POST 请求，简版 Postman', category: '网络工具', file: 'http-tester.js', tags: ['http','request','请求','get','post','api','postman','test'] },
+  { id: 'http-tester', render: 'renderHttpTester',    icon: '🛰️', color: '#be185d', name: 'HTTP 请求测试',  desc: '发送请求、保真查看与导出响应、提取字段并继续校验或对比', category: '网络工具', file: 'http-tester.js', tags: ['http','request','请求','get','post','api','postman','test'] },
   // 趣味工具
   { id: 'ascii-art', render: 'renderAsciiArt',      icon: '🎨', color: '#0f172a', name: 'ASCII 艺术字',   desc: '文字转 ASCII 艺术字，4 种字体风格', category: '趣味工具', file: 'ascii-art.js', tags: ['ascii','art','艺术字','figlet','字符画'] },
   // 新增工具
@@ -105,7 +105,7 @@
   // 图片工具 - 新增
   { id: 'img-exif',        render: 'renderImgExif',        icon: '📷', color: '#64748b', name: 'EXIF 查看器',      desc: '读取图片拍摄参数、相机型号、ISO、曝光时间等 EXIF 信息',    category: '图片工具', file: 'img-exif.js',        isNew: true, tags: ['exif','photo','照片','拍摄','相机','camera','metadata'] },
   // 第三轮新增工具
-  { id: 'mock-data',       render: 'renderMockData',       icon: '🎭', color: '#8b5cf6', name: 'Mock 数据生成',    desc: '批量生成模拟数据（姓名/手机/邮箱/地址等），支持 JSON/CSV/SQL',  category: '开发工具', file: 'mock-data.js',       isNew: true, tags: ['mock','fake','数据','生成','模拟','test','faker'] },
+  { id: 'mock-data',       render: 'renderMockData',       icon: '🎭', color: '#8b5cf6', name: 'Mock 数据生成',    desc: '按字段或 Schema 生成可复现样本，支持类型定义与 JSON/CSV/SQL',  category: '开发工具', file: 'mock-data.js',       isNew: true, tags: ['mock','fake','数据','生成','模拟','test','faker','schema','typescript','seed','样本'] },
   { id: 'chmod-calc',      render: 'renderChmodCalc',      icon: '🔑', color: '#f59e0b', name: 'Chmod 计算器',     desc: 'Linux 文件权限计算，数字与符号模式双向转换',                  category: '开发工具', file: 'chmod-calc.js',      isNew: true, tags: ['chmod','permission','权限','linux','rwx','755','644'] },
   { id: 'placeholder-img', render: 'renderPlaceholderImg', icon: '🖼️', color: '#06b6d4', name: '占位图生成',       desc: '自定义尺寸/颜色/文字的占位图，Canvas 绘制+下载',             category: '图片工具', file: 'placeholder-img.js', isNew: true, tags: ['placeholder','占位图','image','尺寸','dummy','thumbnail'] },
   { id: 'string-inspect',  render: 'renderStringInspect',  icon: '🔬', color: '#ec4899', name: '字符串检查器',     desc: '逐字符检查 Unicode 码点/字节数/不可见字符高亮',              category: '文本处理', file: 'string-inspect.js',  isNew: true, tags: ['string','inspect','unicode','字符','不可见','zero-width','BOM','检查'] },

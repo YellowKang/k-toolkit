@@ -33,6 +33,12 @@ JSON 页面支持去转义一层、展开嵌套 JSON 字符串、格式化并复
 
 JSON 格式化、排序、树编辑/复制、JSONPath、嵌套展开和 Agent 对应动作保留大整数、高精度小数、指数及负零的原始数字文本。JSON 对比区分相邻大整数，并把 `1e3` 与 `1000` 视为相等；每页展示 100 处差异，长值显示摘要，完整差异可复制、下载或继续处理。CSV 换示例、转换方向和输入时会立即清除旧结果。
 
+HTTP 响应支持原文/无损格式化切换、JSON Pointer 字段提取、全文复制和原文下载，并可显式带入 JSON、Schema 或 JSON 对比工具。预览最多 64,000 字符，响应最多 5 MiB；JSON 操作最多 100 万字符。修改请求或请求失败会使旧结果失效，离页中止请求；响应只留在当前页面。
+
+Mock 工具新增「按 Schema 生成」：固定种子可复现 1–100 条样本，生成的每条数据都经过原 Schema 校验，并可复制/下载对应 TypeScript 结构类型。支持嵌套对象、数组、枚举、可选字段、常用数值/长度约束、非循环本地引用、anyOf/oneOf 及常见 format；pattern、allOf、条件、远程引用等生成规则明确报错。输出 JSON 是样本数组，TypeScript 不代替运行时校验。页面、Agent 的 `json_schema_mock` 和「我的流程」使用同一实现，全程本地执行。详见 [响应与 Schema Mock 能力边界](docs/response-schema-mock.md)。
+
+文件 JSON 格式化、JSON→CSV 和 HTTP 响应展示也复用无损 JSON；CSV 默认保留字符串，启用数值推断后，高精度小数与不安全整数仍保留原字符串，避免改值。
+
 图片工具支持文件选择和拖放；图片压缩、Base64 转换及 WebP 转换在浏览器内处理。批量转换最多 20 张、输入共 100 MiB，单张最多 4000 万像素，结果共 100 MiB；支持取消、重复下载和清空。工具卡片会标注本地处理、联网、可选联网或 AI 模型调用。
 
 AES 加解密支持 GCM/CBC/CTR、PBKDF2 口令、OpenSSL `enc -pbkdf2` 格式和原始密钥，结果可与 OpenSSL、Java、Python 互通，并能解密旧版页面的输出；格式与示例见 [AES 说明](docs/aes.md)。
@@ -57,7 +63,7 @@ AI 对话支持停止并保留部分回复、失败重试、最后回复重新�
 
 Agent 与页面共用字符串转义、SQL、文本/JSON Diff、正则和图片处理能力。结果卡片可选择中间步骤、完整复制、下载、带入工具和修改参数重跑。先在图片工具选好文件，Agent 就能按文件 ID 压缩/转格式、读取 EXIF、识别二维码，结果继续下载或复用。图片字节留在本地，文件信息与识别结果随 Agent 对话发送给模型；引用在刷新/清除后失效。
 
-日期差、时间戳/时区、颜色/对比度/调色板和 IPv4 也已统一手动与 Agent 算法，覆盖月末、DST、透明度和严格 CIDR 校验。Agent 共 88 个 action；普通文件可从附件、Base64 或 Hash 选择，通过文件 ID 读取 UTF-8 片段、计算摘要、Base64 往返、JSON/CSV 转换并下载。文件字节留在当前标签页，读取片段与元数据会随对话发给模型；大文件内容建议通过附件处理。
+日期差、时间戳/时区、颜色/对比度/调色板和 IPv4 也已统一手动与 Agent 算法，覆盖月末、DST、透明度和严格 CIDR 校验。Agent 共 89 个 action；普通文件可从附件、Base64 或 Hash 选择，通过文件 ID 读取 UTF-8 片段、计算摘要、Base64 往返、JSON/CSV 转换并下载。文件字节留在当前标签页，读取片段与元数据会随对话发给模型；大文件内容建议通过附件处理。
 
 AI 对话和 Agent 共用上下文预算与固定备注，按完整轮次控制发送内容并显示估算。大工具结果用本地引用继续计算，聊天初次只渲染最近 40 条、可向前加载和完整导出。刷新可恢复历史最多 500 条 / 1,500,000 字符，超出部分会明确提示。模型达到输出上限后，可调整设置并重试，保留已完成的工具结果。详见 [第三轮能力与边界](docs/tool-capabilities-round3.md)。
 
@@ -122,6 +128,8 @@ WebKit 测试按浏览器实际能力验证 WebP 编码（不支持时必须明�
 
 `npm run test:updates` 使用真实 Service Worker 模拟三个发布版本，验证手动更新、增量安装（只请求变化的文件）、旧缓存被篡改后重新下载、多标签页、离线、缺失/错版资源与缓存隔离。
 
+`TEST_BUILD=1 npm run test:browser -- response-mock` 验证 HTTP 保真、完整导出、提取/交接、超限/取消，以及真实 Worker 中的 Schema Mock、固定种子、类型导出、Agent/工作流共用和手机双语界面；可选 `TEST_BROWSER=firefox` 或 `TEST_BROWSER=webkit`。
+
 `TEST_BUILD=1 npm run test:browser -- optimization` 验证无损数字、树编辑与查询、差异分页及完整导出/交接、CSV 结果失效、图片消息的保存保护，以及省流模式下的手动离线安装。可加 `TEST_BROWSER=firefox` 或 `TEST_BROWSER=webkit` 检查其他浏览器。
 
 ## Docker
@@ -178,7 +186,7 @@ JSON supports one-layer unescaping, explicit nested object/array expansion, form
 
 Agent, quick assistant and AI Chat share provider-specific connection settings, endpoint preview and an explicit connection test. Chat keeps partial replies when stopped, preserves the previous reply if regeneration fails, remembers in-tab drafts, supports undoing a clear and respects scroll position. Hash verification follows the current text or file results; file batches run sequentially in terminable Workers (up to 10 files, 32 MiB each).
 
-Date/time, colors/palettes and IPv4 use the same computation in manual pages and Agent. The 88 actions include local file references for UTF-8 excerpts, hashes, Base64 and JSON/CSV conversion. AI Chat and Agent share estimated context budgets and pinned notes; large results can be reused by ID. Chat renders 40 messages initially and supports loading older messages and full export. Refresh restores up to 500 messages / 1,500,000 serialized characters, with an explicit notice when earlier messages remain only in this session.
+Date/time, colors/palettes and IPv4 use the same computation in manual pages and Agent. The 89 actions include local file references for UTF-8 excerpts, hashes, Base64 and JSON/CSV conversion. AI Chat and Agent share estimated context budgets and pinned notes; large results can be reused by ID. Chat renders 40 messages initially and supports loading older messages and full export. Refresh restores up to 500 messages / 1,500,000 serialized characters, with an explicit notice when earlier messages remain only in this session.
 
 Fetch models from the configured API or enter a model name manually. A listed model may still have no available gateway route; verify it with the connection test. Chat and Responses can reuse portable conversation/tool history. Responses accepts both JSON and SSE replies.
 

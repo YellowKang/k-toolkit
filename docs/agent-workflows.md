@@ -80,7 +80,7 @@ SQL、文本 Diff、JSON Diff、字符串转义和正则由页面与 Agent 调�
 
 ## 预算和验证边界
 
-普通文件使用 `list_files`、`read_file`、`file_hash`、`file_convert`；在 Agent 附件或 Base64 / Hash 页面选择后获得真实 ID。文件卡片可下载并带入手动工具。大文本结果通过 `resultId`、`read_result`、`transform_result` 跨轮继续处理，避免模型复述预览。当前共 88 个 action，新增动作的容量与语义见 [第三轮能力说明](tool-capabilities-round3.md)。
+普通文件使用 `list_files`、`read_file`、`file_hash`、`file_convert`；在 Agent 附件或 Base64 / Hash 页面选择后获得真实 ID。文件卡片可下载并带入手动工具。大文本结果通过 `resultId`、`read_result`、`transform_result` 跨轮继续处理，避免模型复述预览。当前共 89 个 action，新增动作的容量与语义见 [第三轮能力说明](tool-capabilities-round3.md)。
 
 每次 Agent 任务最多 8 轮模型请求、32 次顶层动作调用；每条工作流最多 12 步。动作参数序列化不超过 65,536 字符，工作流的参数、单步结果与最终合并输出也受该上限约束；一般动作输出上限为 131,072 字符。单次动作等待超时 15 秒。执行器在内存中运行，不持久保存结果；「我的流程」编辑器会另行保存用户编辑的草稿，规则见下文。
 
@@ -116,3 +116,7 @@ SQL、文本 Diff、JSON Diff、字符串转义和正则由页面与 Agent 调�
 中间结果选项在执行完成后保持原值。修改输入、步骤或执行参数后，下方结果会标为上次运行的结果，禁用复制、下载与带入工具，重新运行后恢复；仅修改流程名称不使结果过期。草稿恢复后需要重新运行，结果不写入持久存储。
 
 `npm run test:interaction-state` 覆盖结果失效、即时刷新恢复、存储失败、连接草稿隔离、保存而不切换、快速菜单、会话消息片段与移动端/英文交互，已纳入 Chromium/Firefox 的完整浏览器回归。
+
+## Schema Mock
+
+新增 `json_schema_mock`，参数为 `schema`（Schema JSON 文本）、`seed`（默认 `"42"`）、`count`（默认 3，1–100）和 `includeOptional`（默认 true）。返回 `data.result`（样本数组 JSON）、`data.typescript`（原 Schema 的结构类型）和 `data.count`，可加入「我的流程」。例如 Schema → Mock → `json_extract` 提取 `/0` → JSON 格式化。样本逐条经过真实 Ajv 校验，支持范围与限额见 [能力边界](response-schema-mock.md)。流程自身 65,536 字符和 Agent 输出预算仍适用，大量样本请减少条数或使用手动页面。

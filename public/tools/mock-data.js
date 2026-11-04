@@ -1,6 +1,10 @@
 const _mockTl = makeToolI18n({
   zh: {
     title: 'Mock 数据生成', add_field: '+ 添加字段', remove: '删除', field_name: '字段名',
+    fields_mode: '按字段生成', schema_mode: '按 Schema 生成', schema_label: 'JSON Schema（Draft-07）', seed: '随机种子', optional: '尽量包含可选字段', count_schema: '样本条数（1–100）', sample: '填入示例', cancel: '取消', cancelled: '已取消', working: '正在生成并校验…',
+    schema_help: '支持嵌套对象、数组、枚举、常用约束、非循环本地引用、anyOf/oneOf 和常见 format；pattern、allOf、条件及远程引用等规则会明确报错。',
+    types_note: 'JSON 输出为样本数组，每条已通过原 Schema 校验。TypeScript 仅描述原 Schema 的结构，不代替运行时校验。',
+    generated: (n,seed) => `已生成并校验 ${n} 条 · 种子 ${seed}`, preview_note: '仅预览前 64,000 字符；复制和下载包含完整内容。', send_json: '带入 JSON 工具', output_kind: '查看结果',
     field_type: '类型', count: '生成条数', generate: '生成数据', clear: '清空',
     output_format: '输出格式', result_title: '生成结果', copy: '复制', download: '下载',
     t_name: '姓名', t_phone: '手机', t_email: '邮箱', t_address: '地址', t_date: '日期',
@@ -9,6 +13,10 @@ const _mockTl = makeToolI18n({
   },
   en: {
     title: 'Mock Data Generator', add_field: '+ Add Field', remove: 'Remove', field_name: 'Field Name',
+    fields_mode: 'Generate by fields', schema_mode: 'Generate from schema', schema_label: 'JSON Schema (Draft-07)', seed: 'Random seed', optional: 'Include optional fields when possible', count_schema: 'Sample count (1–100)', sample: 'Load sample', cancel: 'Cancel', cancelled: 'Cancelled', working: 'Generating and validating…',
+    schema_help: 'Supports nested objects, arrays, enums, common constraints, non-recursive local refs, anyOf/oneOf and common formats. Rules such as pattern, allOf, conditions and remote refs report an explicit error.',
+    types_note: 'JSON output is an array of samples, each validated against the original schema. TypeScript describes the schema structure only; it does not replace runtime validation.',
+    generated: (n,seed) => `Generated and validated ${n} samples · seed ${seed}`, preview_note: 'Preview limited to 64,000 characters; copy and download include all content.', send_json: 'Open in JSON tool', output_kind: 'View result',
     field_type: 'Type', count: 'Count', generate: 'Generate', clear: 'Clear',
     output_format: 'Output Format', result_title: 'Result', copy: 'Copy', download: 'Download',
     t_name: 'Name', t_phone: 'Phone', t_email: 'Email', t_address: 'Address', t_date: 'Date',
@@ -88,9 +96,11 @@ function renderMockData(el) {
     document.getElementById('mockSqlTableWrap').style.display = this.value === 'sql' ? '' : 'none';
   });
   _mockRenderFields();
+  _mockMountSchema(el);
 }
 
 function _mockRenderFields() {
+  _mockInvalidateFields();
   const T = _mockTl;
   const types = ['name','phone','email','address','date','uuid','ip','url','company','number'];
   const c = document.getElementById('mockFieldList');
@@ -199,4 +209,45 @@ function _mockDownload() {
 
 function _mockClear() {
   document.getElementById('mockResultPanel').style.display = 'none';
+  document.getElementById('mockOutput').textContent = '';
+}
+
+function _mockInvalidateFields() { const panel=document.getElementById('mockResultPanel');if(panel){panel.style.display='none';document.getElementById('mockOutput').textContent='';} }
+function _mockMountSchema(el) {
+  const T=_mockTl,fields=el.firstElementChild;fields.id='mockFieldControls';
+  el.insertAdjacentHTML('afterbegin',`<div class="tool-actions"><button id="mockFieldsMode" class="btn btn-primary" aria-pressed="true">${T('fields_mode')}</button><button id="mockSchemaMode" class="btn btn-secondary" aria-pressed="false">${T('schema_mode')}</button></div>
+    <section id="mockSchemaPanel" class="tool-card-panel" hidden>
+      <label class="panel-label" for="mockSchemaInput">${T('schema_label')}</label><textarea id="mockSchemaInput" class="tool-textarea" rows="12" spellcheck="false"></textarea>
+      <p class="workspace-notice">${T('schema_help')}</p>
+      <div class="tool-actions"><label>${T('seed')}<input id="mockSchemaSeed" class="tool-input" value="42" maxlength="128"></label><label>${T('count_schema')}<input id="mockSchemaCount" class="tool-input" type="number" min="1" max="100" value="3"></label><label><input id="mockSchemaOptional" type="checkbox" checked>${T('optional')}</label></div>
+      <div class="tool-actions"><button id="mockSchemaGenerate" class="btn btn-primary" data-tool-submit>${T('generate')}</button><button id="mockSchemaCancel" class="btn btn-secondary" hidden>${T('cancel')}</button><button id="mockSchemaSample" class="btn btn-secondary">${T('sample')}</button></div>
+      <p id="mockSchemaStatus" role="status" class="workspace-notice"></p>
+      <section id="mockSchemaResult" hidden><p class="workspace-notice">${T('types_note')}</p><div class="tool-actions"><label>${T('output_kind')} <select id="mockSchemaView" class="tool-input" style="width:auto"><option value="result">JSON</option><option value="typescript">TypeScript</option></select></label><button id="mockSchemaCopy" class="btn btn-secondary">${T('copy')}</button><button id="mockSchemaDownload" class="btn btn-secondary">${T('download')}</button><button id="mockSchemaHandoff" class="btn btn-secondary">${T('send_json')}</button></div><pre id="mockSchemaOutput" class="result-box" style="max-height:400px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere"></pre><p id="mockSchemaPreviewNote" class="workspace-notice"></p></section>
+    </section>`);
+  const get=id=>el.querySelector('#'+id),task=ToolRuntime.task();let result=null;
+  const busy=value=>{get('mockSchemaGenerate').disabled=value;get('mockSchemaCancel').hidden=!value;};
+  const invalidate=()=>{task.invalidate();result=null;busy(false);get('mockSchemaResult').hidden=true;get('mockSchemaOutput').textContent='';get('mockSchemaStatus').textContent='';};
+  const selected=()=>result?.[get('mockSchemaView').value]||'';
+  const show=()=>{if(!result)return;const text=selected();get('mockSchemaResult').hidden=false;get('mockSchemaOutput').textContent=text.slice(0,64000);get('mockSchemaPreviewNote').textContent=text.length>64000?T('preview_note'):'';};
+  const mode=schema=>{invalidate();el.dataset.mockMode=schema?'schema':'fields';fields.hidden=schema;get('mockSchemaPanel').hidden=!schema;get('mockResultPanel').style.display=!schema&&get('mockOutput').textContent?'':'none';for(const [id,active] of [['mockFieldsMode',!schema],['mockSchemaMode',schema]]){get(id).className='btn '+(active?'btn-primary':'btn-secondary');get(id).setAttribute('aria-pressed',String(active));}};
+  get('mockFieldsMode').onclick=()=>mode(false);get('mockSchemaMode').onclick=()=>mode(true);
+  for(const id of ['mockSchemaInput','mockSchemaSeed','mockSchemaCount','mockSchemaOptional']){get(id).addEventListener('input',invalidate);get(id).addEventListener('change',invalidate);}
+  fields.addEventListener('input',_mockInvalidateFields);fields.addEventListener('change',_mockInvalidateFields);
+  get('mockSchemaSample').onclick=()=>{invalidate();get('mockSchemaInput').value=JSON.stringify({type:'object',required:['id','state','profile'],additionalProperties:false,properties:{id:{type:'integer',minimum:1,maximum:9999},state:{enum:['active','pending']},profile:{type:'object',required:['email'],properties:{email:{type:'string',format:'email'},verified:{type:'boolean'}},additionalProperties:false},tags:{type:'array',minItems:1,maxItems:3,uniqueItems:true,items:{enum:['api','web','test','data']}}}},null,2);};
+  get('mockSchemaSample').onclick();
+  get('mockSchemaGenerate').onclick=async()=>{
+    invalidate();const run=task.start({root:el}),schema=get('mockSchemaInput').value;
+    const options={seed:get('mockSchemaSeed').value,count:Number(get('mockSchemaCount').value),includeOptional:get('mockSchemaOptional').checked,signal:run.signal};
+    busy(true);get('mockSchemaStatus').textContent=T('working');
+    try{const compute=await ToolCompute.load('schema');if(!run.current())return;const data=await compute.mock(schema,options);if(!run.current())return;result=data;get('mockSchemaStatus').textContent=T('generated',data.count,data.seed);show();}
+    catch(error){if(run.owns())get('mockSchemaStatus').textContent=error.name==='AbortError'?T('cancelled'):error.message;}
+    finally{if(run.owns())busy(false);run.finish();}
+  };
+  get('mockSchemaCancel').onclick=()=>{invalidate();get('mockSchemaStatus').textContent=T('cancelled');};
+  get('mockSchemaView').onchange=show;
+  get('mockSchemaCopy').onclick=()=>{if(result)return copyText(selected(),get('mockSchemaCopy'));};
+  get('mockSchemaDownload').onclick=()=>{if(!result)return;const ts=get('mockSchemaView').value==='typescript',url=URL.createObjectURL(new Blob([selected()],{type:ts?'text/plain;charset=utf-8':'application/json'})),a=document.createElement('a');a.href=url;a.download=ts?'mock-record.ts':'mock-samples.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+  get('mockSchemaHandoff').onclick=()=>{if(result)return ToolWorkspace.handoff('json',result.result);};
+  el._toolOutput=()=>el.dataset.mockMode==='schema'?selected():get('mockOutput').textContent;
+  window._activeCleanup=()=>task.dispose();
 }

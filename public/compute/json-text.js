@@ -16,12 +16,12 @@
   const isNumber = value => value instanceof ExactNumber;
   const tokens = /"(?:\\[\s\S]|[^"\\])*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[{}\[\]]/g;
   const exact = raw => !Number.isFinite(Number(raw)) || (Number.isInteger(Number(raw)) && !Number.isSafeInteger(Number(raw))) || JSON.stringify(Number(raw)) !== raw;
-  function parse(text, { maxChars = LIMITS.chars } = {}) {
+  function parse(text, { maxChars = LIMITS.chars, maxTokens = 200000 } = {}) {
     if (typeof text !== 'string') fail('invalid');
     if (text.length > Math.min(maxChars, LIMITS.chars * 2)) fail('limit');
     const strings = new Set(); let depth = 0, nodes = 0, needsExact = false;
     for (const [token] of text.matchAll(tokens)) {
-      if (++nodes > 200000) fail('complexity');
+      if (++nodes > Math.min(maxTokens, 600000)) fail('complexity');
       if (token[0] === '"') strings.add(JSON.parse(token));
       else if (token === '{' || token === '[') { if (++depth > LIMITS.depth) fail('complexity'); }
       else if (token === '}' || token === ']') depth--;
@@ -84,6 +84,17 @@
     if (left.order !== right.order) return (left.order < right.order ? -1 : 1) * left.sign;
     const length = Math.max(left.digits.length, right.digits.length), l = left.digits.padEnd(length, '0'), r = right.digits.padEnd(length, '0');
     return (l === r ? 0 : l < r ? -1 : 1) * left.sign;
+  }
+  function pointer(value, path) {
+    if (typeof path !== 'string' || path.length > 1000 || (path !== '' && !path.startsWith('/'))) throw new Error('JSON Pointer must be empty or start with / (up to 1000 characters)');
+    for (const part of path === '' ? [] : path.slice(1).split('/')) {
+      if (/~(?![01])/u.test(part)) throw new Error('Invalid JSON Pointer escape');
+      const key = part.replace(/~1/g, '/').replace(/~0/g, '~');
+      if (value === null || typeof value !== 'object' || isNumber(value) || !Object.prototype.hasOwnProperty.call(value,key)
+        || (Array.isArray(value) && !/^(0|[1-9]\d*)$/.test(key))) throw new Error('JSON Pointer not found: ' + path);
+      value = value[key];
+    }
+    return value;
   }
   function escapeJSON(text, quotes = true) {
     checkText(text);
@@ -167,5 +178,5 @@
     }
   }
   window.KCompute = window.KCompute || {};
-  window.KCompute['json-text'] = Object.freeze({ LIMITS, parse, stringify, isNumber, compareNumbers, escapeJSON, unescapeJSON, expandNested, inspect });
+  window.KCompute['json-text'] = Object.freeze({ LIMITS, parse, stringify, isNumber, compareNumbers, pointer, escapeJSON, unescapeJSON, expandNested, inspect });
 })();

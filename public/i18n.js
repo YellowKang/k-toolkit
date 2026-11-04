@@ -269,7 +269,7 @@ const TOOLS_EN = {
   'typing-speed':     { name:'Typing Practice',    desc:'Sentence/word/code mode, WPM test with stats chart',                         category:'Productivity' },
   // Network (网络工具)
   'user-agent':       { name:'User Agent',         desc:'Parse browser User-Agent, detect OS/browser/device',                         category:'Network' },
-  'http-tester':      { name:'HTTP Tester',        desc:'Send GET/POST requests visually in browser, simple Postman',                 category:'Network' },
+  'http-tester':      { name:'HTTP Tester',        desc:'Send requests, preserve and export responses, extract fields and continue validation or comparison',                 category:'Network' },
   'ip-info':          { name:'IP Info',            desc:'Query your public IP and geolocation info',                                  category:'Network' },
   'speed-test':       { name:'Speed Test',         desc:'Test network download/upload speed in browser',                              category:'Network' },
   // Fun (趣味工具)
@@ -278,7 +278,7 @@ const TOOLS_EN = {
   'noise-gen':        { name:'White Noise',        desc:'White/pink/brown noise and rain sounds, adjustable volume',                  category:'Fun' },
   'matrix-rain':      { name:'Matrix Rain',        desc:'Matrix digital rain canvas animation, classic green characters',              category:'Fun' },
   // Round 3 new tools
-  'mock-data':        { name:'Mock Data',          desc:'Batch generate fake data (name/phone/email/address), JSON/CSV/SQL export',    category:'Dev Tools' },
+  'mock-data':        { name:'Mock Data',          desc:'Generate by fields or schema with seeded samples, types and JSON/CSV/SQL export',    category:'Dev Tools' },
   'chmod-calc':       { name:'Chmod Calculator',   desc:'Linux file permission calculator, numeric and symbolic mode conversion',      category:'Dev Tools' },
   'placeholder-img':  { name:'Placeholder Image',  desc:'Generate placeholder images with custom size/color/text, Canvas download',    category:'Image' },
   'string-inspect':   { name:'String Inspector',   desc:'Inspect each character: Unicode codepoint, byte count, invisible char highlight', category:'Text' },

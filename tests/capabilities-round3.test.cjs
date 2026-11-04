@@ -1,6 +1,23 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 function setup(){const values=new Map(),c={console,TextDecoder,TextEncoder,Blob,File,URL,atob,btoa,AbortController,DOMException,setTimeout,clearTimeout,getCurrentLang:()=> 'en',crypto:crypto.webcrypto,localStorage:{getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)}};c.window=c;c.self=c;vm.createContext(c);for(const file of ['tool-compute.js','compute/json-text.js','compute/date.js','compute/color.js','compute/ip.js','compute/csv.js','compute/file.js','file-session.js','agent/agent-context.js','agent/agent-result-store.js','agent/agent-core.js','agent/agent-workflow.js','agent/actions/calc.js','agent/actions/dev.js','agent/actions/text.js','agent/actions/convert.js','agent/actions/css-gen.js','agent/actions/general-files.js','agent/actions/index.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../public',file),'utf8'),c,{filename:file});c.AgentActions.registerActions();return c;}
 const plain=x=>JSON.parse(JSON.stringify(x));
+test('file JSON and nested CSV cells preserve exact numeric text across shared conversion entry points',async()=>{
+ const c=setup(),input='[{"id":9223372036854775807,"amount":0.1234567890123456789,"nested":{"n":9007199254740993},"items":[9007199254740995]}]';
+ const out=await c.KCompute.file.convert(new File([input],'records.json'),'json_format',{minify:true});
+ assert.equal(await out.blob.text(),input);
+ const csv=c.KCompute.csv.convert(input,{direction:'json2csv'}).result;
+ assert.match(csv,/9223372036854775807/);assert.match(csv,/0\.1234567890123456789/);assert.match(csv,/9007199254740993/);assert.match(csv,/\[9007199254740995\]/);
+ assert.doesNotMatch(csv,/json-number|nested\.n\.value/);
+ assert.equal(c.KCompute.csv.inferValue('0.1234567890123456789'),'0.1234567890123456789');
+ assert.equal(c.KCompute.csv.inferValue('1e-400'),'1e-400');
+ assert.equal(c.KCompute.csv.inferValue('1e2'),100);
+});
+test('lossless CSV conversion retains the existing 200,000-cell capacity',()=>{
+ const c=setup(),input=JSON.stringify(Array.from({length:200},()=>Array(1000).fill(1)));
+ const result=c.KCompute.csv.convert(input,{direction:'json2csv'});
+ assert.equal(result.rows,200);assert.equal(result.columns,1000);assert.equal(result.result.split('\n').length,200);
+ assert.equal(c.KCompute.csv.parse(result.result,{delimiter:','}).rows.flat().length,200000);
+});
 test('calendar actions use month-end clamping, leap dates, signed intervals and inclusive weekdays',async()=>{
  const c=setup(),d=c.KCompute.date;
  const r=d.diff('2024-01-31','2024-02-29');assert.equal(r.days,29);assert.equal(r.months,1);assert.equal(r.calendar.days,0);assert.equal(r.weekdays,22);

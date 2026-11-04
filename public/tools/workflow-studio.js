@@ -8,6 +8,7 @@ window.renderWorkflowStudio = async function renderWorkflowStudio(container) {
   window._agInjectCSS?.();
   const workflow = window.AgentWorkflow;
   const labels = {
+    json_schema_mock: ['Schema → Mock 与类型', 'Schema → Mock and types'],
     json_unescape: ['JSON 去转义', 'Unescape JSON'], json_expand: ['展开嵌套 JSON', 'Expand nested JSON'], json_format: ['格式化 / 压缩 JSON', 'Format / minify JSON'], json_extract: ['提取 JSON 字段', 'Extract JSON field'],
     base64_encode: ['Base64 编码', 'Base64 encode'], base64_decode: ['Base64 解码', 'Base64 decode'], string_escape: ['字符串转义 / 去转义', 'Escape / unescape string'],
     text_lines: ['清理文本行', 'Clean text lines'], case_convert: ['大小写转换', 'Change case'], hash_generate: ['计算哈希', 'Hash text'],
@@ -17,8 +18,8 @@ window.renderWorkflowStudio = async function renderWorkflowStudio(container) {
   };
   const actions = Object.keys(labels).map(id => window._AGENT_ALL_ACTIONS.get(id)).filter(Boolean);
   const label = id => labels[id] ? say(...labels[id]) : id;
-  const mainKey = action => ['input', 'text', 'encoded', 'sql', 'url'].find(key => action.parameters.properties[key]?.type === 'string');
-  const paramLabels = { unescape: ['去转义', 'Unescape'], quotes: ['保留外层引号', 'Keep outer quotes'],  pointer: ['字段路径（如 /users/0/name）', 'Field path (e.g. /users/0/name)'], minify: ['压缩', 'Minify'], trim: ['去除首尾空白', 'Trim whitespace'], removeEmpty: ['移除空行', 'Remove empty lines'], deduplicate: ['去除重复行', 'Deduplicate lines'], sort: ['排序', 'Sort'], algo: ['算法', 'Algorithm'], mode: ['模式', 'Mode'], type: ['类型', 'Type'], format: ['格式', 'Format'], urlSafe: ['URL 安全模式', 'URL safe'], delimiter: ['分隔符', 'Delimiter'], header: ['首行是表头', 'First row is header'], infer: ['推断数字和布尔值', 'Infer numbers and booleans'], flat: ['展开嵌套字段', 'Flatten nested fields'] };
+  const mainKey = action => ['input', 'text', 'encoded', 'sql', 'url', 'schema'].find(key => action.parameters.properties[key]?.type === 'string');
+  const paramLabels = { seed: ['随机种子', 'Random seed'], count: ['样本条数', 'Sample count'], includeOptional: ['包含可选字段', 'Include optional fields'], unescape: ['去转义', 'Unescape'], quotes: ['保留外层引号', 'Keep outer quotes'],  pointer: ['字段路径（如 /users/0/name）', 'Field path (e.g. /users/0/name)'], minify: ['压缩', 'Minify'], trim: ['去除首尾空白', 'Trim whitespace'], removeEmpty: ['移除空行', 'Remove empty lines'], deduplicate: ['去除重复行', 'Deduplicate lines'], sort: ['排序', 'Sort'], algo: ['算法', 'Algorithm'], mode: ['模式', 'Mode'], type: ['类型', 'Type'], format: ['格式', 'Format'], urlSafe: ['URL 安全模式', 'URL safe'], delimiter: ['分隔符', 'Delimiter'], header: ['首行是表头', 'First row is header'], infer: ['推断数字和布尔值', 'Infer numbers and booleans'], flat: ['展开嵌套字段', 'Flatten nested fields'] };
   const clone = value => JSON.parse(JSON.stringify(value));
   const defaultPlan = () => ({ name: say('JSON 清理流程', 'JSON cleanup'), steps: [{ id: 'expand', action: 'json_expand', params: { input: { $input: true } } }, { id: 'format', action: 'json_format', params: { input: { $ref: 'expand.data.result' } } }] });
   let recovered = window._workflowDraft, storedDraft = null, draftError = '';

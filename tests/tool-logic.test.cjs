@@ -131,7 +131,7 @@ test('cron supports Linux, Spring and Quartz syntax with correct day semantics',
 });
 
 test('CSV parsing and writing round-trip quotes, newlines, BOM and delimiters', () => {
-  const { KCompute: { csv } } = load('compute/csv.js');
+  const { KCompute: { csv } } = load('compute/json-text.js', 'compute/csv.js');
   const parsed = csv.parse('﻿name;note\r\n"Bob; Jr.";"line1\nline2"\r\nAnn;"say ""hi"""\r\n');
   assert.equal(parsed.delimiter, ';');
   assert.deepEqual(plain(parsed.rows), [['name', 'note'], ['Bob; Jr.', 'line1\nline2'], ['Ann', 'say "hi"']]);

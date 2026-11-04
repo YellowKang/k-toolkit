@@ -14,7 +14,7 @@
     if(['base64_encode','base64_decode'].includes(operation))return run(file,operation,options,context);
     const input=await text(file,context);check(context.signal);if(input.length>1000000)throw new Error(say('文本超过 1,000,000 字符','Text exceeds 1,000,000 characters'));
     let result,extension='json';
-    if(operation==='json_format')result=JSON.stringify(JSON.parse(input),null,options.minify?0:2);
+    if(operation==='json_format'){const json=await ToolCompute.load('json-text');result=json.stringify(json.parse(input),options.minify?0:2);}
     else if(['csv_to_json','json_to_csv'].includes(operation)){const data=(await ToolCompute.load('csv')).convert(input,{direction:operation==='csv_to_json'?'csv2json':'json2csv',delimiter:options.delimiter||'auto'});result=data.result;extension=data.extension;}
     else throw new Error('Unsupported file operation');
     check(context.signal);if(result.length>2000000)throw new Error(say('结果超过 2,000,000 字符','Result exceeds 2,000,000 characters'));

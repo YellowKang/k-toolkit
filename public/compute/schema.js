@@ -29,6 +29,13 @@
   }
   function validate(input,schema,{signal}={}) {
     if(typeof input!=='string'||typeof schema!=='string'||input.length>1000000||schema.length>200000)return Promise.reject(new Error(tr('数据最多 1,000,000 字符，Schema 最多 200,000 字符','Data limit: 1,000,000 characters; schema limit: 200,000')));
+    return run({input,schema},{signal});
+  }
+  function mock(schema,{signal,seed='42',count=3,includeOptional=true}={}) {
+    if(typeof schema!=='string'||schema.length>200000)return Promise.reject(new Error(tr('Schema 最多 200,000 字符','Schema limit: 200,000 characters')));
+    return run({operation:'mock',schema,seed,count,includeOptional},{signal});
+  }
+  function run(payload,{signal}={}) {
     return new Promise((resolve,reject)=>{
       let worker,timer,settled=false;
       const finish=(data,error)=>{if(settled)return;settled=true;clearTimeout(timer);worker?.terminate();signal?.removeEventListener('abort',abort);error?reject(error):resolve(data);};
@@ -36,12 +43,12 @@
       if(signal?.aborted){abort();return;}signal?.addEventListener('abort',abort,{once:true});
       try {
         worker=new Worker('tools/schema-worker.js?v='+encodeURIComponent(document.querySelector('meta[name="toolkit-version"]')?.content||'dev'));
-        timer=setTimeout(()=>finish(null,new Error(tr('校验超过 2 秒，已停止；请简化 Schema 或缩小输入','Validation stopped after 2 seconds; simplify the schema or reduce input'))),2000);
+        timer=setTimeout(()=>finish(null,new Error(payload.operation==='mock'?tr('生成超过 3 秒，已停止；请简化 Schema 或减少条数','Generation stopped after 3 seconds; simplify the schema or reduce the count'):tr('校验超过 2 秒，已停止；请简化 Schema 或缩小输入','Validation stopped after 2 seconds; simplify the schema or reduce input'))),payload.operation==='mock'?3000:2000);
         worker.onerror=()=>finish(null,new Error(tr('无法加载校验器，请重试','Could not load validator; try again')));
         worker.onmessage=event=>event.data.error?finish(null,new Error(event.data.error)):finish(event.data);
-        worker.postMessage({input,schema,lang:window.getCurrentLang?.()||'zh'});
+        worker.postMessage({...payload,lang:window.getCurrentLang?.()||'zh'});
       } catch(error){finish(null,error);}
     });
   }
-  (window.KCompute ||= {}).schema=Object.freeze({infer,validate});
+  (window.KCompute ||= {}).schema=Object.freeze({infer,validate,mock});
 })();

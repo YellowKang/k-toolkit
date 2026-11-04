@@ -21,6 +21,12 @@ window.DataActions = [
     async execute({input,schema,assertValid=false},{signal}={}){try{const data=await (await window.ToolCompute.load('schema')).validate(input,schema,{signal});return {success:!assertValid||data.valid,data,...(assertValid&&!data.valid?{error:'JSON does not match schema'}:{})};}catch(error){return {success:false,error:error.message};}},
   },
   {
+    name:'json_schema_mock',description:'按 Draft-07 Schema 生成可复现的本地 Mock 样本及 TypeScript 结构类型。result 是样本数组 JSON，每条均经过原 Schema 校验；typescript 不是运行时验证器。支持嵌套、枚举、常用约束、非循环本地引用、anyOf/oneOf；pattern/allOf/条件/远程引用等生成规则明确报错。最多 100 条，Worker 3 秒。',
+    meta:{tier:'standard',tags:['schema','mock','samples','typescript','测试数据','样本','类型'],category:'convert'},
+    parameters:{type:'object',properties:{schema:{type:'string',maxLength:65536},seed:{type:'string',maxLength:128,default:'42'},count:{type:'integer',minimum:1,maximum:100,default:3},includeOptional:{type:'boolean',default:true}},required:['schema'],additionalProperties:false},
+    async execute({schema,...options},{signal}={}){try{return {success:true,data:await(await window.ToolCompute.load('schema')).mock(schema,{...options,signal})};}catch(error){return {success:false,error:error.message};}},
+  },
+  {
     name: 'json_unescape',
     description: 'JSON 字符串去转义一层，接受完整字符串字面量或不带外层引号的片段；准确保留路径、反斜杠和 Unicode。返回 result。',
     meta: { tier: 'standard', tags: ['json', 'unescape', 'decode', '转义', '去转义'], category: 'text' },
@@ -51,15 +57,7 @@ window.DataActions = [
     async execute({ input, pointer }) {
       try {
         const json = await window.ToolCompute.load('json-text');
-        let value = json.parse(input);
-        if (pointer !== '' && !pointer.startsWith('/')) throw new Error('JSON Pointer must be empty or start with /');
-        for (const part of pointer === '' ? [] : pointer.slice(1).split('/')) {
-          if (/~(?![01])/u.test(part)) throw new Error('Invalid JSON Pointer escape');
-          const key = part.replace(/~1/g, '/').replace(/~0/g, '~');
-          if (value === null || typeof value !== 'object' || json.isNumber(value) || !Object.prototype.hasOwnProperty.call(value, key)
-            || (Array.isArray(value) && !/^(0|[1-9]\d*)$/.test(key))) throw new Error('JSON Pointer not found: ' + pointer);
-          value = value[key];
-        }
+        const value = json.pointer(json.parse(input), pointer);
         return { success: true, data: { value, result: typeof value === 'string' ? value : json.stringify(value) }, display: 'JSON Pointer: ' + (pointer || '/') };
       } catch (error) { return { success: false, error: error.message }; }
     },
