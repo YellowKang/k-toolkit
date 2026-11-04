@@ -114,7 +114,8 @@ const ConvertActions = [
       try {
         const diffs = (await ToolCompute.load('json-diff')).compareText(a, b);
         const summary = diffs.length === 0 ? '完全相同' : `${diffs.filter(d=>d.type==='added').length} 新增, ${diffs.filter(d=>d.type==='removed').length} 删除, ${diffs.filter(d=>d.type==='changed').length} 变更`;
-        return { success: true, data: { diffs, summary, count: diffs.length }, display: summary };
+        const result = (await ToolCompute.load('json-text')).stringify(diffs);
+        return { success: true, data: { diffs, summary, count: diffs.length, result }, display: summary };
       } catch (e) { return { success: false, data: { error: e.message }, display: 'JSON 解析失败: ' + e.message }; }
     },
   },

@@ -10,6 +10,26 @@ window.ChatConversations = (() => {
   let observed;
   const clone = value => JSON.parse(JSON.stringify(value)); // The persistence contract contains JSON values only.
   const mutate = operation => window.ToolRuntime.exclusive('chat-conversations', operation);
+  function prepare(snapshot) {
+    const messages = snapshot.messages || [], saved = [];
+    let end = messages.length, chars = 2, count = 0;
+    while (end > 0) {
+      let start = end - 1;
+      while (start > 0 && messages[start].role !== 'user') start--;
+      const turn = messages.slice(start, end).map(m => ({ role: m.role, content: m.content, _images: m._images || null, ts: m.ts, status: m.status }));
+      const size = turn.reduce((n, m) => n + JSON.stringify(m).length + 1, 0);
+      if (turn[0].role !== 'user' || count + turn.length > 500 || chars + size > 1500000) {
+        if (!count) throw Object.assign(new Error(say(
+          '本轮文字或图片超过会话保存上限，原存档已保留。请缩小图片或文字后重试；当前输入和回复仍在本标签页。',
+          'This turn exceeds the chat storage limit. The previous saved history is intact. Reduce the images or text and retry; current inputs and replies remain in this tab.'
+        )), { code: 'chat_turn_limit' });
+        break;
+      }
+      saved.unshift(turn); count += turn.length; chars += size; end = start;
+    }
+    const prior = Number.isSafeInteger(snapshot.meta?.omitted) && snapshot.meta.omitted > 0 ? snapshot.meta.omitted : 0;
+    return { ...snapshot, messages: saved.flat(), meta: { ...snapshot.meta, omitted: prior + messages.length - count } };
+  }
   function write(values) {
     const before = new Map(Object.keys(values).map(key => [key, localStorage.getItem(key)]));
     try {
@@ -49,7 +69,7 @@ window.ChatConversations = (() => {
     if (item.automaticTitle && first) item.title = first.content.trim().replace(/\s+/g, ' ').slice(0, 60);
   }
   function save(snapshot, expected) {
-    snapshot = clone(snapshot);
+    snapshot = clone(prepare(snapshot));
     return mutate(() => { const index = assertActive(expected); updateTitle(index, snapshot);
       write({ ...activeValues(snapshot), [INDEX]: JSON.stringify(index) }); return index;
     });
@@ -66,7 +86,7 @@ window.ChatConversations = (() => {
     });
   }
   function switchTo(id, snapshot, expected, create = false) {
-    snapshot = clone(snapshot);
+    snapshot = clone(prepare(snapshot));
     return mutate(() => {
     const index = assertActive(expected); const next = create ? fresh() : index.items.find(item => item.id === id);
     if (!next) throw new Error('Unknown conversation');
@@ -104,5 +124,5 @@ window.ChatConversations = (() => {
     index.items = index.items.filter(item => item.id !== id); values[INDEX] = JSON.stringify(index); write(values); return { index, record: target };
     });
   }
-  return { ensure, record, save, patch, switchTo, edit, remove, assertActive, activeSnapshot };
+  return { ensure, record, prepare, save, patch, switchTo, edit, remove, assertActive, activeSnapshot };
 })();

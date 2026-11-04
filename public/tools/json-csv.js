@@ -81,7 +81,7 @@ function renderJsonCsv(el) {
     </div>`;
   window._jcMode = 'json2csv';
   const input=el.querySelector('#jcInput');input.dataset.mode='json2csv';
-  const invalidate=()=>{input._revision=(input._revision||0)+1;el.querySelector('#jcResultPanel').style.display='none';el.querySelector('#jcOutput').value='';};
+  const invalidate=()=>{input._revision=(input._revision||0)+1;el.querySelector('#jcResultPanel').style.display='none';el.querySelector('#jcOutput').value='';window._jcLastResult='';};
   el.addEventListener('input',invalidate);el.addEventListener('change',invalidate);window._activeCleanup=invalidate;
   el._toolOutput=()=>el.querySelector('#jcOutput').value;
   ToolCompute.load('csv').catch(() => {});
@@ -91,6 +91,7 @@ function setJsonCsvMode(mode, keepInput = false) {
   const T = makeToolI18n(_jcDict);
   window._jcMode = mode;
   const input=document.getElementById('jcInput');input.dataset.mode=mode;input._revision=(input._revision||0)+1;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
   const toCsv = mode === 'json2csv';
   document.getElementById('modeJsonToCsv').className = toCsv ? 'btn btn-primary' : 'btn btn-secondary';
   document.getElementById('modeCsvToJson').className = toCsv ? 'btn btn-secondary' : 'btn btn-primary';
@@ -144,7 +145,7 @@ function clearJC() {
 }
 
 function loadJCDemo() {
-  if (window._jcMode === 'json2csv') {
+  if (document.getElementById('jcInput').dataset.mode === 'json2csv') {
     document.getElementById('jcInput').value = JSON.stringify([
       { name: 'Alice', age: 30, city: 'Beijing', role: 'Engineer', tags: ['go', 'k8s'], profile: { level: 'P7', remote: false } },
       { name: 'Bob', age: 25, city: 'Shanghai', role: 'Designer, UI', tags: [], profile: { level: 'P5', remote: true } },
@@ -153,4 +154,5 @@ function loadJCDemo() {
   } else {
     document.getElementById('jcInput').value = 'name,age,city,role\nAlice,30,Beijing,Engineer\n"Bob, Jr.",25,Shanghai,"Designer ""UI"""\nCharlie,35,Guangzhou,"Manager\nTeam lead"';
   }
+  document.getElementById('jcInput').dispatchEvent(new Event('input', { bubbles: true }));
 }

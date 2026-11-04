@@ -8,7 +8,7 @@ function setup() {
  const values = new Map();
  const context={localStorage:{getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v)},window:{},crypto:webcrypto,TextEncoder,TextDecoder,Uint8Array,URL,AbortController,btoa,atob,setTimeout,clearTimeout,console};
  vm.createContext(context);
- for(const file of ['tool-compute.js','compute/url.js','agent/actions/text.js','agent/actions/dev.js','agent/actions/composite.js','agent/actions/data.js','agent/agent-workflow.js','agent/actions/index.js','agent/agent-core.js','agent/agent-cmd-parser.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../public',file),'utf8'),context,{filename:file});
+ for(const file of ['tool-compute.js','compute/json-text.js','compute/url.js','agent/actions/text.js','agent/actions/dev.js','agent/actions/composite.js','agent/actions/data.js','agent/agent-workflow.js','agent/actions/index.js','agent/agent-core.js','agent/agent-cmd-parser.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../public',file),'utf8'),context,{filename:file});
  context.window.AgentActions.registerActions();
  return {window:context.window,action:name=>context.window._AGENT_ALL_ACTIONS.get(name),context};
 }
@@ -31,12 +31,12 @@ test('shared text operations cover Unicode, acronyms, empty values and line clea
  assert.equal(c.caseConvert('   ','camel'),'');
  assert.deepEqual(normalize(c.processLines(' b \r\na\r\n b\n \n',{trim:true,removeEmpty:true,deduplicate:true,sort:'asc'})),{result:'a\nb',inputLines:5,outputLines:2,removed:3});
 });
-test('JSON extraction preserves scalar types, escaped keys and rejects missing or malformed paths',()=>{
+test('JSON extraction preserves scalar types, escaped keys and rejects missing or malformed paths',async()=>{
  const {action}=setup();const extract=action('json_extract');
  const input='{"a/b":{"~key":[false,0,null,"",{"x":1}]}}';
- for(const [index,value]of [false,0,null,'',{x:1}].entries())assert.deepEqual(normalize(extract.execute({input,pointer:'/a~1b/~0key/'+index}).data.value),value);
- for(const pointer of ['/a~1b/~0key/01','/a~1b/~0key/length','/missing','/bad~2escape','a'])assert.equal(extract.execute({input,pointer}).success,false,pointer);
- assert.deepEqual(normalize(extract.execute({input:'{"__proto__":7}',pointer:'/__proto__'}).data.value),7);
+ for(const [index,value]of [false,0,null,'',{x:1}].entries())assert.deepEqual(normalize((await extract.execute({input,pointer:'/a~1b/~0key/'+index})).data.value),value);
+ for(const pointer of ['/a~1b/~0key/01','/a~1b/~0key/length','/missing','/bad~2escape','a'])assert.equal((await extract.execute({input,pointer})).success,false,pointer);
+ assert.deepEqual(normalize((await extract.execute({input:'{"__proto__":7}',pointer:'/__proto__'})).data.value),7);
 });
 test('HMAC and hash actions return independently verified digests',async()=>{
  const {action}=setup();

@@ -37,8 +37,9 @@ window.DataActions = [
     parameters: { type: 'object', properties: { input: { type: 'string', maxLength: 65536 } }, required: ['input'], additionalProperties: false },
     async execute({ input }) {
       try {
-        const { value, count, layers } = (await window.ToolCompute.load('json-text')).expandNested(input);
-        return { success: true, data: { result: JSON.stringify(value, null, 2), count, layers } };
+        const json = await window.ToolCompute.load('json-text');
+        const { value, count, layers } = json.expandNested(input);
+        return { success: true, data: { result: json.stringify(value, 2), count, layers } };
       } catch (error) { return { success: false, error: error.message }; }
     },
   },
@@ -47,18 +48,19 @@ window.DataActions = [
     description: '按 JSON Pointer 提取 JSON 字段，例如 /users/0/name；空路径返回根值。返回保留类型的 value 和可继续处理的文本 result，不执行表达式。',
     meta: { tier: 'standard', tags: ['json', 'extract', 'pointer', '字段', '提取'], category: 'text' },
     parameters: { type: 'object', properties: { input: { type: 'string', maxLength: 65536 }, pointer: { type: 'string', maxLength: 1000 } }, required: ['input', 'pointer'], additionalProperties: false },
-    execute({ input, pointer }) {
+    async execute({ input, pointer }) {
       try {
-        let value = JSON.parse(input);
+        const json = await window.ToolCompute.load('json-text');
+        let value = json.parse(input);
         if (pointer !== '' && !pointer.startsWith('/')) throw new Error('JSON Pointer must be empty or start with /');
         for (const part of pointer === '' ? [] : pointer.slice(1).split('/')) {
           if (/~(?![01])/u.test(part)) throw new Error('Invalid JSON Pointer escape');
           const key = part.replace(/~1/g, '/').replace(/~0/g, '~');
-          if (value === null || typeof value !== 'object' || !Object.prototype.hasOwnProperty.call(value, key)
+          if (value === null || typeof value !== 'object' || json.isNumber(value) || !Object.prototype.hasOwnProperty.call(value, key)
             || (Array.isArray(value) && !/^(0|[1-9]\d*)$/.test(key))) throw new Error('JSON Pointer not found: ' + pointer);
           value = value[key];
         }
-        return { success: true, data: { value, result: typeof value === 'string' ? value : JSON.stringify(value) }, display: 'JSON Pointer: ' + (pointer || '/') };
+        return { success: true, data: { value, result: typeof value === 'string' ? value : json.stringify(value) }, display: 'JSON Pointer: ' + (pointer || '/') };
       } catch (error) { return { success: false, error: error.message }; }
     },
   },

@@ -47,3 +47,29 @@ test('restoring or focusing an unchanged draft does not invalidate another tab',
   revision = map.get('dtb_chat_sessions');
   await store.patch({ draft: 'typed' }, id); assert.equal(map.get('dtb_chat_sessions'), revision);
 });
+
+test('oversized latest image turns reject saving and switching without changing any stored data', async () => {
+  const {store,map} = setup(), id = store.ensure().activeId;
+  await store.save(snapshot('saved question'), id);
+  const before = Object.fromEntries(map), next = snapshot('saved question');
+  next.messages.push({role:'user',content:'Describe this image',_images:[{mime:'image/png',base64:'A'.repeat(1600000)}]});
+  await assert.rejects(async () => store.save(next,id), e => e.code === 'chat_turn_limit');
+  assert.deepEqual(Object.fromEntries(map), before);
+  await assert.rejects(async () => store.switchTo(null,next,id,true), e => e.code === 'chat_turn_limit');
+  assert.deepEqual(Object.fromEntries(map), before);
+});
+
+test('save and archive share one complete-turn limit and retain omission metadata', async () => {
+  const {store,map} = setup(), id = store.ensure().activeId;
+  const next = {messages:Array.from({length:521},(_,i)=>({role:i%2?'assistant':'user',content:'message '+i})),meta:{omitted:10}};
+  await store.save(next,id);
+  const saved = JSON.parse(map.get('dtb_chat_history'));
+  assert.equal(saved.length,499); assert.equal(saved[0].content,'message 22');
+  assert.equal(JSON.parse(map.get('dtb_chat_history_meta')).omitted,32);
+  await store.switchTo(null,next,id,true);
+  const archived = store.record(id);
+  assert.deepEqual(plain(archived.messages),saved);
+  assert.equal(archived.meta.omitted,32);
+});
+
+const plain = value => JSON.parse(JSON.stringify(value));

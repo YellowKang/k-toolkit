@@ -63,6 +63,7 @@ const express = require('express');
       return { digests, types };
     }, 'dtb-release:/k-toolkit/:' + version);
     await page.goto(base + 'dashboard.html#json');
+    assert.equal(requests.some(request => request.path === '/k-toolkit/sw.js'),false,'first automatic install waits until after page load');
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
     await page.evaluate(async () => {
       await AppUpdates.check();

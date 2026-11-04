@@ -90,7 +90,8 @@
       let field = source.value === 'result' ? ids[1] || ids[0] : ids[0];
       if (id === 'toml-json' && source.value === 'input' && body.querySelector('#tjPane1').style.display === 'none') field = 'tjJsonIn';
       const node = body.querySelector('#' + CSS.escape(field));
-      const text = read(source.value === 'result' && id === 'unicode-convert' ? node?.querySelector('pre') : node);
+      const text = source.value === 'result' && typeof body._toolOutput === 'function' ? body._toolOutput()
+        : read(source.value === 'result' && id === 'unicode-convert' ? node?.querySelector('pre') : node);
       if (!text) return showToast(T('empty'), 'info');
       handoff(select.value, text);
     });

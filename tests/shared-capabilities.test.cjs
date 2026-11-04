@@ -59,6 +59,18 @@ test('JSON diffs support root values, own prototype keys, arrays and unambiguous
   assert.throws(() => compute['json-diff'].compareText('['.repeat(66) + '0' + ']'.repeat(66), '[]'), /limits/);
   assert.equal((await run('json_diff', { a: '{broken', b: '{}' })).success, false);
 });
+
+test('Agent JSON formatting, extraction and diffs preserve large numbers exactly', async () => {
+  const { run, compute } = setup(), input = '{"id":9223372036854775807,"amount":1.234567890123456789}';
+  assert.equal((await run('json_format', {input, minify:true})).data.result, input);
+  assert.equal((await run('json_extract', {input,pointer:'/id'})).data.result, '9223372036854775807');
+  assert.equal(compute['json-diff'].compareText('9007199254740992','9007199254740993').length, 1);
+  assert.equal(compute['json-diff'].compareText('123e100','1.23e102').length, 0);
+  assert.equal(compute['json-diff'].compareText('9007199254740993','"9007199254740993"').length, 1);
+  const diff = await run('json_diff', {a:'9007199254740992',b:'9007199254740993'});
+  assert.match(diff.data.result, /9007199254740993/);
+  assert.deepEqual(plain(diff.data.diffs[0].to), {type:'json-number',value:'9007199254740993'});
+});
 function exifFixture(little) {
   const bytes = new Uint8Array(144), view = new DataView(bytes.buffer);
   view.setUint16(0, 0xFFD8); view.setUint16(2, 0xFFE1); view.setUint16(4, 138);

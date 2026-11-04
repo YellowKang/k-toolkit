@@ -41,6 +41,7 @@ const _chatTl = makeToolI18n({
 
 // ── State ──
 let _chatMessages = [];
+let _chatHistoryOmitted = 0, _chatUnsavedHistory = false;
 let _chatAdapterId = '';
 let _chatModel = '';
 let _chatTemp = 0.7;
@@ -57,12 +58,13 @@ const _CHAT_LS_KEY = 'dtb_chat_history';
 const _CHAT_SYS_KEY = 'dtb_chat_system';
 const _CHAT_CFG_KEY = 'dtb_chat_config';
 
-function _chatLoadHistory(source) {
+function _chatLoadHistory(source, meta) {
   try {
     const messages = source || JSON.parse(localStorage.getItem(_CHAT_LS_KEY));
     const saved=Array.isArray(messages)?messages:messages?.messages;
     if (!Array.isArray(saved)) return [];
-    let omitted=messages?.omitted;try{omitted=source ? 0 : omitted||JSON.parse(localStorage.getItem('dtb_chat_history_meta')||'{}')?.omitted;}catch{}
+    let omitted=messages?.omitted;try{omitted=source ? meta?.omitted || 0 : omitted||JSON.parse(localStorage.getItem('dtb_chat_history_meta')||'{}')?.omitted;}catch{}
+    _chatHistoryOmitted = Number.isSafeInteger(omitted) && omitted > 0 ? omitted : 0;
     if(omitted)queueMicrotask(()=>window.showToast?.(_chatSay('仅恢复上次保存的最近历史；旧内容请查看导出文件。','Only the recent saved history was restored; see your export for older content.')));
 
     return saved.filter(m => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string').map(m => ({ ...m,
@@ -72,21 +74,24 @@ function _chatLoadHistory(source) {
 }
 async function _chatSaveHistory() {
   try {
-    const save=[];let characters=0;
-    for(let i=_chatMessages.length-1;i>=0;i--){const m=_chatMessages[i],value={role:m.role,content:m.content,_images:m._images||null,ts:m.ts,status:m.status},size=JSON.stringify(value).length;if(save.length>=500||characters+size>1500000)break;save.unshift(value);characters+=size;}
-    while(save.length&&save[0].role!=='user')save.shift();
-    const omitted=_chatMessages.length-save.length;
+    let snapshot;
     if (window.ChatConversations) {
-      const index = await window.ChatConversations.save({ ..._chatSnapshot(), messages: save, meta: { omitted } }, _chatSessionId);
+      snapshot = window.ChatConversations.prepare(_chatSnapshot());
+      const index = await window.ChatConversations.save(snapshot, _chatSessionId);
       _chatSessionId = index.activeId; _chatSessionTitle();
     } else { throw new Error(_chatTl('no_adapter')); }
-    const status=document.getElementById('_chatStorageStatus');if(status)status.textContent=omitted?_chatSay(`刷新后仅恢复最近 ${save.length} 条；请导出以保留完整对话。`,`Only the latest ${save.length} messages will survive refresh; export to keep the full conversation.`):'';
+    _chatUnsavedHistory = false;
+    const status=document.getElementById('_chatStorageStatus');if(status)status.textContent=snapshot.meta.omitted?_chatSay(`刷新或切换会话后仅恢复最近 ${snapshot.messages.length} 条；请导出以保留完整文字记录。`,`Only the latest ${snapshot.messages.length} messages survive reload or switching chats; export to keep the full text history.`):'';
     return true;
   } catch (error) {
-    window.showToast?.(error.message || _chatSay('对话暂存失败，浏览器空间不足；请导出后再清理。', 'Chat could not be saved. Export it before freeing browser storage.'), 'error');
+    _chatUnsavedHistory = true;
+    const message = error.message || _chatSay('对话暂存失败，浏览器空间不足；请导出后再清理。', 'Chat could not be saved. Export it before freeing browser storage.');
+    const status = document.getElementById('_chatStorageStatus'); if (status) status.textContent = message;
+    window.showToast?.(message, 'error');
     return false;
   }
 }
+window.addEventListener('beforeunload', event => { if (_chatUnsavedHistory) { event.preventDefault(); event.returnValue = ''; } });
 function _chatLoadConfig() {
   try { return JSON.parse(localStorage.getItem(_CHAT_CFG_KEY)) || {}; } catch { return {}; }
 }
@@ -101,7 +106,7 @@ function _chatSaveConfig() {
 // ── Conversation library ──
 let _chatSessionId = null, _chatDraftTimer = null, _chatDialogClose = null;
 function _chatSafeImages(images) { return Array.isArray(images) ? images.filter(img => img && /^image\/(png|jpeg|webp|gif)$/.test(img.mime) && typeof img.base64 === 'string' && img.base64.length <= 2800000 && /^[A-Za-z0-9+/=]+$/.test(img.base64)).slice(0, 4) : []; }
-function _chatSnapshot() { return { messages: _chatMessages, systemPrompt: _chatSystemPrompt, draft: document.getElementById('_chatInput')?.value ?? _chatDraft, images: _chatImages, meta: {} }; }
+function _chatSnapshot() { return { messages: _chatMessages, systemPrompt: _chatSystemPrompt, draft: document.getElementById('_chatInput')?.value ?? _chatDraft, images: _chatImages, meta: { omitted: _chatHistoryOmitted } }; }
 function _chatSessionTitle() {
   try {
     const store = window.ChatConversations; if (!store) return;
@@ -119,7 +124,7 @@ async function _chatSaveDraft() {
   } catch (e) { window.showToast?.(e.message || _chatSay('草稿保存失败。', 'Could not save draft.'), 'error'); }
 }
 function _chatRestoreSession(value) {
-  _chatSessionId = value.index.activeId; _chatMessages = _chatLoadHistory(value.record.messages); _chatSystemPrompt = value.record.systemPrompt || '';
+  _chatSessionId = value.index.activeId; _chatMessages = _chatLoadHistory(value.record.messages, value.record.meta); _chatSystemPrompt = value.record.systemPrompt || ''; _chatUnsavedHistory = false;
   _chatDraft = typeof value.record.draft === 'string' ? value.record.draft : ''; _chatImages = _chatSafeImages(value.record.images); _chatImageEpoch++; _chatUndo = null; _chatHistoryLimit = 40;
   document.getElementById('_chatUndoBar')?.remove();
   const input = document.getElementById('_chatInput'); if (input) { input.value = _chatDraft; input.dispatchEvent(new Event('input')); }
@@ -637,8 +642,8 @@ function _chatUpdateImgPreview() {
 function _chatClear() {
   if (_chatPreparing && !_chatBusy) return;
   _chatStop();
-  _chatUndo = { messages: _chatMessages, images: _chatImages, draft: document.getElementById('_chatInput')?.value || _chatDraft };
-  _chatMessages = []; _chatImages = []; _chatDraft = ''; _chatImageEpoch++;
+  _chatUndo = { messages: _chatMessages, images: _chatImages, draft: document.getElementById('_chatInput')?.value || _chatDraft, omitted: _chatHistoryOmitted };
+  _chatMessages = []; _chatImages = []; _chatDraft = ''; _chatHistoryOmitted = 0; _chatImageEpoch++;
   const inner = _chatGetMsgContainer(); inner?.replaceChildren();
   const input = document.getElementById('_chatInput'); if (input) input.value = '';
   _chatUpdateImgPreview(); _chatSaveHistory();
@@ -647,7 +652,7 @@ function _chatClear() {
   const button = document.createElement('button'); button.className = '_chat-action-btn'; button.textContent = _chatSay('撤销清空', 'Undo clear');
   button.onclick = () => {
     if (!_chatUndo || _chatBusy) return;
-    _chatMessages = _chatUndo.messages; _chatImages = _chatUndo.images; _chatDraft = _chatUndo.draft; _chatUndo = null;
+    _chatMessages = _chatUndo.messages; _chatImages = _chatUndo.images; _chatDraft = _chatUndo.draft; _chatHistoryOmitted = _chatUndo.omitted; _chatUndo = null;
     if (input) { input.value = _chatDraft; input.dispatchEvent(new Event('input')); }
     _chatRenderHistory(inner);
     _chatUpdateImgPreview(); _chatSaveHistory(); _chatScrollBottom(true); bar.remove();

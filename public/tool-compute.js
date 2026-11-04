@@ -109,8 +109,9 @@
 
   // Shared DOM-free modules in compute/<name>.js register on window.KCompute; pages and Agent load the same code.
   const moduleLoads = new Map();
-  function load(name) {
+  async function load(name) {
     if (!/^[a-z][a-z0-9-]*$/.test(name)) return Promise.reject(new Error('Invalid compute module: ' + name));
+    if (name === 'json-diff') await load('json-text');
     if (window.KCompute?.[name]) return Promise.resolve(window.KCompute[name]);
     if (!moduleLoads.has(name)) moduleLoads.set(name, new Promise((resolve, reject) => {
       const script = document.createElement('script');

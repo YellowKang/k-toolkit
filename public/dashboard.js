@@ -251,6 +251,7 @@ async function loadTool(id, showProgress = true) {
   if (loadedTools[id]) return;
   const tool = TOOLS.find(t => t.id === id);
   if (!tool) throw new Error('Unknown tool: ' + id);
+  if (id === 'json') await ToolCompute.load('json-text');
   if (!_toolLoads.has(tool.file)) {
     if (showProgress) _progressStart();
     const pending = new Promise((resolve, reject) => {

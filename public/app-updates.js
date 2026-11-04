@@ -14,6 +14,24 @@
   const find = selector => dialog.querySelector(selector);
   let registration, latest = '', ready = false, status = current === 'dev' ? 'dev' : 'checking';
   let pending = null, lastCheck = 0, applying = false, reloadRequested = false, reloaded = false;
+  let scheduledTimer = null, scheduledIdle = null;
+  const cancelScheduled = () => {
+    clearTimeout(scheduledTimer); scheduledTimer = null;
+    if (scheduledIdle !== null) window.cancelIdleCallback?.(scheduledIdle);
+    scheduledIdle = null;
+  };
+  const canCheckAutomatically = () => !document.hidden && !navigator.connection?.saveData && !['slow-2g', '2g'].includes(navigator.connection?.effectiveType);
+  function scheduleAutomatic() {
+    if (current === 'dev' || document.readyState !== 'complete' || pending || scheduledTimer !== null || scheduledIdle !== null || !canCheckAutomatically()) return;
+    // Let initial rendering and lazy tool requests finish before installing the full offline release.
+    scheduledTimer = setTimeout(() => {
+      scheduledTimer = null;
+      if (!canCheckAutomatically()) return;
+      const run = () => { scheduledIdle = null; if (canCheckAutomatically()) check(); };
+      if (window.requestIdleCallback) scheduledIdle = window.requestIdleCallback(run, {timeout:5000});
+      else run();
+    }, 1000);
+  }
   const render = () => {
     find('#updateTitle').textContent = tl('title');
     find('[data-current-label]').textContent = tl('current'); find('[data-current]').textContent = current;
@@ -44,6 +62,7 @@
     worker.addEventListener('statechange', changed); changed();
   });
   async function check() {
+    cancelScheduled();
     if (pending) return pending;
     if (current === 'dev') { status = 'dev'; render(); return; }
     lastCheck = Date.now(); status = 'checking';
@@ -101,10 +120,16 @@
     if (reloadRequested) reload();
     else if (!pending) check();
   });
-  const background = () => { if (!document.hidden && Date.now() - lastCheck > 60000) check(); };
+  const background = () => {
+    if (!canCheckAutomatically()) { cancelScheduled(); return; }
+    if (Date.now() - lastCheck > 60000) scheduleAutomatic();
+  };
   document.addEventListener('visibilitychange', background);
-  window.addEventListener('online', () => check());
+  window.addEventListener('online', background);
+  navigator.connection?.addEventListener?.('change', background);
   setInterval(background, 5 * 60 * 1000);
   window.AppUpdates = { check };
-  render(); check();
+  render();
+  if (document.readyState === 'complete') scheduleAutomatic();
+  else window.addEventListener('load', scheduleAutomatic, {once:true});
 })();

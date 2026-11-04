@@ -39,10 +39,10 @@ const TextActions = [
       },
       required: ['input'],
     },
-    execute({ input, minify = false }) {
+    async execute({ input, minify = false }) {
       try {
-        const parsed = JSON.parse(input);
-        const result = minify ? JSON.stringify(parsed) : JSON.stringify(parsed, null, 2);
+        const json = await window.ToolCompute.load('json-text');
+        const result = json.stringify(json.parse(input), minify ? 0 : 2);
         return { success: true, data: { result, valid: true }, display: minify ? 'JSON 已压缩' : 'JSON 已格式化' };
       } catch (e) {
         return { success: false, data: { valid: false, error: e.message }, display: `JSON 无效: ${e.message}` };

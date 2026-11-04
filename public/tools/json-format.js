@@ -1,3 +1,9 @@
+// JSON tools share lossless numeric values; scripts are loaded before this page is mounted.
+const _jsonCodec = () => window.KCompute['json-text'];
+const _jsonParse = text => _jsonCodec().parse(text, { maxChars: 2000000 }); // Formatted results can exceed the input budget.
+const _jsonStringify = (value, _replacer, space = 0) => _jsonCodec().stringify(value, space);
+const _jsonIsNumber = value => _jsonCodec().isNumber(value);
+
 // ── i18n ──
 const _jsonTl = makeToolI18n({
   zh: {
@@ -216,7 +222,7 @@ function _jsonRender(text, label, success) {
   const tree = document.getElementById('jsonTreeOutput'); tree.style.display = 'none'; tree.replaceChildren(); tree._jsonValue = undefined;
   output.style.display = ''; document.getElementById('jsonTreeBtn').textContent = _jsonTl('tree_view');
   let isJSON = false;
-  if (success) { try { JSON.parse(text); isJSON = true; } catch {} }
+  if (success) { try { _jsonParse(text); isJSON = true; } catch {} }
   for (const id of ['jsonCopy','jsonUse','jsonDownload']) document.getElementById(id).disabled = !success;
   document.getElementById('jsonTreeBtn').disabled = !isJSON;
   const copyMode = document.getElementById('jsonCopyMode');
@@ -236,15 +242,15 @@ function _jsonTransform(fn, label, allowEmpty = false) {
     _jsonRender(message, _jsonTl('invalid_json'), false); return { success: false, error: message };
   }
 }
-function formatJSON() { return _jsonTransform(raw => JSON.stringify(JSON.parse(raw), null, 2), 'format_done'); }
-function compressJSON() { return _jsonTransform(raw => JSON.stringify(JSON.parse(raw)), 'compressed'); }
-function jsonSort() { return _jsonTransform(raw => JSON.stringify(_sortKeys(JSON.parse(raw)), null, 2), 'sorted'); }
+function formatJSON() { return _jsonTransform(raw => _jsonStringify(_jsonParse(raw), null, 2), 'format_done'); }
+function compressJSON() { return _jsonTransform(raw => _jsonStringify(_jsonParse(raw)), 'compressed'); }
+function jsonSort() { return _jsonTransform(raw => _jsonStringify(_sortKeys(_jsonParse(raw)), null, 2), 'sorted'); }
 function _sortKeys(obj) {
   if (Array.isArray(obj)) return obj.map(_sortKeys);
-  if (obj !== null && typeof obj === 'object') return Object.fromEntries(Object.keys(obj).sort().map(k => [k, _sortKeys(obj[k])]));
+  if (obj !== null && typeof obj === 'object' && !_jsonIsNumber(obj)) return Object.fromEntries(Object.keys(obj).sort().map(k => [k, _sortKeys(obj[k])]));
   return obj;
 }
-function jsonEscape() { return _jsonTransform(raw => JSON.stringify(raw), 'escaped', true); }
+function jsonEscape() { return _jsonTransform(raw => _jsonStringify(raw), 'escaped', true); }
 function jsonUnescape() { return _jsonStringAction('unescape'); }
 function jsonExpandNested() { return _jsonStringAction('expand'); }
 async function _jsonStringAction(action) {
@@ -258,7 +264,7 @@ async function _jsonStringAction(action) {
     if (action === 'unescape') _jsonRender(compute.unescapeJSON(raw), _jsonTl('unescaped'), true);
     else {
       const result = compute.expandNested(raw);
-      _jsonRender(JSON.stringify(result.value, null, 2), result.count ? _jsonTl('expanded', result.count) : _jsonTl('unchanged'), true);
+      _jsonRender(_jsonStringify(result.value, null, 2), result.count ? _jsonTl('expanded', result.count) : _jsonTl('unchanged'), true);
     }
     document.getElementById('jsonLiveStatus').textContent = '';
     return { success: true };
@@ -283,7 +289,7 @@ function jsonUndoInput() {
 }
 function clearJSON() { _jsonReplaceInput(''); }
 function jsonNestedSample() {
-  _jsonReplaceInput(JSON.stringify({ requestId:'00123', payload:JSON.stringify({ name:'BIGKANG', tags:['JSON','工具'], detail:JSON.stringify({ ok:true, count:2 }) }), path:'C:\\data\\file.json' }, null, 2));
+  _jsonReplaceInput(_jsonStringify({ requestId:'00123', payload:_jsonStringify({ name:'BIGKANG', tags:['JSON','工具'], detail:_jsonStringify({ ok:true, count:2 }) }), path:'C:\\data\\file.json' }, null, 2));
 }
 function jsonFormatCopy(btn) { const result = formatJSON(); if (result.success) return copyText(result.result, btn); }
 function copyJSON(btn) {
@@ -291,25 +297,25 @@ function copyJSON(btn) {
   let text = document.getElementById('jsonOutput').textContent;
   try {
     const mode = document.getElementById('jsonCopyMode').value;
-    if (mode === 'minified') text = JSON.stringify(JSON.parse(text));
-    if (mode === 'escaped') text = JSON.stringify(text);
+    if (mode === 'minified') text = _jsonStringify(_jsonParse(text));
+    if (mode === 'escaped') text = _jsonStringify(text);
     return copyText(text, btn);
   } catch { showToast(_jsonTl('invalid_json'), 'error'); }
 }
 function jsonDownload() {
   if (!document.getElementById('jsonResultPanel')._jsonSuccess) return;
   const text = document.getElementById('jsonOutput').textContent;
-  let json = true; try { JSON.parse(text); } catch { json = false; }
+  let json = true; try { _jsonParse(text); } catch { json = false; }
   const url = URL.createObjectURL(new Blob([text], { type: json ? 'application/json' : 'text/plain' }));
   const a = document.createElement('a'); a.href = url; a.download = json ? 'output.json' : 'output.txt'; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000); showToast(_jsonTl('downloaded'));
 }
 
-function _jPathKey(key) { return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? '.' + key : '[' + JSON.stringify(key) + ']'; }
+function _jPathKey(key) { return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? '.' + key : '[' + _jsonStringify(key) + ']'; }
 function jsonToggleView() {
   const output = document.getElementById('jsonOutput'), tree = document.getElementById('jsonTreeOutput'), btn = document.getElementById('jsonTreeBtn');
   if (tree.style.display !== 'none') { tree.style.display = 'none'; output.style.display = ''; btn.textContent = _jsonTl('tree_view'); return; }
-  try { _jsonBuildTree(JSON.parse(output.textContent), tree); }
+  try { _jsonBuildTree(_jsonParse(output.textContent), tree); }
   catch { return; }
   output.style.display = 'none'; tree.style.display = ''; btn.textContent = _jsonTl('text_view');
 }
@@ -325,15 +331,15 @@ function _jsonBuildTree(value, tree) {
     const select = document.createElement('button'); select.type = 'button'; select.className = 'jt-select'; select.dataset.jpath = path;
     let text;
     if (val === null) { select.classList.add('jt-null'); text = 'null'; }
-    else if (typeof val !== 'object') {
-      select.classList.add('jt-' + typeof val); text = JSON.stringify(val);
+    else if (typeof val !== 'object' || _jsonIsNumber(val)) {
+      select.classList.add('jt-' + (_jsonIsNumber(val) ? 'number' : typeof val)); text = _jsonStringify(val);
       if (text.length > 260) text = text.slice(0, 260) + '…';
     } else text = _jsonTl(Array.isArray(val) ? 'array_label' : 'object_label', Object.keys(val).length);
-    select.textContent = (parent && !Array.isArray(parent) ? JSON.stringify(key) + ': ' : '') + text;
+    select.textContent = (parent && !Array.isArray(parent) ? _jsonStringify(key) + ': ' : '') + text;
     select.onclick = () => _jShowPath(node, select);
     select.ondblclick = () => { _jShowPath(node, select); _jTreeEdit(node); };
     wrap.appendChild(select);
-    if (val !== null && typeof val === 'object') {
+    if (val !== null && typeof val === 'object' && !_jsonIsNumber(val)) {
       if (depth >= 20) { limited = true; return wrap; }
       const children = document.createElement('div');
       const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'jt-collapse';
@@ -359,9 +365,9 @@ function _jShowPath(node, selected) {
   const code = document.createElement('code'); code.textContent = node.path; bar.appendChild(code);
   const actions = document.createElement('div'); actions.className = 'jw-actions'; bar.appendChild(actions);
   const button = (label, action) => { const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn btn-secondary'; btn.textContent = _jsonTl(label); btn.onclick = () => action(btn); actions.appendChild(btn); };
-  const raw = () => typeof node.value === 'string' ? node.value : JSON.stringify(node.value, null, 2);
+  const raw = () => typeof node.value === 'string' ? node.value : _jsonStringify(node.value, null, 2);
   button('copy_value', btn => copyText(raw(), btn));
-  button('copy_json', btn => copyText(JSON.stringify(node.value, null, 2), btn));
+  button('copy_json', btn => copyText(_jsonStringify(node.value, null, 2), btn));
   button('copy_path', btn => copyText(node.path, btn));
   button('use_value', () => _jsonReplaceInput(raw()));
   button('edit', () => _jTreeEdit(node));
@@ -370,7 +376,7 @@ function _jTreeEdit(node) {
   const bar = node.tree.querySelector('#jsonPathBar');
   if (!bar || bar.querySelector('textarea')) return;
   const input = document.createElement('textarea'); input.className = 'tool-textarea jt-edit-input'; input.setAttribute('aria-label', _jsonTl('edit'));
-  input.value = typeof node.value === 'string' ? node.value : JSON.stringify(node.value, null, 2);
+  input.value = typeof node.value === 'string' ? node.value : _jsonStringify(node.value, null, 2);
   const actions = document.createElement('div'); actions.className = 'jw-actions';
   const cancel = () => { input.remove(); actions.remove(); };
   for (const key of ['save','cancel']) {
@@ -378,11 +384,11 @@ function _jTreeEdit(node) {
     btn.onclick = () => {
       if (key === 'cancel') return cancel();
       let value;
-      try { value = typeof node.value === 'string' ? input.value : JSON.parse(input.value); }
+      try { value = typeof node.value === 'string' ? input.value : _jsonParse(input.value); }
       catch { showToast(_jsonTl('edit_save_fail'), 'error'); return; }
       if (node.parent) Object.defineProperty(node.parent, node.key, {value, enumerable:true, configurable:true, writable:true});
       else node.tree._jsonValue = value;
-      _jsonRender(JSON.stringify(node.tree._jsonValue, null, 2), _jsonTl('edited'), true); jsonToggleView();
+      _jsonRender(_jsonStringify(node.tree._jsonValue, null, 2), _jsonTl('edited'), true); jsonToggleView();
     };
     actions.appendChild(btn);
   }
@@ -398,18 +404,18 @@ function jsonPathQuery() {
   const current = document.getElementById('jsonResultPanel');
   if (current?._jsonSuccess && current.style.display !== 'none') {
     const result = document.getElementById('jsonOutput').textContent;
-    try { JSON.parse(result); raw = result; } catch {}
+    try { _jsonParse(result); raw = result; } catch {}
   }
   if (!raw) { resultEl.innerHTML = ''; return; }
   let obj;
-  try { obj = JSON.parse(raw); } catch(e) { resultEl.innerHTML = `<span style="color:#ef4444;font-size:12px">${_jsonTl('json_invalid_msg')}${escHtml(e.message)}</span>`; return; }
+  try { obj = _jsonParse(raw); } catch(e) { resultEl.innerHTML = `<span style="color:#ef4444;font-size:12px">${_jsonTl('json_invalid_msg')}${escHtml(e.message)}</span>`; return; }
   if (!path.trim()) { resultEl.innerHTML = ''; return; }
   try {
     const result = _jsonPath(obj, path.trim());
     if (result === undefined) {
       resultEl.innerHTML = `<span style="color:var(--text-muted);font-size:12px">${_jsonTl('no_match')}</span>`;
     } else {
-      const text = JSON.stringify(result, null, 2);
+      const text = _jsonStringify(result, null, 2);
       resultEl.innerHTML = `<pre class="result-box" style="max-height:200px;overflow-y:auto">${escHtml(text)}</pre>`;
       const copy = document.createElement('button'); copy.className = 'btn btn-secondary'; copy.textContent = _jsonTl('copy_result');
       copy.onclick = () => copyText(text, copy); resultEl.appendChild(copy);
@@ -432,13 +438,13 @@ function _jsonReadPathKey(path) {
     if (char === '\\') {
       const escaped = path[i++];
       if (escaped === quote) key += quote;
-      else if (escaped === 'u') { key += JSON.parse('"\\u' + path.slice(i, i + 4) + '"'); i += 4; }
-      else key += JSON.parse('"\\' + escaped + '"');
+      else if (escaped === 'u') { key += _jsonParse('"\\u' + path.slice(i, i + 4) + '"'); i += 4; }
+      else key += _jsonParse('"\\' + escaped + '"');
     } else { if (char.charCodeAt(0) < 32) throw new Error('Invalid property path'); key += char; }
   }
   throw new Error('Unclosed property path');
 }
-function _jsonOwn(obj, key) { return obj !== null && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, key) ? obj[key] : undefined; }
+function _jsonOwn(obj, key) { return obj !== null && typeof obj === 'object' && !_jsonIsNumber(obj) && Object.prototype.hasOwnProperty.call(obj, key) ? obj[key] : undefined; }
 function _jsonPath(obj, path) {
   if (path === '$') return obj;
   let p = path.replace(/^\$/, '');
@@ -449,7 +455,7 @@ function _jsonPath(obj, path) {
     const rest = p.slice(2 + key.length);
     const results = [];
     function descend(node) {
-      if (node === null || typeof node !== 'object') return;
+      if (node === null || typeof node !== 'object' || _jsonIsNumber(node)) return;
       if (Object.prototype.hasOwnProperty.call(node, key)) {
         const val = rest ? _jsonPath(node[key], '$' + rest) : node[key];
         if (val !== undefined) results.push(val);
@@ -471,7 +477,7 @@ function _jsonPath(obj, path) {
       const next = [];
       for (const c of cur) {
         if (Array.isArray(c)) next.push(...c);
-        else if (c !== null && typeof c === 'object') next.push(...Object.values(c));
+        else if (c !== null && typeof c === 'object' && !_jsonIsNumber(c)) next.push(...Object.values(c));
       }
       cur = next;
       rem = wildcard[1];
@@ -489,7 +495,7 @@ function _jsonPath(obj, path) {
       else if (fVal === 'false') fVal = false;
       else if (fVal === 'null') fVal = null;
       else if (/^['"]/.test(fVal)) fVal = fVal.slice(1, -1);
-      else if (!isNaN(Number(fVal))) fVal = Number(fVal);
+      else if (/^-?\d/.test(fVal)) fVal = _jsonParse(fVal);
 
       const next = [];
       for (const c of cur) {
@@ -498,7 +504,12 @@ function _jsonPath(obj, path) {
           if (item === null || typeof item !== 'object') continue;
           const v = _jsonOwn(item, fKey);
           let pass = false;
-          switch (fOp) {
+          if ((typeof v === 'number' || _jsonIsNumber(v)) && (typeof fVal === 'number' || _jsonIsNumber(fVal))) {
+            const cmp = _jsonCodec().compareNumbers(v, fVal);
+            pass = ({'==':cmp===0,'!=':cmp!==0,'>':cmp>0,'>=':cmp>=0,'<':cmp<0,'<=':cmp<=0})[fOp];
+          } else if (_jsonIsNumber(v) || _jsonIsNumber(fVal)) {
+            pass = fOp === '!=';
+          } else switch (fOp) {
             case '==': pass = v == fVal; break;
             case '!=': pass = v != fVal; break;
             case '>':  pass = v > fVal; break;
@@ -551,7 +562,7 @@ function jsonToTsInterface() {
   const v = document.getElementById('jsonInput').value.trim();
   if (!v) return;
   let obj;
-  try { obj = JSON.parse(v); } catch(e) {
+  try { obj = _jsonParse(v); } catch(e) {
     _jsonRender(_jsonTl('error_prefix') + e.message, _jsonTl('invalid_json'), false);
     return;
   }
@@ -562,7 +573,7 @@ function jsonToTsInterface() {
 }
 
 function _jsonToTs(val, name, interfaces) {
-  if (val === null || typeof val !== 'object') {
+  if (val === null || typeof val !== 'object' || _jsonIsNumber(val)) {
     // Primitive at root level — just show the type
     interfaces.push(`type ${name} = ${_jsonTsType(val, name, interfaces)};`);
     return;
@@ -587,7 +598,7 @@ function _jsonToTs(val, name, interfaces) {
 function _jsonTsType(val, hintName, interfaces) {
   if (val === null) return 'null';
   if (typeof val === 'string') return 'string';
-  if (typeof val === 'number') return 'number';
+  if (typeof val === 'number' || _jsonIsNumber(val)) return 'number';
   if (typeof val === 'boolean') return 'boolean';
   if (Array.isArray(val)) {
     if (val.length === 0) return 'unknown[]';
@@ -610,7 +621,7 @@ function _tsPascal(str) {
 }
 
 function jsonLoadSample() {
-  _jsonReplaceInput(JSON.stringify({
+  _jsonReplaceInput(_jsonStringify({
     name: 'K Toolkit', version: '2.0', tags: ['JSON', 'Markdown', 'SQL'],
     meta: { author: 'BIGKANG', local: true }
   }, null, 2));
